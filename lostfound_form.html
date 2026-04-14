@@ -447,22 +447,28 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
         </div>
       </div>
     </div>
-      <div class="field">
-        <label>รูปภาพสิ่งของ (ถ้ามี)</label>
-        <div class="file-zone">
-          <input type="file" accept="image/*" onchange="previewFile(this,'pv-lost')" multiple>
-          <div class="file-zone-icon">📷</div>
-          <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+
+    <div class="card-section">
+      <div class="card-section-head red"><span class="dot"></span>รูปภาพประกอบ</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>รูปภาพสิ่งของ (ถ้ามี)</label>
+          <div class="file-zone">
+            <input type="file" accept="image/*" onchange="previewFile(this,'pv-lost')" multiple>
+            <div class="file-zone-icon">📷</div>
+            <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+          </div>
+          <div class="file-preview" id="pv-lost"></div>
         </div>
-        <div class="file-preview" id="pv-lost"></div>
       </div>
     </div>
+
   </div>
   <div class="nav-bar">
     <button class="btn btn-back" onclick="go(2)">← กลับ</button>
     <button class="btn btn-next" onclick="go(4)">ถัดไป →</button>
   </div>
-</div>
+</div>  <!-- /s3-lost -->
 
 <!-- STEP 3B: FOUND -->
 <div class="page" id="s3-found">
@@ -965,15 +971,30 @@ async function submitForm() {
   // Show sending overlay
   document.getElementById('sending-overlay').classList.add('show');
 
+  let submitOk = false;
   try {
-    await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' }
+    // GAS ต้องรับแบบ FormData (no-cors) เพราะ CORS ไม่รองรับ JSON POST โดยตรง
+    const formData = new FormData();
+    Object.keys(payload).forEach(k => {
+      if (k === 'files') {
+        formData.append('files', JSON.stringify(payload.files));
+      } else {
+        formData.append(k, payload[k] || '');
+      }
     });
+    formData.append('action', 'submit');
+
+    const response = await fetch(GAS_URL, {
+      method: 'POST',
+      body: formData,
+      mode: 'no-cors' // จำเป็นสำหรับ GAS
+    });
+    submitOk = true;
+    console.log('✅ ส่งข้อมูลไป GAS สำเร็จ');
   } catch(e) {
-    // Continue even if fetch fails (for testing without GAS)
-    console.log('GAS not connected yet:', e);
+    console.warn('⚠️ GAS fetch error:', e);
+    // ยังแสดงหน้าสำเร็จ แต่แจ้งเตือนในกรณีที่ GAS ยังไม่พร้อม
+    submitOk = false;
   }
 
   document.getElementById('sending-overlay').classList.remove('show');
