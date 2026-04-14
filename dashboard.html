@@ -17,6 +17,38 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); }
 
+
+/* ─── OVERDUE WARNING ─── */
+.overdue-warn { font-size:11.5px; color:#c0392b; font-weight:700; display:block; margin-top:3px; white-space:nowrap; }
+tr.row-overdue td { background: #fff5f5 !important; }
+tr.row-overdue td:first-child { border-left: 3px solid #c0392b; }
+
+/* ─── REFRESH BAR ─── */
+.refresh-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, #1a3a5c, #2d5f8f);
+  border-radius: 12px; padding: 12px 20px; margin-bottom: 20px;
+  box-shadow: 0 4px 16px rgba(26,58,92,0.2);
+}
+.refresh-info { color: rgba(255,255,255,0.85); font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.refresh-info .dot-live { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; animation: pulse 2s infinite; flex-shrink: 0; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.5;transform:scale(1.3);} }
+.refresh-countdown { font-size: 12px; color: rgba(255,255,255,0.6); }
+.btn-refresh-main {
+  background: #e8a020; color: white; border: none;
+  padding: 9px 20px; border-radius: 9px;
+  font-family: 'Sarabun',sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: all 0.2s; box-shadow: 0 3px 10px rgba(232,160,32,0.4);
+}
+.btn-refresh-main:hover { transform: translateY(-2px); box-shadow: 0 5px 16px rgba(232,160,32,0.5); }
+.btn-refresh-main.spinning svg { animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slideUp { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
+
+/* ─── TABLE NOTE COL ─── */
+.note-cell { font-size:12px; color:var(--muted); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 /* LOGIN */
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-mid) 100%); padding: 20px; }
 .login-box { background: white; border-radius: 20px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
@@ -113,6 +145,7 @@ tbody td { padding: 10px 14px; }
 .dash-loading { text-align: center; padding: 40px; color: var(--muted); }
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary-mid); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slideUp { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
 
 @media (max-width: 768px) {
   .charts-grid { grid-template-columns: 1fr; }
@@ -215,10 +248,28 @@ tbody td { padding: 10px 14px; }
       </div>
     </div>
 
+    <!-- REFRESH BAR -->
+    <div class="refresh-bar">
+      <div class="refresh-info">
+        <div class="dot-live"></div>
+        <div>
+          <div style="font-weight:700;font-size:14px;">🔴 Live — อัปเดตอัตโนมัติทุก 5 นาที</div>
+          <div class="refresh-countdown" id="countdown-text">รีเฟรชครั้งถัดไปใน 5:00</div>
+        </div>
+      </div>
+      <button class="btn-refresh-main" id="btn-refresh-main" onclick="manualRefresh()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        รีเฟรชข้อมูล
+      </button>
+    </div>
+
     <!-- TABLE -->
     <div class="table-card">
       <div class="table-head">
-        <h3>📋 รายการทั้งหมด</h3>
+        <h3>📋 รายการทั้งหมด <span id="overdue-badge" style="display:none;background:#c0392b;color:white;font-size:11px;padding:2px 8px;border-radius:20px;margin-left:8px;font-weight:600;"></span></h3>
         <input type="text" class="table-search" id="table-search" placeholder="ค้นหา..." oninput="renderTable()">
       </div>
       <div class="table-wrap">
@@ -227,11 +278,11 @@ tbody td { padding: 10px 14px; }
             <tr>
               <th>RefCode</th><th>ประเภท</th><th>รายละเอียด</th>
               <th>ผู้แจ้ง</th><th>คณะ/หน่วยงาน</th>
-              <th>วันที่</th><th>สถานะ</th><th>แก้ไข</th>
+              <th>วันที่</th><th>สถานะ</th><th>หมายเหตุ</th><th>แก้ไข</th>
             </tr>
           </thead>
           <tbody id="table-body">
-            <tr><td colspan="8" class="dash-loading"><div class="spinner"></div></td></tr>
+            <tr><td colspan="9" class="dash-loading"><div class="spinner"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -262,7 +313,7 @@ tbody td { padding: 10px 14px; }
 <script>
 /* =====================================================
  * Lost & Found Web App — dashboard.html
- * Version : 1.2.0
+ * Version : 1.2.1
  * Author  : Traffic Control and Premises Security Unit,
  *           Mahidol University
  * © 2025–2026 Traffic Control and Premises Security Unit,
@@ -309,8 +360,45 @@ window.onload = () => {
     document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     loadDashboard();
+    startAutoRefresh();
   }
 };
+
+// ── Auto-refresh every 5 minutes + countdown ──
+let refreshInterval = null;
+let countdownInterval = null;
+const REFRESH_SEC = 300; // 5 นาที
+let secondsLeft = REFRESH_SEC;
+
+function startAutoRefresh() {
+  clearInterval(refreshInterval);
+  clearInterval(countdownInterval);
+  secondsLeft = REFRESH_SEC;
+
+  refreshInterval = setInterval(() => {
+    loadDashboard();
+    secondsLeft = REFRESH_SEC;
+  }, REFRESH_SEC * 1000);
+
+  countdownInterval = setInterval(() => {
+    secondsLeft--;
+    const m = Math.floor(secondsLeft / 60);
+    const s = String(secondsLeft % 60).padStart(2, '0');
+    const el = document.getElementById('countdown-text');
+    if (el) el.textContent = `รีเฟรชครั้งถัดไปใน ${m}:${s}`;
+  }, 1000);
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('btn-refresh-main');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  await loadDashboard();
+  secondsLeft = REFRESH_SEC;
+  btn.classList.remove('spinning');
+  btn.disabled = false;
+  showSaveToast('🔄 โหลดข้อมูลใหม่แล้ว');
+}
 
 // ============================================
 // LOAD DATA
@@ -573,10 +661,13 @@ function drawItemChart() {
 function renderTable() {
   const q = document.getElementById('table-search').value.toLowerCase();
   let data = filteredData.filter(d => !q || `${d.title} ${d.name} ${d.dept} ${d.refCode}`.toLowerCase().includes(q));
-  data = data.slice(0, 100); // max 100 rows
+  data = data.slice(0, 100);
 
   const tbody = document.getElementById('table-body');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">ไม่พบข้อมูล</td></tr>'; return; }
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--muted)">ไม่พบข้อมูล</td></tr>'; return; }
+
+  const now = new Date();
+  let overdueCount = 0;
 
   tbody.innerHTML = data.map(d => {
     const typeTag = d.type==='สิ่งของสูญหาย' ? 'tag-lost' : d.type==='พบสิ่งของ' ? 'tag-found' : 'tag-pickup';
@@ -585,64 +676,114 @@ function renderTable() {
     if (s.includes('รับของคืนแล้ว')) { statusTag='tag-done'; statusText='รับของคืนแล้ว'; }
     else if (s.includes('ช่วยหาแล้วยังไม่พบ')) { statusTag='tag-notfound'; statusText='ช่วยหาแล้วยังไม่พบ'; }
     else if (s.includes('เจ้าของยังไม่มารับคืน')) { statusTag='tag-unclaimed'; statusText='เจ้าของยังไม่มารับคืน'; }
+
+    // ตรวจสอบ overdue: รอดำเนินการ > 3 วัน
+    let overdueHtml = '';
+    let rowClass = '';
+    const isPending = s === '' || s === 'รอดำเนินการ';
+    if (isPending && d.dateObj) {
+      const daysDiff = Math.floor((now - d.dateObj) / 86400000);
+      if (daysDiff > 3) {
+        overdueHtml = `<span class="overdue-warn">⚠️ รอดำเนินการเกิน ${daysDiff} วัน</span>`;
+        rowClass = 'row-overdue';
+        overdueCount++;
+      }
+    }
+
     let dateStr = d.date || '-';
     try { if (d.dateObj) dateStr = d.dateObj.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}); } catch(e){}
+
     const canEdit = d.source === 'new' && d.refCode;
-    return `<tr>
+    const noteText = (d.actionText||'').trim();
+
+    return `<tr class="${rowClass}">
       <td style="font-size:12px;color:var(--muted)">${d.refCode||'-'}</td>
       <td><span class="tag ${typeTag}">${d.type}</span></td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.title}">${d.title||'-'}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.title}">${d.title||'-'}</td>
       <td>${d.name||'-'}</td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.dept||'-'}</td>
-      <td style="white-space:nowrap">${dateStr}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.dept||'-'}</td>
+      <td style="white-space:nowrap">${dateStr}${overdueHtml}</td>
       <td><span class="tag ${statusTag}">${statusText}</span></td>
-      <td>${canEdit ? `<button class="btn-status" onclick="openStatusModal('${d.refCode}','${s}')">แก้ไข</button>` : '<span style="font-size:12px;color:var(--muted)">-</span>'}</td>
+      <td class="note-cell" title="${noteText}">${noteText || '<span style="color:#ccc">-</span>'}</td>
+      <td>${canEdit ? `<button class="btn-status" onclick="openStatusModal('${d.refCode}','${s}','${noteText.replace(/'/g,"\'")}')">✏️ แก้ไข</button>` : '<span style="font-size:12px;color:var(--muted)">-</span>'}</td>
     </tr>`;
   }).join('');
+
+  // อัปเดต overdue badge
+  const badge = document.getElementById('overdue-badge');
+  if (overdueCount > 0) {
+    badge.textContent = `⚠️ ${overdueCount} รายการเกิน 3 วัน`;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // ============================================
 // STATUS UPDATE
 // ============================================
-function openStatusModal(refCode, currentStatus) {
+function openStatusModal(refCode, currentStatus, currentNote) {
   editingRef = refCode;
   document.getElementById('modal-ref').textContent = refCode;
   document.getElementById('modal-status-select').value = currentStatus || 'รอดำเนินการ';
-  document.getElementById('modal-action-text').value = '';
+  document.getElementById('modal-action-text').value = currentNote || '';
   document.getElementById('status-modal').classList.add('show');
 }
 function closeStatusModal() { document.getElementById('status-modal').classList.remove('show'); }
 
 async function saveStatus() {
   const status = document.getElementById('modal-status-select').value;
-  const action = document.getElementById('modal-action-text').value;
-  if (!editingRef) {
-    alert('ไม่พบ RefCode');
-    return;
-  }
+  const actionText = document.getElementById('modal-action-text').value;
+  if (!editingRef) { alert('ไม่พบ RefCode'); return; }
+
+  const btn = document.querySelector('.btn-save');
+  btn.textContent = '⏳ กำลังบันทึก...';
+  btn.disabled = true;
+
   try {
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action:'updateStatus', refCode:editingRef, status, actionText:action, updatedBy:'admin01' }),
-      headers: { 'Content-Type':'application/json' }
-    });
-    const data = await res.json();
-    if (data.success) {
-      closeStatusModal();
-      await loadDashboard();
-      alert('✅ อัปเดตสถานะสำเร็จ');
-    } else {
-      alert('❌ เกิดข้อผิดพลาด: ' + data.error);
+    // ใช้ URLSearchParams + no-cors เหมือน form submit
+    const params = new URLSearchParams();
+    params.append('action', 'updateStatus');
+    params.append('refCode', editingRef);
+    params.append('status', status);
+    params.append('actionText', actionText);
+    params.append('updatedBy', 'admin01');
+
+    await fetch(GAS_URL, { method:'POST', body:params, mode:'no-cors' });
+
+    closeStatusModal();
+    // อัปเดต local data ทันที ไม่ต้องรอโหลดใหม่
+    const item = allData.find(d => d.refCode === editingRef);
+    if (item) {
+      item.status = status;
+      item.actionText = actionText;
     }
+    applyDashFilter();
+    // โหลดใหม่หลัง 2 วิ (รอ GAS เขียนเสร็จ)
+    setTimeout(loadDashboard, 2000);
+
+    // แจ้งเตือน toast แทน alert
+    showSaveToast('✅ อัปเดตสถานะ "' + status + '" สำเร็จ');
   } catch(e) {
     alert('❌ เชื่อมต่อไม่ได้: ' + e);
+  } finally {
+    btn.textContent = '💾 บันทึก';
+    btn.disabled = false;
   }
+}
+
+function showSaveToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1e7e44;color:white;padding:12px 20px;border-radius:10px;font-family:Sarabun,sans-serif;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:9999;animation:slideUp 0.3s ease';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
 }
 </script>
 
 <!-- FOOTER -->
 <footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
-  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Dashboard — San v1.2.0</span></div>
+  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Dashboard — San v1.2.1</span></div>
   <div style="font-size:11.5px;margin-top:3px;">
     © 2025–2026 Traffic Control and Premises Security Unit, Division of Physical and Environmental, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
