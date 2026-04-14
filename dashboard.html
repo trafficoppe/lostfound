@@ -272,7 +272,7 @@ tbody td { padding: 10px 14px; }
 // CONFIG
 // ============================================
 const CREDENTIALS = { user: 'admin01', pass: '024414400' };
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec'; // ← ใส่ URL หลัง Deploy GAS
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec'; // ← ใส่ URL หลัง Deploy GAS
 const OLD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14MJgb81aVEjT2qVp6n9zNKCCpJNVimX1q0hiYkH0f5I/gviz/tq?tqx=out:json&gid=751456190';
 
 const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -318,7 +318,7 @@ window.onload = () => {
 async function loadDashboard() {
   const results = await Promise.allSettled([
     fetch(OLD_SHEET_URL).then(r => r.text()),
-    GAS_URL !== 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec'
+    GAS_URL !== 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec'
       ? fetch(GAS_URL + '?action=getData').then(r => r.json())
       : Promise.resolve(null)
   ]);
@@ -618,7 +618,7 @@ function closeStatusModal() { document.getElementById('status-modal').classList.
 async function saveStatus() {
   const status = document.getElementById('modal-status-select').value;
   const action = document.getElementById('modal-action-text').value;
-  if (!editingRef || GAS_URL === 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec') {
+  if (!editingRef || GAS_URL === 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec') {
     alert('ยังไม่ได้ตั้งค่า GAS_URL');
     return;
   }
