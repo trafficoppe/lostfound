@@ -29,6 +29,91 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
+
+/* ─── FIELD ZONES ─── */
+.zone { margin-bottom: 0; }
+.zone-sep {
+  height: 1px; background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+  margin: 14px 0;
+}
+.zone-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--muted); margin-bottom: 10px; margin-top: 16px;
+  display: flex; align-items: center; gap: 6px;
+}
+.zone-label::before { content:''; flex:1; max-width:20px; height:2px; background:var(--border); border-radius:2px; }
+.zone-label::after  { content:''; flex:1; height:2px; background:var(--border); border-radius:2px; }
+
+/* ─── PREFIX SELECT ─── */
+.prefix-name-row { display: flex; gap: 10px; }
+.prefix-select {
+  width: 130px; flex-shrink: 0;
+  padding: 11px 10px; border: 1.5px solid var(--border);
+  border-radius: 9px; font-family: 'Sarabun', sans-serif; font-size: 14.5px;
+  color: var(--text); background: #fafbfd; outline: none;
+  transition: border-color 0.2s;
+}
+.prefix-select:focus { border-color: var(--primary-mid); background: white; }
+.prefix-name-row input { flex: 1; }
+
+/* ─── CARD SECTION DIVIDER ─── */
+.card-section {
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  margin-bottom: 0;
+}
+.card-section:last-child { border-bottom: none; }
+.card-section-head {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--muted);
+  padding: 12px 0 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-section-head .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--primary); flex-shrink: 0;
+}
+.card-section-head.red .dot { background: var(--lost); }
+.card-section-head.green .dot { background: var(--found); }
+.card-section-body { padding: 4px 0 16px; }
+
+
+/* ─── TOAST / ALERT POPUP ─── */
+.toast-wrap {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: flex-start; justify-content: center;
+  z-index: 9999; pointer-events: none;
+  padding-top: 80px;
+}
+.toast-wrap.show { pointer-events: auto; }
+.toast-box {
+  background: white; border-radius: 14px; padding: 20px 24px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  max-width: 380px; width: 90%;
+  transform: translateY(-20px); opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  border-left: 5px solid var(--lost);
+}
+.toast-wrap.show .toast-box { transform: translateY(0); opacity: 1; }
+.toast-title {
+  font-size: 15px; font-weight: 700; color: var(--lost);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.toast-list { list-style: none; padding: 0; margin: 0 0 16px; }
+.toast-list li {
+  font-size: 14px; color: var(--text); padding: 6px 0;
+  border-bottom: 1px solid var(--border); display: flex; gap: 8px;
+  align-items: flex-start;
+}
+.toast-list li:last-child { border-bottom: none; }
+.toast-list li::before { content: '•'; color: var(--lost); font-weight: 900; flex-shrink: 0; }
+.toast-close {
+  width: 100%; padding: 10px; background: var(--primary); color: white;
+  border: none; border-radius: 9px; font-family: 'Sarabun',sans-serif;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.toast-close:hover { background: var(--primary-mid); }
+
 /* HEADER */
 .header {
   background: linear-gradient(135deg, #1a3a5c 0%, #2d5f8f 100%);
@@ -54,8 +139,8 @@ body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--t
 
 /* MAIN */
 .main { max-width: 660px; margin: 0 auto; padding: 24px 16px 60px; }
-.page { display: none; animation: fadeUp 0.3s ease; }
-.page.active { display: block; }
+.page { display: none; animation: fadeUp 0.3s ease; overflow: hidden; }
+.page.active { display: block; overflow: visible; }
 @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
 
 /* PAGE HEADER */
@@ -148,6 +233,9 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 
 /* NAV BUTTONS */
 .nav-bar { display: flex; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+/* ซ่อน nav-bar ใน page ที่ไม่ active */
+.page:not(.active) .nav-bar { display: none !important; }
+.page:not(.active) { display: none !important; height: 0 !important; overflow: hidden !important; }
 .btn { padding: 13px 24px; border-radius: 10px; font-family: 'Sarabun', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; flex: 1; }
 .btn-back { background: white; border: 1.5px solid var(--border); color: var(--muted); }
 .btn-back:hover { background: var(--bg); }
@@ -258,34 +346,58 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
     <p>กรอกข้อมูลของท่านเพื่อให้เราติดต่อกลับได้</p>
   </div>
   <div class="card">
-    <div class="card-head blue">👤 ข้อมูลส่วนตัว</div>
-    <div class="card-body">
-      <div class="field">
-        <label>ชื่อ-นามสกุล <span class="req">*</span></label>
-        <input type="text" id="f-name" placeholder="ชื่อ นามสกุล">
-      </div>
-      <div class="field">
-        <label>ประเภทบุคคล <span class="req">*</span></label>
-        <div class="radio-group" id="rg-ptype">
-          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา มหาวิทยาลัยมหิดล Student Of Mahidol University"><label>🎓 นักศึกษา มหาวิทยาลัยมหิดล</label></label>
-          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา คณะ/สถาบันอื่น Student Of Other University"><label>🎓 นักศึกษา คณะ/สถาบันอื่น</label></label>
-          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคลากรมหาวิทยาลัยมหิดล Staff Of Mahidol University"><label>👔 บุคลากรมหาวิทยาลัยมหิดล</label></label>
-          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคคลภายนอก External Person"><label>🌐 บุคคลภายนอก</label></label>
-          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักเรียน"><label>📚 นักเรียน</label></label>
+    <div class="card-head blue">👤 ข้อมูลผู้แจ้ง</div>
+
+    <!-- ZONE A: ชื่อ + คำนำหน้า -->
+    <div class="card-section">
+      <div class="card-section-head"><span class="dot"></span>ข้อมูลส่วนตัว</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>คำนำหน้า — ชื่อ-นามสกุล <span class="req">*</span></label>
+          <div class="prefix-name-row">
+            <select id="f-prefix" class="prefix-select">
+              <option value="">-- คำนำหน้า --</option>
+              <option value="นาย">นาย</option>
+              <option value="นาง">นาง</option>
+              <option value="นางสาว">นางสาว</option>
+              <option value="เด็กชาย">เด็กชาย</option>
+              <option value="เด็กหญิง">เด็กหญิง</option>
+              <option value="ไม่ระบุ">ไม่ระบุ</option>
+            </select>
+            <input type="text" id="f-name" placeholder="ชื่อ นามสกุล">
+          </div>
         </div>
-      </div>
-      <div class="field">
-        <label>คณะ/สถาบัน/หน่วยงาน <span class="req">*</span></label>
-        <div class="autocomplete-wrap">
-          <input type="text" id="f-dept" placeholder="พิมพ์เพื่อค้นหาหรือระบุ..." oninput="acSearch(this.value,'ac-dept','DEPTS')" autocomplete="off">
-          <div class="autocomplete-list" id="ac-dept"></div>
+        <div class="field">
+          <label>ประเภทบุคคล <span class="req">*</span></label>
+          <div class="radio-group" id="rg-ptype">
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา มหาวิทยาลัยมหิดล Student Of Mahidol University"><label>🎓 นักศึกษา มหาวิทยาลัยมหิดล</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา คณะ/สถาบันอื่น Student Of Other University"><label>🎓 นักศึกษา คณะ/สถาบันอื่น</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคลากรมหาวิทยาลัยมหิดล Staff Of Mahidol University"><label>👔 บุคลากรมหาวิทยาลัยมหิดล</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคคลภายนอก External Person"><label>🌐 บุคคลภายนอก</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักเรียน"><label>📚 นักเรียน</label></label>
+          </div>
         </div>
-      </div>
-      <div class="field">
-        <label>เบอร์โทรศัพท์ <span class="req">*</span></label>
-        <input type="tel" id="f-phone" placeholder="0XX-XXX-XXXX">
       </div>
     </div>
+
+    <!-- ZONE B: คณะ + เบอร์ -->
+    <div class="card-section">
+      <div class="card-section-head"><span class="dot"></span>ข้อมูลติดต่อ</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>คณะ/สถาบัน/หน่วยงาน <span class="req">*</span></label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="f-dept" placeholder="พิมพ์เพื่อค้นหาหรือระบุ..." oninput="acSearchMemory(this.value,'ac-dept','DEPTS','dept')" autocomplete="off">
+            <div class="autocomplete-list" id="ac-dept"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>เบอร์โทรศัพท์ <span class="req">*</span></label>
+          <input type="tel" id="f-phone" placeholder="0XX-XXX-XXXX">
+        </div>
+      </div>
+    </div>
+
   </div>
   <div class="nav-bar">
     <button class="btn btn-back" onclick="go(1)">← กลับ</button>
@@ -307,19 +419,34 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
   </div>
   <div class="card">
     <div class="card-head red">🔎 รายละเอียดสิ่งของที่หาย</div>
-    <div class="card-body">
-      <div class="field">
-        <label>รายการสิ่งของสูญหาย <span class="req">*</span></label>
-        <div class="hint">ระบุ: ประเภท / ยี่ห้อ-รุ่น / สี / ลักษณะเด่น / สิ่งของภายใน</div>
-        <textarea id="d-lost-desc" placeholder="เช่น: กระเป๋าสตางค์สีดำ ยี่ห้อ Fossil มีบัตรประชาชนและบัตร ATM"></textarea>
-      </div>
-      <div class="field">
-        <label>บริเวณที่สูญหาย <span class="req">*</span></label>
-        <div class="autocomplete-wrap">
-          <input type="text" id="d-lost-loc" placeholder="อาคาร/ห้อง/ชั้น/บริเวณ" oninput="acSearch(this.value,'ac-lost-loc','PLACES')" autocomplete="off">
-          <div class="autocomplete-list" id="ac-lost-loc"></div>
+
+    <div class="card-section">
+      <div class="card-section-head red"><span class="dot"></span>รายการสิ่งของ</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>รายการสิ่งของสูญหาย <span class="req">*</span></label>
+          <div class="hint">ระบุ: ประเภท / ยี่ห้อ-รุ่น / สี / ลักษณะเด่น / สิ่งของภายใน</div>
+          <div class="autocomplete-wrap">
+            <textarea id="d-lost-desc" placeholder="เช่น: กระเป๋าสตางค์สีดำ ยี่ห้อ Fossil มีบัตรประชาชนและบัตร ATM" oninput="acSearchMemory(this.value,'ac-lost-desc',null,'lostDesc')"></textarea>
+            <div class="autocomplete-list" id="ac-lost-desc"></div>
+          </div>
         </div>
       </div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-head red"><span class="dot"></span>สถานที่</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>บริเวณที่สูญหาย <span class="req">*</span></label>
+          <div class="hint">ระบุสถานที่ให้ชัดเจน เช่น อาคาร/ห้อง/ชั้น/บริเวณ</div>
+          <div class="autocomplete-wrap">
+            <input type="text" id="d-lost-loc" placeholder="พิมพ์เพื่อค้นหาสถานที่..." oninput="acSearchMemory(this.value,'ac-lost-loc','PLACES','lostLoc')" autocomplete="off">
+            <div class="autocomplete-list" id="ac-lost-loc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
       <div class="field">
         <label>รูปภาพสิ่งของ (ถ้ามี)</label>
         <div class="file-zone">
@@ -333,7 +460,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
   </div>
   <div class="nav-bar">
     <button class="btn btn-back" onclick="go(2)">← กลับ</button>
-    <button class="btn btn-next" onclick="go(4)">ตรวจสอบ →</button>
+    <button class="btn btn-next" onclick="go(4)">ถัดไป →</button>
   </div>
 </div>
 
@@ -352,33 +479,54 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
   </div>
   <div class="card">
     <div class="card-head green">📝 สิ่งของที่พบ</div>
-    <div class="card-body">
-      <div class="field">
-        <label>รายละเอียดสิ่งของที่พบ <span class="req">*</span></label>
-        <div class="hint">ระบุ: ประเภท สี ยี่ห้อ ลักษณะที่สังเกตได้</div>
-        <textarea id="d-found-desc" placeholder="เช่น: กุญแจ พวงกุญแจสีแดง มีพวงกุญแจรูปหมี"></textarea>
-      </div>
-      <div class="field">
-        <label>สถานที่ที่พบ <span class="req">*</span></label>
-        <div class="autocomplete-wrap">
-          <input type="text" id="d-found-loc" placeholder="อาคาร/จุดที่พบ" oninput="acSearch(this.value,'ac-found-loc','PLACES')" autocomplete="off">
-          <div class="autocomplete-list" id="ac-found-loc"></div>
+
+    <div class="card-section">
+      <div class="card-section-head green"><span class="dot"></span>รายละเอียดของที่พบ</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>รายละเอียดสิ่งของที่พบ <span class="req">*</span></label>
+          <div class="hint">ระบุ: ประเภท สี ยี่ห้อ ลักษณะที่สังเกตได้</div>
+          <div class="autocomplete-wrap">
+            <textarea id="d-found-desc" placeholder="เช่น: กุญแจ พวงกุญแจสีแดง มีพวงกุญแจรูปหมี" oninput="acSearchMemory(this.value,'ac-found-desc',null,'foundDesc')"></textarea>
+            <div class="autocomplete-list" id="ac-found-desc"></div>
+          </div>
         </div>
-      </div>
-      <div class="field">
-        <label>รูปภาพสิ่งของ <span style="color:var(--found);font-size:12px;">(แนะนำให้ถ่ายมาด้วย)</span></label>
-        <div class="file-zone">
-          <input type="file" accept="image/*" onchange="previewFile(this,'pv-found')" multiple>
-          <div class="file-zone-icon">📷</div>
-          <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
-        </div>
-        <div class="file-preview" id="pv-found"></div>
       </div>
     </div>
+
+    <div class="card-section">
+      <div class="card-section-head green"><span class="dot"></span>สถานที่</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>สถานที่ที่พบ <span class="req">*</span></label>
+          <div class="hint">ระบุสถานที่ให้ชัดเจนที่สุด</div>
+          <div class="autocomplete-wrap">
+            <input type="text" id="d-found-loc" placeholder="พิมพ์เพื่อค้นหาสถานที่..." oninput="acSearchMemory(this.value,'ac-found-loc','PLACES','foundLoc')" autocomplete="off">
+            <div class="autocomplete-list" id="ac-found-loc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-head green"><span class="dot"></span>รูปภาพประกอบ</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>รูปภาพสิ่งของ <span style="color:var(--found);font-size:12px;">(แนะนำให้ถ่ายมาด้วย)</span></label>
+          <div class="file-zone">
+            <input type="file" accept="image/*" onchange="previewFile(this,'pv-found')" multiple>
+            <div class="file-zone-icon">📷</div>
+            <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+          </div>
+          <div class="file-preview" id="pv-found"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
   <div class="nav-bar">
     <button class="btn btn-back" onclick="go(2)">← กลับ</button>
-    <button class="btn btn-next" onclick="go(4)">ตรวจสอบ →</button>
+    <button class="btn btn-next" onclick="go(4)">ถัดไป →</button>
   </div>
 </div>
 
@@ -416,7 +564,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
   </div>
   <div class="nav-bar">
     <button class="btn btn-back" onclick="go(2)">← กลับ</button>
-    <button class="btn btn-next" onclick="go(4)">ตรวจสอบ →</button>
+    <button class="btn btn-next" onclick="go(4)">ถัดไป →</button>
   </div>
 </div>
 
@@ -441,6 +589,16 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
   </div>
 </div>
 
+
+<!-- VALIDATION TOAST -->
+<div class="toast-wrap" id="toast-wrap">
+  <div class="toast-box" id="toast-box">
+    <div class="toast-title">⚠️ กรุณากรอกข้อมูลให้ครบ</div>
+    <ul class="toast-list" id="toast-list"></ul>
+    <button class="toast-close" onclick="closeToast()">รับทราบ — กลับไปกรอก</button>
+  </div>
+</div>
+
 </div><!-- /main -->
 
 <!-- SENDING OVERLAY -->
@@ -452,7 +610,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 <script>
 /* =====================================================
  * Lost & Found Web App — lostfound_form.html
- * Version : 1.1.0
+ * Version : 1.2.1
  * Author  : Traffic Control and Premises Security Unit,
  *           Mahidol University
  * © 2025–2026 Traffic Control and Premises Security Unit,
@@ -464,7 +622,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82
 // ========= DATA =========
 const DEPTS = ["กองกฎหมาย","กองกิจการนักศึกษา","กองกายภาพและสิ่งแวดล้อม","กองคลัง","กองทรัพยากรบุคคล","กองเทคโนโลยีสารสนเทศ","กองบริหารการศึกษา","กองบริหารงานทั่วไป","กองบริหารงานวิจัย","กองแผนงาน","กองพัฒนาคุณภาพ","กองวิเทศสัมพันธ์","คณะกายภาพบำบัด","คณะทันตแพทยศาสตร์","คณะเทคนิคการแพทย์","คณะเทคโนโลยีสารสนเทศและการสื่อสาร","คณะพยาบาลศาสตร์","คณะเภสัชศาสตร์","คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี","คณะแพทยศาสตร์ศิริราชพยาบาล","คณะวิทยาศาสตร์","คณะวิศวกรรมศาสตร์","คณะเวชศาสตร์เขตร้อน","คณะศิลปศาสตร์","คณะสังคมศาสตร์และมนุษยศาสตร์","คณะสัตวแพทยศาสตร์","คณะสาธารณสุขศาสตร์","คณะสิ่งแวดล้อมและทรัพยากรศาสตร์","บัณฑิตวิทยาลัย","โรงเรียนสาธิตนานาชาติ","วิทยาเขตกาญจนบุรี","วิทยาลัยการจัดการ","วิทยาลัยดุริยางคศิลป์","วิทยาลัยนานาชาติ","วิทยาลัยวิทยาศาสตร์และเทคโนโลยีการกีฬา","วิทยาลัยศาสนศึกษา","ศูนย์การแพทย์กาญจนาภิเษก","ศูนย์จิตตปัญญาศึกษา","ศูนย์บริหารสินทรัพย์","ศูนย์ส่งเสริมการเรียนรู้แบบบูรณาการชีวิต","ศูนย์สัตว์ทดลองแห่งชาติ","สถาบันชีววิทยาศาสตร์โมเลกุล","สถาบันนวัตกรรมการเรียนรู้","สถาบันพัฒนาสุขภาพอาเซียน","สถาบันวิจัยประชากรและสังคม","สถาบันวิจัยภาษาและวัฒนธรรมเอเชีย","สถาบันโภชนาการ","สำนักงานคณะกรรมการตรวจสอบการบริหารงานประจำมหาวิทยาลัย","สำนักงานสภามหาวิทยาลัยมหิดล","หอสมุดและคลังความรู้มหาวิทยาลัยมหิดล","บุคคลภายนอก","อื่นๆ"];
 
-const PLACES = ["ถนนชนนีประทาน","ถนนเทิดจักรี","ถนนผสานเทศไทย","ถนนการุณยมิตร","ถนนกันภัยมหิดล","ถนนถื่นวิทยาการ","ถนนจิตตสมาน","ถนนสานสัตยา","ถนนมานะมั่นคง","ถนนดำรงวิจัย","ถนนพูนผลประชา","ถนนส่องไทยทัศน์","ถนนปัญญาแผ่นดิน","ถนนวิชาชื่นชน","ถนนวิถีปัญญา","ถนนสาย D","ประตู 1","ประตู 2","ประตู 3","ประตู 4","ประตู 5","ประตู 6","ประตู 7","ประตู 8","ประตูคณะพยาบาลศาสตร์","ประตูวิทยาลัยดุริยางคศิลป์","หอพักนักศึกษา 1","หอพักนักศึกษา 2","หอพักนักศึกษา 3","หอพักนักศึกษา 4","หอพักนักศึกษา 5","หอพักนักศึกษา 6","หอพักนักศึกษา 7","หอพักนักศึกษา 8","หอพักนักศึกษา 9","หอพักนักศึกษา 10","หอพักนักศึกษา 11","อาคารเจรจานวัตกรรม","ลานจอดรถ P1","ลานจอดรถ P2","ลานจอดรถ P3","ลานจอดรถ P4","ลานจอดรถ P5","ลานจอดรถ อาคารเจรจานวัตกรรม","อาคารสิริวิทยา","ลานจอดรถเรือนไทย","งานจราจรและความปลอดภัย","ศูนย์การเรียนรู้มหิดล (MLC)","อาคาร OP","อาคาร SC","อาคาร MB","ลานพระบิดา","สนามกีฬา","สนามบาสเกตบอล","สนามฟุตบอล","MU Lake","รถราง","ตะกร้าจักรยาน Anywheel"];
+const PLACES = ["ถนนชนนีประทาน","ถนนเทิดจักรี","ถนนผสานเทศไทย","ถนนการุณยมิตร","ถนนกันภัยมหิดล","ถนนถื่นวิทยาการ","ถนนจิตตสมาน","ถนนสานสัตยา","ถนนมานะมั่นคง","ถนนดำรงวิจัย","ถนนพูนผลประชา","ถนนส่องไทยทัศน์","ถนนปัญญาแผ่นดิน","ถนนวิชาชื่นชน","ถนนวิถีปัญญา","ถนนสาย D","ประตู 1","ประตู 2","ประตู 3","ประตู 4","ประตู 5","ประตู 6","ประตู 7","ประตู 8","ประตูคณะพยาบาลศาสตร์","ประตูวิทยาลัยดุริยางคศิลป์","หอพักนักศึกษา 1","หอพักนักศึกษา 2","หอพักนักศึกษา 3","หอพักนักศึกษา 4","หอพักนักศึกษา 5","หอพักนักศึกษา 6","หอพักนักศึกษา 7","หอพักนักศึกษา 8","หอพักนักศึกษา 9","หอพักนักศึกษา 10","หอพักนักศึกษา 11","อาคารเจรจานวัตกรรม","ลานจอดรถ P1","ลานจอดรถ P2","ลานจอดรถ P3","ลานจอดรถ P4","ลานจอดรถ P5","ลานจอดรถ อาคารเจรจานวัตกรรม","อาคารสิริวิทยา","ลานจอดรถเรือนไทย","งานจราจรและความปลอดภัย","ศูนย์การเรียนรู้มหิดล (MLC)","อาคาร OP","อาคาร SC","อาคาร MB","ลานพระบิดา","สนามกีฬา","สนามบาสเกตบอล","สนามฟุตบอล","MU Lake","รถราง","ในพื้นที่มหาวิทยาลัย","ตะกร้าจักรยาน Anywheel"];
 
 // ========= STATE =========
 let currentType = null;
@@ -495,6 +653,92 @@ document.addEventListener('click', e => {
     if (!l.parentElement.contains(e.target)) l.classList.remove('show');
   });
 });
+
+// ========= MEMORY AUTOCOMPLETE (localStorage) =========
+const MEM_KEY = 'lf_memory';
+const MEM_MAX = 10; // จำไว้สูงสุด 10 รายการต่อ field
+
+function getMemory(key) {
+  try { return JSON.parse(localStorage.getItem(MEM_KEY + '_' + key) || '[]'); }
+  catch(e) { return []; }
+}
+function saveMemory(key, val) {
+  if (!val || val.trim().length < 2) return;
+  let arr = getMemory(key);
+  arr = arr.filter(v => v !== val); // ลบซ้ำ
+  arr.unshift(val); // เพิ่มหัว
+  arr = arr.slice(0, MEM_MAX);
+  try { localStorage.setItem(MEM_KEY + '_' + key, JSON.stringify(arr)); } catch(e) {}
+}
+
+function acSearchMemory(q, listId, dataKey, memKey) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+
+  // ดึงข้อมูล
+  const staticData = dataKey === 'DEPTS' ? DEPTS : dataKey === 'PLACES' ? PLACES : [];
+  const memory = memKey ? getMemory(memKey) : [];
+
+  if (!q.trim()) {
+    // ถ้ายังไม่ได้พิมพ์ → แสดง memory ที่เคยกรอก
+    if (memory.length > 0) {
+      list.innerHTML = '<div style="padding:8px 14px;font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.5px;">🕐 เคยกรอกมาก่อน</div>' +
+        memory.slice(0, 5).map(m =>
+          `<div class="ac-item" onclick="pickAcMemory('${listId}','${m.replace(/'/g,"\'")}','${memKey}')">${m}</div>`
+        ).join('');
+      list.classList.add('show');
+    } else {
+      list.classList.remove('show');
+    }
+    return;
+  }
+
+  // ค้นหาจาก static + memory
+  const q_lower = q.toLowerCase();
+  const fromStatic = staticData.filter(d => d.toLowerCase().includes(q_lower));
+  const fromMem = memory.filter(m => m.toLowerCase().includes(q_lower) && !fromStatic.includes(m));
+  const matches = [...fromMem, ...fromStatic];
+
+  if (!matches.length) { list.classList.remove('show'); return; }
+
+  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+  list.innerHTML = matches.slice(0, 8).map((m, i) => {
+    const hi = m.replace(re, '<mark>$1</mark>');
+    const isMem = i < fromMem.length;
+    return `<div class="ac-item" onclick="pickAcMemory('${listId}','${m.replace(/'/g,"\'")}','${memKey}')">${isMem ? '🕐 ' : ''}${hi}</div>`;
+  }).join('');
+  list.classList.add('show');
+}
+
+function pickAcMemory(listId, val, memKey) {
+  const list = document.getElementById(listId);
+  const input = list.previousElementSibling;
+  input.value = val;
+  list.classList.remove('show');
+  if (memKey) saveMemory(memKey, val);
+}
+
+// save memory on blur
+function setupMemoryBlur() {
+  const fields = [
+    { id: 'f-dept',      key: 'dept' },
+    { id: 'd-lost-loc',  key: 'lostLoc' },
+    { id: 'd-found-loc', key: 'foundLoc' },
+  ];
+  fields.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => saveMemory(key, el.value.trim()));
+  });
+  // textarea memory on blur
+  const taFields = [
+    { id: 'd-lost-desc',  key: 'lostDesc' },
+    { id: 'd-found-desc', key: 'foundDesc' },
+  ];
+  taFields.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => saveMemory(key, el.value.trim()));
+  });
+}
 
 // ========= TYPE SELECTION =========
 function pickType(type) {
@@ -528,23 +772,64 @@ function previewFile(input, previewId) {
   });
 }
 
+// ========= TOAST VALIDATION =========
+function showToast(errors) {
+  const list = document.getElementById('toast-list');
+  list.innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+  document.getElementById('toast-wrap').classList.add('show');
+  window.scrollTo({ top: 60, behavior: 'smooth' });
+}
+function closeToast() {
+  document.getElementById('toast-wrap').classList.remove('show');
+}
+
 // ========= NAVIGATION =========
 function go(n) {
-  if (n === 2 && currentStep === 1) {
-    if (!currentType) { alert('กรุณาเลือกประเภทการแจ้ง'); return; }
-  }
-  if (n === 3 && currentStep === 2) {
-    if (!document.getElementById('f-name').value.trim()) { alert('กรุณากรอกชื่อ-นามสกุล'); return; }
-    if (!document.querySelector('input[name="ptype"]:checked')) { alert('กรุณาเลือกประเภทบุคคล'); return; }
-    if (!document.getElementById('f-dept').value.trim()) { alert('กรุณากรอกคณะ/หน่วยงาน'); return; }
-    if (!document.getElementById('f-phone').value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์'); return; }
-  // Validate phone
-  const phoneVal = document.getElementById('f-phone').value.trim();
-  const phoneRegex = /^[0-9\-\+\s]{9,15}$/;
-  if (!phoneRegex.test(phoneVal)) { alert('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (ตัวเลข 9-15 หลัก)'); return; }
+  closeToast();
 
+  if (n === 2 && currentStep === 1) {
+    if (!currentType) {
+      showToast(['กรุณาเลือกประเภทการแจ้ง (สูญหาย / พบของ / รับของคืน)']);
+      return;
+    }
   }
-  if (n === 4) {
+
+  if (n === 3 && currentStep === 2) {
+    const errors = [];
+    if (!document.getElementById('f-prefix').value)
+      errors.push('คำนำหน้าชื่อ — ยังไม่ได้เลือก');
+    if (!document.getElementById('f-name').value.trim())
+      errors.push('ชื่อ-นามสกุล — ยังไม่ได้กรอก');
+    if (!document.querySelector('input[name="ptype"]:checked'))
+      errors.push('ประเภทบุคคล — ยังไม่ได้เลือก');
+    if (!document.getElementById('f-dept').value.trim())
+      errors.push('คณะ/สถาบัน/หน่วยงาน — ยังไม่ได้กรอก');
+    const phone = document.getElementById('f-phone').value.trim();
+    if (!phone)
+      errors.push('เบอร์โทรศัพท์ — ยังไม่ได้กรอก');
+    else if (!/^[0-9\-\+\s]{9,15}$/.test(phone))
+      errors.push('เบอร์โทรศัพท์ — รูปแบบไม่ถูกต้อง (ควรเป็นตัวเลข 9-15 หลัก)');
+    if (errors.length) { showToast(errors); return; }
+  }
+  if (n === 4 && currentStep === 3) {
+    const errors3 = [];
+    if (currentType === 'lost') {
+      if (!document.getElementById('d-lost-date').value) errors3.push('วันที่หาย — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-lost-time').value) errors3.push('เวลาที่หาย — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-lost-desc').value.trim()) errors3.push('รายการสิ่งของสูญหาย — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-lost-loc').value.trim()) errors3.push('บริเวณที่สูญหาย — ยังไม่ได้กรอก');
+    } else if (currentType === 'found') {
+      if (!document.getElementById('d-found-date').value) errors3.push('วันที่พบ — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-found-time').value) errors3.push('เวลาที่พบ — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-found-desc').value.trim()) errors3.push('รายละเอียดสิ่งของที่พบ — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-found-loc').value.trim()) errors3.push('สถานที่ที่พบ — ยังไม่ได้กรอก');
+    } else if (currentType === 'pickup') {
+      if (!document.getElementById('d-pickup-date').value) errors3.push('วันที่มารับ — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-pickup-time').value) errors3.push('เวลาที่มารับ — ยังไม่ได้กรอก');
+      if (!document.getElementById('d-pickup-desc').value.trim()) errors3.push('รายละเอียดสิ่งของที่รับคืน — ยังไม่ได้กรอก');
+    }
+    if (errors3.length) { showToast(errors3); return; }
+
     buildSummary();
     document.getElementById('btn-back-sum').onclick = () => { showStep('s3-'+currentType); setProgress(3); currentStep=3; };
   }
@@ -600,7 +885,7 @@ function buildSummary() {
   }
   document.getElementById('sum-card').innerHTML = `
     <div class="summary-type-banner ${typeBanner[currentType]}">${typeLabel[currentType]}</div>
-    <div class="sum-row"><span class="sum-k">ชื่อ-นามสกุล</span><span class="sum-v">${document.getElementById('f-name').value}</span></div>
+    <div class="sum-row"><span class="sum-k">ชื่อ-นามสกุล</span><span class="sum-v">${(document.getElementById('f-prefix').value||'')+' '+document.getElementById('f-name').value}</span></div>
     <div class="sum-row"><span class="sum-k">ประเภทบุคคล</span><span class="sum-v">${ptype.split(' ')[0]}</span></div>
     <div class="sum-row"><span class="sum-k">คณะ/หน่วยงาน</span><span class="sum-v">${document.getElementById('f-dept').value}</span></div>
     <div class="sum-row"><span class="sum-k">โทรศัพท์</span><span class="sum-v">${document.getElementById('f-phone').value}</span></div>
@@ -667,7 +952,8 @@ async function submitForm() {
     timestamp: now.toISOString(),
     refCode: ref,
     type: currentType === 'lost' ? 'สิ่งของสูญหาย' : currentType === 'found' ? 'พบสิ่งของ' : 'รับของคืน',
-    name: document.getElementById('f-name').value,
+    prefix: document.getElementById('f-prefix').value,
+    name: (document.getElementById('f-prefix').value ? document.getElementById('f-prefix').value + ' ' : '') + document.getElementById('f-name').value,
     personType: ptype,
     department: document.getElementById('f-dept').value,
     phone: document.getElementById('f-phone').value,
@@ -715,6 +1001,7 @@ function resetAll() {
   currentStep = 1;
   uploadedFiles = { lost:[], found:[], pickup:[] };
   document.querySelectorAll('input[type=text], input[type=tel], textarea').forEach(el => el.value='');
+  const pfEl = document.getElementById('f-prefix'); if(pfEl) pfEl.value='';
   document.querySelectorAll('input[type=date], input[type=time]').forEach(el => el.value='');
   document.querySelectorAll('input[type=radio]').forEach(r => r.checked=false);
   document.querySelectorAll('.radio-item').forEach(r => r.classList.remove('checked'));
@@ -727,6 +1014,7 @@ function resetAll() {
 
 // ========= INIT =========
 window.onload = () => {
+  setupMemoryBlur();
   const today = new Date().toISOString().split('T')[0];
   const nowTime = new Date().toTimeString().slice(0,5);
   ['lost','found','pickup'].forEach(t => {
@@ -740,9 +1028,9 @@ window.onload = () => {
 
 <!-- FOOTER -->
 <footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
-  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Web App — v1.1.0</span></div>
+  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Web App — San v1.2.1</span></div>
   <div style="font-size:11.5px;margin-top:3px;">
-    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
+    © 2025–2026 Traffic Control and Premises Security Unit, Division of Physical and Environmental, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
   </div>
 </footer>
