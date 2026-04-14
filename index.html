@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบแจ้งของหาย / เก็บของได้ | มหาวิทยาลัยมหิดล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary:#1a3a5c;--primary-mid:#2d5f8f;--accent:#e8a020;
+  --lost:#c0392b;--found:#1e7e44;--pickup:#1a5276;
+  --bg:#f0f3f8;--white:#fff;--border:#d5dce8;--muted:#6c7a89;--text:#1c2833;
+  --shadow:0 2px 12px rgba(26,58,92,0.09);--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+.header{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-mid) 100%);padding:0;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
+.header-inner{max-width:1400px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;gap:16px;}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-icon{width:42px;height:42px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.header-title{color:white;font-size:15px;font-weight:700;line-height:1.3;}
+.header-sub{color:rgba(255,255,255,0.7);font-size:11px;}
+.header-actions{display:flex;gap:10px;align-items:center;}
+.btn-dash{background:rgba(255,255,255,0.15);color:white;border:1.5px solid rgba(255,255,255,0.35);padding:8px 16px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;}
+.btn-dash:hover{background:rgba(255,255,255,0.25);}
+.btn-add{background:var(--accent);color:white;border:none;padding:9px 20px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 3px 10px rgba(232,160,32,0.35);}
+.btn-add:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(232,160,32,0.45);}
+
+.content{max-width:1400px;margin:0 auto;padding:24px 20px;}
+
+.stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
+.stat-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:2px solid transparent;}
+.stat-chip .count{font-size:15px;font-weight:800;}
+.chip-all{background:var(--primary);color:white;}
+.chip-lost{background:#fdecea;color:var(--lost);border-color:#f5c6c2;}
+.chip-found{background:#edf7f1;color:var(--found);border-color:#b7e4c7;}
+.chip-pickup{background:#eaf1fb;color:var(--pickup);border-color:#b6d0ef;}
+.stat-chip:hover,.stat-chip.active{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+.chip-all{opacity:0.75;}.chip-all.active{opacity:1;}
+
+.search-row{display:flex;gap:10px;margin-bottom:20px;}
+.search-box{flex:1;position:relative;}
+.search-box input{width:100%;padding:10px 14px 10px 40px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14.5px;background:white;outline:none;transition:border-color 0.2s;}
+.search-box input:focus{border-color:var(--primary-mid);}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.sort-select{padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;background:white;outline:none;cursor:pointer;color:var(--text);}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
+.card{background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:2px solid transparent;transition:transform 0.25s,box-shadow 0.25s;cursor:pointer;display:flex;flex-direction:column;}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 28px rgba(26,58,92,0.14);}
+.card.border-lost{border-color:#f5c6c2;background:#fffafa;}
+.card.border-found{border-color:#b7e4c7;}
+.card.border-pickup{border-color:#b6d0ef;background:#f8fbff;}
+.card-img{width:100%;height:220px;object-fit:cover;display:block;flex-shrink:0;}
+.card-img-placeholder{width:100%;height:220px;background:#f0f3f8;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);flex-shrink:0;}
+.card-img-wrap{position:relative;flex-shrink:0;}
+.type-badge{position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;color:white;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+.badge-lost{background:var(--lost);}.badge-found{background:var(--found);}.badge-pickup{background:var(--pickup);}
+.card-body{padding:14px;flex:1;display:flex;flex-direction:column;}
+.card-title{font-size:15px;font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
+.card-loc{font-size:13px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-date{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.card-status{font-size:13px;font-weight:600;margin-top:auto;}
+.status-wait{color:var(--muted);}.status-done{color:var(--found);}.status-notfound{color:#d35400;}.status-unclaimed{color:#8e44ad;}
+
+.empty{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--muted);}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:0.5;}
+.loading{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--muted);}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.modal-backdrop.show{display:flex;}
+.modal{background:white;border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:popIn 0.3s ease;}
+@keyframes popIn{from{opacity:0;transform:scale(0.9);}to{opacity:1;transform:scale(1);}}
+.modal-img{width:100%;max-height:320px;object-fit:contain;background:#f0f3f8;}
+.modal-banner{padding:12px 22px;color:white;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:none;border:none;font-size:28px;color:rgba(255,255,255,0.8);cursor:pointer;line-height:1;}
+.modal-body{padding:22px;}
+.modal-row{display:flex;margin-bottom:10px;font-size:14px;}
+.modal-key{color:var(--muted);min-width:110px;flex-shrink:0;font-weight:600;}
+.modal-val{flex:1;color:var(--text);}
+.modal-status-box{margin-top:16px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;text-align:center;}
+.ms-wait{background:#f8f9fa;color:var(--muted);}.ms-done{background:#edf7f1;color:var(--found);}
+.ms-notfound{background:#fff3e0;color:#d35400;}.ms-unclaimed{background:#f3e5f5;color:#8e44ad;}
+
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:28px;flex-wrap:wrap;}
+.page-btn{padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;transition:all 0.18s;}
+.page-btn:hover{border-color:var(--primary-mid);color:var(--primary);}
+.page-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
+.page-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+.btn-refresh{background:white;border:1.5px solid var(--border);padding:9px 14px;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;font-family:'Sarabun',sans-serif;}
+.btn-refresh:hover{border-color:var(--primary-mid);}
+.info-text{margin-left:auto;font-size:13px;color:var(--muted);}
+
+@media(max-width:600px){
+  .header-inner{padding:12px 16px;}
+  .content{padding:16px 12px;}
+  .gallery{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;}
+  .card-img,.card-img-placeholder{height:155px;}
+  .header-sub,.btn-dash{display:none;}
+  .btn-add{padding:8px 14px;font-size:13px;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-icon">🔍</div>
+      <div>
+        <div class="header-title">ระบบแจ้งของหาย / เก็บของได้</div>
+        <div class="header-sub">งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a href="dashboard.html" class="btn-dash">📊 Dashboard</a>
+      <a href="lostfound_form.html" class="btn-add">+ แจ้งของหาย / เก็บของได้</a>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div class="stats-bar">
+    <div class="stat-chip chip-all active" id="chip-all" onclick="filterType('all')">ทั้งหมด <span class="count" id="cnt-all">-</span></div>
+    <div class="stat-chip chip-lost" id="chip-lost" onclick="filterType('สิ่งของสูญหาย')">😟 สูญหาย <span class="count" id="cnt-lost">-</span></div>
+    <div class="stat-chip chip-found" id="chip-found" onclick="filterType('พบสิ่งของ')">📦 พบของ <span class="count" id="cnt-found">-</span></div>
+    <div class="stat-chip chip-pickup" id="chip-pickup" onclick="filterType('รับของคืน')">🤝 รับคืนแล้ว <span class="count" id="cnt-pickup">-</span></div>
+    <button class="btn-refresh" onclick="loadAll()">🔄 รีเฟรช</button>
+    <div class="info-text" id="update-time"></div>
+  </div>
+
+  <div class="search-row">
+    <div class="search-box">
+      <span class="search-icon">🔎</span>
+      <input type="text" id="searchInput" placeholder="ค้นหาชื่อ, รายละเอียดสิ่งของ, สถานที่..." oninput="applyFilters()">
+    </div>
+    <select class="sort-select" id="sortSelect" onchange="applyFilters()">
+      <option value="newest">ล่าสุดก่อน</option>
+      <option value="oldest">เก่าสุดก่อน</option>
+      <option value="status">จัดตามสถานะ</option>
+    </select>
+  </div>
+
+  <div class="gallery" id="gallery">
+    <div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<div class="modal-backdrop" id="modal-bg" onclick="bgClose(event)">
+  <div class="modal">
+    <div class="modal-banner" id="modal-banner">
+      <span id="modal-type-text"></span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <img id="modal-img" class="modal-img" src="" style="display:none" onerror="this.style.display='none'">
+    <div class="modal-body">
+      <div id="modal-rows"></div>
+      <div class="modal-status-box" id="modal-status-box"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec';
+const OLD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14MJgb81aVEjT2qVp6n9zNKCCpJNVimX1q0hiYkH0f5I/gviz/tq?tqx=out:json&gid=751456190';
+const ITEMS_PER_PAGE = 20;
+
+let allItems = [], filtered = [], currentPage = 1, currentFilter = 'all';
+
+// ── Parse Sheet เดิม (gviz) ──────────────────────────
+function parseOldSheet(text) {
+  try {
+    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);/);
+    if (!m) return [];
+    const rows = JSON.parse(m[1]).table.rows || [];
+    return rows.map(row => {
+      if (!row?.c) return null;
+      const g = i => row.c[i] ? String(row.c[i].f || row.c[i].v || '') : '';
+      const subj = g(6);
+      let type = '';
+      if (subj.includes('สูญหาย')||subj.includes('หาย')) type='สิ่งของสูญหาย';
+      else if (subj.includes('พบ')||subj.includes('เก็บ')) type='พบสิ่งของ';
+      else if (subj.includes('คืน')) type='รับของคืน';
+      else return null;
+      let title='',loc='',imgRaw='';
+      if(type==='สิ่งของสูญหาย'){title=g(7);loc=g(8);imgRaw=g(9);}
+      else if(type==='พบสิ่งของ'){title=g(10);loc=g(11);imgRaw=g(12);}
+      else{title=g(13);imgRaw=g(14);}
+      let imgUrl='';
+      if(imgRaw&&imgRaw.includes('drive.google.com')){
+        const first=imgRaw.split(',')[0].trim();
+        const mid=first.match(/id=([a-zA-Z0-9_-]+)/)||first.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if(mid) imgUrl=`https://drive.google.com/thumbnail?id=${mid[1]}&sz=w400`;
+      }
+      let dateObj=null;
+      try{dateObj=new Date(g(0));if(isNaN(dateObj))dateObj=null;}catch(e){}
+      return {
+        source:'old',type,
+        title:title||g(5)||'ไม่ระบุ',
+        location:loc||'ไม่ระบุ',
+        date:g(0),dateObj,imgUrl,
+        status:g(18)||'',actionText:g(17)||'',
+        name:g(2),personType:g(3),dept:g(4),phone:g(5)
+      };
+    }).filter(Boolean).reverse();
+  }catch(e){console.error('old parse',e);return[];}
+}
+
+// ── Parse Sheet ใหม่ (GAS JSON) ──────────────────────
+function parseNewSheet(data) {
+  return (data||[]).map(r => {
+    let imgUrl = r['URL รูปภาพ']||'';
+    if(imgUrl&&imgUrl.includes('drive.google.com')){
+      const mid=imgUrl.match(/id=([a-zA-Z0-9_-]+)/)||imgUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if(mid) imgUrl=`https://drive.google.com/thumbnail?id=${mid[1]}&sz=w400`;
+    }
+    let dateObj=null;
+    try{dateObj=new Date(r['Timestamp']);if(isNaN(dateObj))dateObj=null;}catch(e){}
+    return {
+      source:'new',
+      refCode:r['RefCode']||'',
+      type:r['ประเภท']||'',
+      title:r['รายละเอียด']||'ไม่ระบุ',
+      location:r['สถานที่']||'ไม่ระบุ',
+      date:r['Timestamp']||'',dateObj,imgUrl,
+      status:r['สถานะ']||'รอดำเนินการ',
+      actionText:r['การดำเนินการ']||'',
+      name:r['ชื่อ-นามสกุล']||'',
+      personType:r['ประเภทบุคคล']||'',
+      dept:r['คณะ/หน่วยงาน']||'',
+      phone:r['เบอร์โทร']||''
+    };
+  }).filter(r=>r.type);
+}
+
+// ── Load all data ─────────────────────────────────────
+async function loadAll() {
+  document.getElementById('gallery').innerHTML='<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
+  const [r1,r2] = await Promise.allSettled([
+    fetch(OLD_SHEET_URL).then(r=>r.text()),
+    fetch(GAS_URL+'?action=getData').then(r=>r.json())
+  ]);
+  const oldItems = r1.status==='fulfilled' ? parseOldSheet(r1.value) : [];
+  const newItems = r2.status==='fulfilled' && r2.value?.data ? parseNewSheet(r2.value.data) : [];
+  // ใหม่ก่อน เก่าหลัง
+  allItems = [...newItems, ...oldItems];
+  updateCounts();
+  applyFilters();
+  document.getElementById('update-time').textContent = 'อัปเดต: '+new Date().toLocaleTimeString('th-TH');
+}
+
+function updateCounts(){
+  document.getElementById('cnt-all').textContent=allItems.length;
+  document.getElementById('cnt-lost').textContent=allItems.filter(i=>i.type==='สิ่งของสูญหาย').length;
+  document.getElementById('cnt-found').textContent=allItems.filter(i=>i.type==='พบสิ่งของ').length;
+  document.getElementById('cnt-pickup').textContent=allItems.filter(i=>i.type==='รับของคืน').length;
+}
+
+function filterType(t){
+  currentFilter=t; currentPage=1;
+  ['all','lost','found','pickup'].forEach(x=>{
+    const el=document.getElementById('chip-'+x);
+    if(el) el.classList.remove('active');
+  });
+  const map={all:'chip-all','สิ่งของสูญหาย':'chip-lost','พบสิ่งของ':'chip-found','รับของคืน':'chip-pickup'};
+  if(map[t]) document.getElementById(map[t]).classList.add('active');
+  applyFilters();
+}
+
+function applyFilters(){
+  const q=document.getElementById('searchInput').value.toLowerCase().trim();
+  const sort=document.getElementById('sortSelect').value;
+  filtered=allItems.filter(it=>{
+    const matchT=currentFilter==='all'||it.type===currentFilter;
+    const searchStr=`${it.title} ${it.location} ${it.name} ${it.dept} ${it.phone}`.toLowerCase();
+    return matchT&&(!q||searchStr.includes(q));
+  });
+  if(sort==='newest') filtered.sort((a,b)=>(b.dateObj||0)-(a.dateObj||0));
+  else if(sort==='oldest') filtered.sort((a,b)=>(a.dateObj||0)-(b.dateObj||0));
+  else if(sort==='status'){
+    const o={'รับของคืนแล้ว':0,'รับของคืน':0,'ช่วยหาแล้วยังไม่พบ':1,'เจ้าของยังไม่มารับคืน':2,'รอดำเนินการ':3,'':4};
+    filtered.sort((a,b)=>(o[a.status]??5)-(o[b.status]??5));
+  }
+  currentPage=1; renderPage();
+}
+
+function renderPage(){
+  const gallery=document.getElementById('gallery');
+  const total=filtered.length;
+  const pages=Math.ceil(total/ITEMS_PER_PAGE);
+  const start=(currentPage-1)*ITEMS_PER_PAGE;
+  const items=filtered.slice(start,start+ITEMS_PER_PAGE);
+  if(!items.length){
+    gallery.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div>ไม่พบข้อมูลที่ตรงกับการค้นหา</div></div>';
+    document.getElementById('pagination').innerHTML=''; return;
+  }
+  gallery.innerHTML=items.map((it,i)=>renderCard(it,start+i)).join('');
+  renderPagination(pages);
+}
+
+function fmtDate(d){
+  try{if(d)return d.toLocaleString('th-TH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){}
+  return '-';
+}
+
+function renderCard(it,idx){
+  const tc=it.type==='สิ่งของสูญหาย'?'border-lost':it.type==='พบสิ่งของ'?'border-found':'border-pickup';
+  const bc=it.type==='สิ่งของสูญหาย'?'badge-lost':it.type==='พบสิ่งของ'?'badge-found':'badge-pickup';
+  const imgHtml=it.imgUrl
+    ?`<img class="card-img" src="${it.imgUrl}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+    :'';
+  const phHtml=`<div class="card-img-placeholder" style="${it.imgUrl?'display:none':''}">ไม่มีภาพประกอบ</div>`;
+  const s=(it.status||'').trim();
+  let stHtml='<div class="card-status status-wait">รอดำเนินการ</div>';
+  if(s.includes('รับของคืนแล้ว')||s.includes('รับของคืน')) stHtml='<div class="card-status status-done">✅ รับของคืนแล้ว</div>';
+  else if(s.includes('ช่วยหาแล้วยังไม่พบ')) stHtml='<div class="card-status status-notfound">🔎 ช่วยหาแล้วยังไม่พบ</div>';
+  else if(s.includes('เจ้าของยังไม่มารับคืน')) stHtml='<div class="card-status status-unclaimed">⏳ เจ้าของยังไม่มารับคืน</div>';
+  return `<div class="card ${tc}" onclick="openModal(${idx})">
+    <div class="card-img-wrap">${imgHtml}${phHtml}<span class="type-badge ${bc}">${it.type}</span></div>
+    <div class="card-body">
+      <div class="card-title" title="${it.title}">${it.title}</div>
+      <div class="card-loc">📍 ${it.location}</div>
+      <div class="card-date">🕐 ${fmtDate(it.dateObj)}</div>
+      ${stHtml}
+    </div></div>`;
+}
+
+function renderPagination(pages){
+  const pg=document.getElementById('pagination');
+  if(pages<=1){pg.innerHTML='';return;}
+  let h=`<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← ก่อนหน้า</button>`;
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-currentPage)<=2) h+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    else if(Math.abs(i-currentPage)===3) h+=`<span style="padding:8px 4px;color:var(--muted)">…</span>`;
+  }
+  h+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>ถัดไป →</button>`;
+  pg.innerHTML=h;
+}
+
+function goPage(p){
+  const pages=Math.ceil(filtered.length/ITEMS_PER_PAGE);
+  if(p<1||p>pages)return;
+  currentPage=p; renderPage();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function openModal(idx){
+  const it=filtered[idx]; if(!it)return;
+  const color=it.type==='สิ่งของสูญหาย'?'#c0392b':it.type==='พบสิ่งของ'?'#1e7e44':'#1a5276';
+  const emoji=it.type==='สิ่งของสูญหาย'?'😟':it.type==='พบสิ่งของ'?'📦':'🤝';
+  document.getElementById('modal-banner').style.background=color;
+  document.getElementById('modal-type-text').textContent=`${emoji} ${it.type}`;
+  const img=document.getElementById('modal-img');
+  if(it.imgUrl){img.src=it.imgUrl.replace('sz=w400','sz=w1000');img.style.display='block';}
+  else img.style.display='none';
+  const rows=[
+    it.refCode?['เลขอ้างอิง',it.refCode]:null,
+    ['รายละเอียด',it.title],['สถานที่',it.location],
+    ['วันที่/เวลา',fmtDate(it.dateObj)],
+    ['ผู้แจ้ง',it.name],
+    it.personType?['ประเภทบุคคล',it.personType.split(' ')[0]]:null,
+    it.dept?['คณะ/หน่วยงาน',it.dept]:null,
+    it.phone?['เบอร์ติดต่อ',it.phone]:null,
+    it.actionText?['การดำเนินการ',it.actionText]:null
+  ].filter(Boolean);
+  document.getElementById('modal-rows').innerHTML=rows.map(r=>
+    `<div class="modal-row"><span class="modal-key">${r[0]}</span><span class="modal-val">${r[1]||'-'}</span></div>`
+  ).join('');
+  const s=(it.status||'').trim();
+  const sb=document.getElementById('modal-status-box');
+  if(s.includes('รับของคืนแล้ว')||s.includes('รับของคืน')){sb.className='modal-status-box ms-done';sb.textContent='✅ รับของคืนแล้ว';}
+  else if(s.includes('ช่วยหาแล้วยังไม่พบ')){sb.className='modal-status-box ms-notfound';sb.textContent='🔎 ช่วยหาแล้วยังไม่พบ';}
+  else if(s.includes('เจ้าของยังไม่มารับคืน')){sb.className='modal-status-box ms-unclaimed';sb.textContent='⏳ เจ้าของยังไม่มารับคืน';}
+  else{sb.className='modal-status-box ms-wait';sb.textContent='รอดำเนินการ';}
+  document.getElementById('modal-bg').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+
+function bgClose(e){if(e.target===document.getElementById('modal-bg'))closeModal();}
+function closeModal(){document.getElementById('modal-bg').classList.remove('show');document.body.style.overflow='';}
+
+window.onload=()=>{
+  loadAll();
+  setInterval(loadAll,5*60*1000);
+};
+</script>
+</body>
+</html>
