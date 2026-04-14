@@ -355,9 +355,19 @@ function fmtDate(d) {
 
 function parseDate(str) {
   if (!str) return null;
+  const s = String(str).trim();
+
+  // Format: dd/MM/yyyy HH:mm:ss (จาก GAS ใหม่)
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    const d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]),
+                       parseInt(m[4]||0), parseInt(m[5]||0), parseInt(m[6]||0));
+    if (!isNaN(d)) return d;
+  }
+
+  // ISO / M/D/YYYY format
   try {
-    // รองรับทั้ง "9/6/2025 8:53:03" และ ISO format
-    const d = new Date(str);
+    const d = new Date(s);
     if (!isNaN(d) && d.getFullYear() > 2000) return d;
   } catch(e) {}
   return null;
