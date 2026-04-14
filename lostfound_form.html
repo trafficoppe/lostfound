@@ -450,6 +450,14 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 </div>
 
 <script>
+/* =====================================================
+ * Lost & Found Web App — lostfound_form.html
+ * Version : 1.1.0
+ * Author  : Traffic Control and Premises Security Unit,
+ *           Mahidol University
+ * © 2025–2026 Traffic Control and Premises Security Unit,
+ *   Mahidol University. All rights reserved.
+ * ===================================================== */
 // ========= CONFIG =========
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec';
 
@@ -530,6 +538,11 @@ function go(n) {
     if (!document.querySelector('input[name="ptype"]:checked')) { alert('กรุณาเลือกประเภทบุคคล'); return; }
     if (!document.getElementById('f-dept').value.trim()) { alert('กรุณากรอกคณะ/หน่วยงาน'); return; }
     if (!document.getElementById('f-phone').value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์'); return; }
+  // Validate phone
+  const phoneVal = document.getElementById('f-phone').value.trim();
+  const phoneRegex = /^[0-9\-\+\s]{9,15}$/;
+  if (!phoneRegex.test(phoneVal)) { alert('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (ตัวเลข 9-15 หลัก)'); return; }
+
   }
   if (n === 4) {
     buildSummary();
@@ -724,5 +737,14 @@ window.onload = () => {
   });
 };
 </script>
+
+<!-- FOOTER -->
+<footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
+  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Web App — v1.1.0</span></div>
+  <div style="font-size:11.5px;margin-top:3px;">
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
+  </div>
+</footer>
 </body>
 </html>
