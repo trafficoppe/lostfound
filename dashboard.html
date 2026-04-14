@@ -328,6 +328,31 @@ const OLD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14MJgb81aVEjT2qVp6
 
 const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
+// ── Parse date รองรับทุก format ──
+// รองรับ: "15/04/2026 00:18:39", "2026-04-15", ISO, "4/15/2026"
+function parseAnyDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+
+  // Format: dd/MM/yyyy HH:mm:ss หรือ dd/MM/yyyy (จาก GAS)
+  const thaiMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (thaiMatch) {
+    const [, dd, mm, yyyy, hh='0', mi='0', ss='0'] = thaiMatch;
+    const d = new Date(parseInt(yyyy), parseInt(mm)-1, parseInt(dd),
+                       parseInt(hh), parseInt(mi), parseInt(ss));
+    if (!isNaN(d)) return d;
+  }
+
+  // Format: ISO หรือ yyyy-MM-dd
+  try {
+    const d = new Date(s);
+    if (!isNaN(d) && d.getFullYear() > 2000) return d;
+  } catch(e) {}
+
+  return null;
+}
+
 let allData = [];
 let filteredData = [];
 let charts = {};
@@ -421,7 +446,7 @@ async function loadDashboard() {
       title: r['รายละเอียด'] || '',
       location: r['สถานที่'] || '',
       date: r['Timestamp'] || '',
-      dateObj: r['Timestamp'] ? new Date(r['Timestamp']) : null,
+      dateObj: parseAnyDate(r['Timestamp']),
       name: r['ชื่อ-นามสกุล'] || '',
       personType: r['ประเภทบุคคล'] || '',
       dept: r['คณะ/หน่วยงาน'] || '',
@@ -456,7 +481,7 @@ function parseOldSheet(text) {
       else if (type==='พบสิ่งของ') { title=g(10); location=g(11); }
       else { title=g(13); }
       let dateObj = null;
-      try { dateObj = new Date(g(0)); if(isNaN(dateObj)) dateObj = null; } catch(e){}
+      dateObj = parseAnyDate(g(0));
       return { source:'old', refCode:'', type, title: title||g(5)||'ไม่ระบุ', location: location||'-', date:g(0), dateObj, name:g(2), personType:g(3), dept:g(4), phone:g(5), status:g(18)||'', actionText:g(17)||'' };
     }).filter(Boolean);
   } catch(e) { return []; }
