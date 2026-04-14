@@ -318,9 +318,7 @@ window.onload = () => {
 async function loadDashboard() {
   const results = await Promise.allSettled([
     fetch(OLD_SHEET_URL).then(r => r.text()),
-    GAS_URL !== 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec'
-      ? fetch(GAS_URL + '?action=getData').then(r => r.json())
-      : Promise.resolve(null)
+    fetch(GAS_URL + '?action=getData&t=' + Date.now()).then(r => r.json())
   ]);
 
   let oldItems = [];
@@ -618,8 +616,8 @@ function closeStatusModal() { document.getElementById('status-modal').classList.
 async function saveStatus() {
   const status = document.getElementById('modal-status-select').value;
   const action = document.getElementById('modal-action-text').value;
-  if (!editingRef || GAS_URL === 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec') {
-    alert('ยังไม่ได้ตั้งค่า GAS_URL');
+  if (!editingRef) {
+    alert('ไม่พบ RefCode');
     return;
   }
   try {
