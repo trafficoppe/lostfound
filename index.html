@@ -14,100 +14,135 @@
   --shadow:0 2px 12px rgba(26,58,92,0.09);--radius:12px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 
+/* ─── HEADER ─── */
 .header{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-mid) 100%);padding:0;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
 .header-inner{max-width:1400px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;gap:16px;}
 .header-left{display:flex;align-items:center;gap:12px;}
 .header-icon{width:42px;height:42px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .header-title{color:white;font-size:15px;font-weight:700;line-height:1.3;}
-.header-sub{color:rgba(255,255,255,0.7);font-size:11px;}
-.header-actions{display:flex;gap:10px;align-items:center;}
-.btn-dash{background:rgba(255,255,255,0.15);color:white;border:1.5px solid rgba(255,255,255,0.35);padding:8px 16px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;}
+.header-sub{color:rgba(255,255,255,0.7);font-size:11px;margin-top:1px;}
+.header-actions{display:flex;gap:10px;align-items:center;flex-shrink:0;}
+.btn-dash{background:rgba(255,255,255,0.15);color:white;border:1.5px solid rgba(255,255,255,0.35);padding:8px 16px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;white-space:nowrap;}
 .btn-dash:hover{background:rgba(255,255,255,0.25);}
-.btn-add{background:var(--accent);color:white;border:none;padding:9px 20px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 3px 10px rgba(232,160,32,0.35);}
+.btn-add{background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 3px 10px rgba(232,160,32,0.35);white-space:nowrap;}
 .btn-add:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(232,160,32,0.45);}
 
-.content{max-width:1400px;margin:0 auto;padding:24px 20px;}
+/* ─── CONTENT ─── */
+.content{max-width:1400px;margin:0 auto;padding:24px 20px;flex:1;}
 
+/* ─── STATS BAR ─── */
 .stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
-.stat-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:2px solid transparent;}
+.stat-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:2px solid transparent;user-select:none;}
 .stat-chip .count{font-size:15px;font-weight:800;}
-.chip-all{background:var(--primary);color:white;}
+.chip-all{background:var(--primary);color:white;opacity:0.75;}
+.chip-all.active{opacity:1;}
 .chip-lost{background:#fdecea;color:var(--lost);border-color:#f5c6c2;}
 .chip-found{background:#edf7f1;color:var(--found);border-color:#b7e4c7;}
 .chip-pickup{background:#eaf1fb;color:var(--pickup);border-color:#b6d0ef;}
 .stat-chip:hover,.stat-chip.active{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15);}
-.chip-all{opacity:0.75;}.chip-all.active{opacity:1;}
+.btn-refresh{background:white;border:1.5px solid var(--border);padding:8px 14px;border-radius:10px;font-size:13.5px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;font-family:'Sarabun',sans-serif;}
+.btn-refresh:hover{border-color:var(--primary-mid);color:var(--primary);}
+.info-text{margin-left:auto;font-size:12.5px;color:var(--muted);}
 
+/* ─── SEARCH ─── */
 .search-row{display:flex;gap:10px;margin-bottom:20px;}
 .search-box{flex:1;position:relative;}
-.search-box input{width:100%;padding:10px 14px 10px 40px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14.5px;background:white;outline:none;transition:border-color 0.2s;}
-.search-box input:focus{border-color:var(--primary-mid);}
-.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.search-box input{width:100%;padding:10px 14px 10px 40px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14.5px;background:white;outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
+.search-box input:focus{border-color:var(--primary-mid);box-shadow:0 0 0 3px rgba(45,95,143,0.08);}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
 .sort-select{padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;background:white;outline:none;cursor:pointer;color:var(--text);}
 
+/* ─── GALLERY ─── */
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
-.card{background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:2px solid transparent;transition:transform 0.25s,box-shadow 0.25s;cursor:pointer;display:flex;flex-direction:column;}
+.card{background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:2px solid transparent;transition:transform 0.22s,box-shadow 0.22s;cursor:pointer;display:flex;flex-direction:column;}
 .card:hover{transform:translateY(-4px);box-shadow:0 8px 28px rgba(26,58,92,0.14);}
+.card:active{transform:translateY(-1px);}
 .card.border-lost{border-color:#f5c6c2;background:#fffafa;}
 .card.border-found{border-color:#b7e4c7;}
 .card.border-pickup{border-color:#b6d0ef;background:#f8fbff;}
-.card-img{width:100%;height:220px;object-fit:cover;display:block;flex-shrink:0;}
-.card-img-placeholder{width:100%;height:220px;background:#f0f3f8;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);flex-shrink:0;}
-.card-img-wrap{position:relative;flex-shrink:0;}
-.type-badge{position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;color:white;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+.card-img-wrap{position:relative;flex-shrink:0;height:220px;background:#f0f3f8;overflow:hidden;}
+.card-img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s;}
+.card:hover .card-img{transform:scale(1.03);}
+.card-img-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px;}
+.card-img-placeholder .ph-icon{font-size:32px;opacity:0.35;}
+.type-badge{position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;color:white;box-shadow:0 2px 8px rgba(0,0,0,0.2);backdrop-filter:blur(4px);}
 .badge-lost{background:var(--lost);}.badge-found{background:var(--found);}.badge-pickup{background:var(--pickup);}
+.source-badge{position:absolute;top:10px;left:10px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(255,255,255,0.85);color:var(--primary);backdrop-filter:blur(4px);}
 .card-body{padding:14px;flex:1;display:flex;flex-direction:column;}
-.card-title{font-size:15px;font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
-.card-loc{font-size:13px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.card-date{font-size:13px;color:var(--muted);margin-bottom:10px;}
-.card-status{font-size:13px;font-weight:600;margin-top:auto;}
+.card-title{font-size:14.5px;font-weight:700;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--text);line-height:1.4;}
+.card-loc{font-size:13px;color:var(--muted);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-date{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+.card-status{font-size:13px;font-weight:600;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);}
 .status-wait{color:var(--muted);}.status-done{color:var(--found);}.status-notfound{color:#d35400;}.status-unclaimed{color:#8e44ad;}
 
-.empty{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--muted);}
-.empty-icon{font-size:48px;margin-bottom:12px;opacity:0.5;}
-.loading{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--muted);}
+/* ─── EMPTY / LOADING ─── */
+.empty,.loading{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--muted);}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:0.4;display:block;}
 .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
-.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:500;align-items:center;justify-content:center;padding:20px;}
+/* ─── MODAL ─── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(5px);z-index:500;align-items:center;justify-content:center;padding:20px;}
 .modal-backdrop.show{display:flex;}
-.modal{background:white;border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:popIn 0.3s ease;}
-@keyframes popIn{from{opacity:0;transform:scale(0.9);}to{opacity:1;transform:scale(1);}}
-.modal-img{width:100%;max-height:320px;object-fit:contain;background:#f0f3f8;}
-.modal-banner{padding:12px 22px;color:white;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;}
-.modal-close{background:none;border:none;font-size:28px;color:rgba(255,255,255,0.8);cursor:pointer;line-height:1;}
+.modal{background:white;border-radius:18px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,0.35);animation:popIn 0.28s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes popIn{from{opacity:0;transform:scale(0.88);}to{opacity:1;transform:scale(1);}}
+.modal-banner{padding:14px 20px;color:white;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;border-radius:18px 18px 0 0;}
+.modal-close{background:rgba(255,255,255,0.2);border:none;font-size:20px;color:white;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s;line-height:1;}
+.modal-close:hover{background:rgba(255,255,255,0.35);}
+.modal-img-wrap{background:#f0f3f8;max-height:320px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.modal-img{width:100%;max-height:320px;object-fit:contain;}
 .modal-body{padding:22px;}
-.modal-row{display:flex;margin-bottom:10px;font-size:14px;}
-.modal-key{color:var(--muted);min-width:110px;flex-shrink:0;font-weight:600;}
-.modal-val{flex:1;color:var(--text);}
+.modal-row{display:flex;margin-bottom:11px;font-size:14px;gap:10px;}
+.modal-key{color:var(--muted);min-width:110px;flex-shrink:0;font-weight:600;padding-top:1px;}
+.modal-val{flex:1;color:var(--text);line-height:1.5;word-break:break-word;}
 .modal-status-box{margin-top:16px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;text-align:center;}
 .ms-wait{background:#f8f9fa;color:var(--muted);}.ms-done{background:#edf7f1;color:var(--found);}
 .ms-notfound{background:#fff3e0;color:#d35400;}.ms-unclaimed{background:#f3e5f5;color:#8e44ad;}
+.modal-action{margin-top:10px;padding:10px 14px;background:#f8f9fa;border-radius:8px;font-size:13px;color:var(--muted);line-height:1.5;}
+.modal-action strong{color:var(--text);}
 
-.pagination{display:flex;justify-content:center;gap:8px;margin-top:28px;flex-wrap:wrap;}
-.page-btn{padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;transition:all 0.18s;}
-.page-btn:hover{border-color:var(--primary-mid);color:var(--primary);}
+/* ─── PAGINATION ─── */
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:28px;flex-wrap:wrap;padding-bottom:10px;}
+.page-btn{padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;transition:all 0.18s;min-width:42px;}
+.page-btn:hover:not(:disabled){border-color:var(--primary-mid);color:var(--primary);transform:translateY(-1px);}
 .page-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
-.page-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.page-btn:disabled{opacity:0.38;cursor:not-allowed;}
 
-.btn-refresh{background:white;border:1.5px solid var(--border);padding:9px 14px;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;font-family:'Sarabun',sans-serif;}
-.btn-refresh:hover{border-color:var(--primary-mid);}
-.info-text{margin-left:auto;font-size:13px;color:var(--muted);}
+/* ─── FOOTER ─── */
+footer{background:var(--primary);color:rgba(255,255,255,0.75);font-size:12px;padding:18px 24px;text-align:center;line-height:1.8;margin-top:auto;}
+footer .footer-ver{font-weight:700;color:var(--accent);letter-spacing:0.5px;}
+footer .footer-copy{font-size:11.5px;margin-top:3px;}
+footer a{color:rgba(255,255,255,0.6);text-decoration:none;}
+footer a:hover{color:white;}
 
-@media(max-width:600px){
+/* ─── RESPONSIVE ─── */
+@media(max-width:768px){
   .header-inner{padding:12px 16px;}
-  .content{padding:16px 12px;}
-  .gallery{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;}
-  .card-img,.card-img-placeholder{height:155px;}
-  .header-sub,.btn-dash{display:none;}
+  .header-sub{display:none;}
+  .btn-dash{display:none;}
   .btn-add{padding:8px 14px;font-size:13px;}
+  .content{padding:16px 12px;}
+  .gallery{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;}
+  .card-img-wrap{height:170px;}
+  .card-body{padding:11px;}
+  .card-title{font-size:13.5px;}
+  .stats-bar{gap:8px;}
+  .stat-chip{font-size:13px;padding:7px 12px;}
+  .info-text{display:none;}
+}
+@media(max-width:480px){
+  .gallery{grid-template-columns:1fr 1fr;gap:10px;}
+  .card-img-wrap{height:150px;}
+  .search-row{flex-direction:column;}
+  .sort-select{width:100%;}
 }
 </style>
 </head>
 <body>
 
+<!-- HEADER -->
 <div class="header">
   <div class="header-inner">
     <div class="header-left">
@@ -124,16 +159,28 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
+<!-- CONTENT -->
 <div class="content">
+
+  <!-- STATS BAR -->
   <div class="stats-bar">
-    <div class="stat-chip chip-all active" id="chip-all" onclick="filterType('all')">ทั้งหมด <span class="count" id="cnt-all">-</span></div>
-    <div class="stat-chip chip-lost" id="chip-lost" onclick="filterType('สิ่งของสูญหาย')">😟 สูญหาย <span class="count" id="cnt-lost">-</span></div>
-    <div class="stat-chip chip-found" id="chip-found" onclick="filterType('พบสิ่งของ')">📦 พบของ <span class="count" id="cnt-found">-</span></div>
-    <div class="stat-chip chip-pickup" id="chip-pickup" onclick="filterType('รับของคืน')">🤝 รับคืนแล้ว <span class="count" id="cnt-pickup">-</span></div>
+    <div class="stat-chip chip-all active" id="chip-all" onclick="filterType('all')">
+      ทั้งหมด <span class="count" id="cnt-all">-</span>
+    </div>
+    <div class="stat-chip chip-lost" id="chip-lost" onclick="filterType('สิ่งของสูญหาย')">
+      😟 สูญหาย <span class="count" id="cnt-lost">-</span>
+    </div>
+    <div class="stat-chip chip-found" id="chip-found" onclick="filterType('พบสิ่งของ')">
+      📦 พบของ <span class="count" id="cnt-found">-</span>
+    </div>
+    <div class="stat-chip chip-pickup" id="chip-pickup" onclick="filterType('รับของคืน')">
+      🤝 รับคืนแล้ว <span class="count" id="cnt-pickup">-</span>
+    </div>
     <button class="btn-refresh" onclick="loadAll()">🔄 รีเฟรช</button>
     <div class="info-text" id="update-time"></div>
   </div>
 
+  <!-- SEARCH -->
   <div class="search-row">
     <div class="search-box">
       <span class="search-icon">🔎</span>
@@ -146,248 +193,384 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
     </select>
   </div>
 
+  <!-- GALLERY -->
   <div class="gallery" id="gallery">
     <div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>
   </div>
   <div class="pagination" id="pagination"></div>
+
 </div>
 
+<!-- MODAL -->
 <div class="modal-backdrop" id="modal-bg" onclick="bgClose(event)">
-  <div class="modal">
+  <div class="modal" id="modal-box">
     <div class="modal-banner" id="modal-banner">
       <span id="modal-type-text"></span>
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <img id="modal-img" class="modal-img" src="" style="display:none" onerror="this.style.display='none'">
+    <div class="modal-img-wrap" id="modal-img-wrap" style="display:none">
+      <img id="modal-img" class="modal-img" src="" alt="รูปภาพประกอบ">
+    </div>
     <div class="modal-body">
       <div id="modal-rows"></div>
       <div class="modal-status-box" id="modal-status-box"></div>
+      <div class="modal-action" id="modal-action" style="display:none"></div>
     </div>
   </div>
 </div>
 
+<!-- FOOTER -->
+<footer>
+  <div><span class="footer-ver">Lost &amp; Found Web App — v1.1.0</span></div>
+  <div class="footer-copy">
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
+  </div>
+</footer>
+
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec';
+/* =====================================================
+ * Lost & Found — index.html
+ * Version : 1.1.0
+ * Author  : Traffic Control and Premises Security Unit,
+ *           Mahidol University
+ * © 2025–2026 Traffic Control and Premises Security Unit,
+ *   Mahidol University. All rights reserved.
+ * ===================================================== */
+
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec';
 const OLD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14MJgb81aVEjT2qVp6n9zNKCCpJNVimX1q0hiYkH0f5I/gviz/tq?tqx=out:json&gid=751456190';
 const ITEMS_PER_PAGE = 20;
 
 let allItems = [], filtered = [], currentPage = 1, currentFilter = 'all';
 
-// ── Parse Sheet เดิม (gviz) ──────────────────────────
+/* ── helpers ── */
+function driveThumb(raw, size='w400') {
+  if (!raw) return '';
+  const first = raw.split(',')[0].trim();
+  if (!first.includes('drive.google.com')) return first;
+  const m = first.match(/id=([a-zA-Z0-9_-]+)/) || first.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=${size}` : '';
+}
+
+function fmtDate(d) {
+  if (!d || isNaN(d)) return '-';
+  try {
+    return d.toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  } catch(e) { return '-'; }
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  try {
+    // รองรับทั้ง "9/6/2025 8:53:03" และ ISO format
+    const d = new Date(str);
+    if (!isNaN(d) && d.getFullYear() > 2000) return d;
+  } catch(e) {}
+  return null;
+}
+
+/* ── Parse Sheet เดิม (gviz) ── */
 function parseOldSheet(text) {
   try {
-    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);/);
+    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+?)\);?\s*$/);
     if (!m) return [];
-    const rows = JSON.parse(m[1]).table.rows || [];
+    const json = JSON.parse(m[1]);
+    const rows = json?.table?.rows || [];
+
     return rows.map(row => {
       if (!row?.c) return null;
-      const g = i => row.c[i] ? String(row.c[i].f || row.c[i].v || '') : '';
+      const g = i => {
+        const cell = row.c[i];
+        if (!cell) return '';
+        return String(cell.f || cell.v || '').trim();
+      };
+
+      // Col G (index 6) = ประเภท
       const subj = g(6);
       let type = '';
-      if (subj.includes('สูญหาย')||subj.includes('หาย')) type='สิ่งของสูญหาย';
-      else if (subj.includes('พบ')||subj.includes('เก็บ')) type='พบสิ่งของ';
-      else if (subj.includes('คืน')) type='รับของคืน';
+      if (subj.includes('สูญหาย') || subj.includes('หาย')) type = 'สิ่งของสูญหาย';
+      else if (subj.includes('พบ') || subj.includes('เก็บ')) type = 'พบสิ่งของ';
+      else if (subj.includes('คืน')) type = 'รับของคืน';
       else return null;
-      let title='',loc='',imgRaw='';
-      if(type==='สิ่งของสูญหาย'){title=g(7);loc=g(8);imgRaw=g(9);}
-      else if(type==='พบสิ่งของ'){title=g(10);loc=g(11);imgRaw=g(12);}
-      else{title=g(13);imgRaw=g(14);}
-      let imgUrl='';
-      if(imgRaw&&imgRaw.includes('drive.google.com')){
-        const first=imgRaw.split(',')[0].trim();
-        const mid=first.match(/id=([a-zA-Z0-9_-]+)/)||first.match(/\/d\/([a-zA-Z0-9_-]+)/);
-        if(mid) imgUrl=`https://drive.google.com/thumbnail?id=${mid[1]}&sz=w400`;
+
+      // ดึง title/location/image ตามประเภท
+      let title = '', loc = '', imgRaw = '';
+      if (type === 'สิ่งของสูญหาย') {
+        title  = g(7);   // Col H: รายละเอียดของสูญหาย
+        loc    = g(8);   // Col I: สถานที่สูญหาย
+        imgRaw = g(9);   // Col J: รูปของสูญหาย
+      } else if (type === 'พบสิ่งของ') {
+        title  = g(10);  // Col K: รายละเอียดของที่พบ
+        loc    = g(11);  // Col L: สถานที่พบ
+        imgRaw = g(12);  // Col M: รูปของที่พบ
+      } else {
+        title  = g(13);  // Col N: รายละเอียดของที่รับคืน
+        imgRaw = g(14);  // Col O: รูปของที่รับคืน
+        loc    = '-';
       }
-      let dateObj=null;
-      try{dateObj=new Date(g(0));if(isNaN(dateObj))dateObj=null;}catch(e){}
+
+      // Fallback: ถ้า title ว่างหรือเป็นเบอร์โทร → ใช้ชื่อผู้แจ้งแทน
+      const phone = g(5);
+      const isPhone = /^[\d\s\-\+]{7,15}$/.test(title.trim());
+      if (!title || isPhone) {
+        title = type === 'สิ่งของสูญหาย' ? `[ของหาย] ${g(2)}` :
+                type === 'พบสิ่งของ'     ? `[ของที่พบ] ${g(2)}` : `[รับคืน] ${g(2)}`;
+      }
+
       return {
-        source:'old',type,
-        title:title||g(5)||'ไม่ระบุ',
-        location:loc||'ไม่ระบุ',
-        date:g(0),dateObj,imgUrl,
-        status:g(18)||'',actionText:g(17)||'',
-        name:g(2),personType:g(3),dept:g(4),phone:g(5)
+        source     : 'old',
+        type,
+        title      : title || 'ไม่ระบุ',
+        location   : loc   || 'ไม่ระบุสถานที่',
+        date       : g(0),
+        dateObj    : parseDate(g(0)),
+        imgUrl     : driveThumb(imgRaw),
+        status     : g(18) || '',
+        actionText : g(17) || '',
+        name       : g(2),
+        personType : g(3),
+        dept       : g(4),
+        phone,
+        time       : g(15)
       };
     }).filter(Boolean).reverse();
-  }catch(e){console.error('old parse',e);return[];}
+  } catch(e) {
+    console.error('parseOldSheet error:', e);
+    return [];
+  }
 }
 
-// ── Parse Sheet ใหม่ (GAS JSON) ──────────────────────
+/* ── Parse Sheet ใหม่ (GAS JSON) ── */
 function parseNewSheet(data) {
-  return (data||[]).map(r => {
-    let imgUrl = r['URL รูปภาพ']||'';
-    if(imgUrl&&imgUrl.includes('drive.google.com')){
-      const mid=imgUrl.match(/id=([a-zA-Z0-9_-]+)/)||imgUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if(mid) imgUrl=`https://drive.google.com/thumbnail?id=${mid[1]}&sz=w400`;
-    }
-    let dateObj=null;
-    try{dateObj=new Date(r['Timestamp']);if(isNaN(dateObj))dateObj=null;}catch(e){}
-    return {
-      source:'new',
-      refCode:r['RefCode']||'',
-      type:r['ประเภท']||'',
-      title:r['รายละเอียด']||'ไม่ระบุ',
-      location:r['สถานที่']||'ไม่ระบุ',
-      date:r['Timestamp']||'',dateObj,imgUrl,
-      status:r['สถานะ']||'รอดำเนินการ',
-      actionText:r['การดำเนินการ']||'',
-      name:r['ชื่อ-นามสกุล']||'',
-      personType:r['ประเภทบุคคล']||'',
-      dept:r['คณะ/หน่วยงาน']||'',
-      phone:r['เบอร์โทร']||''
-    };
-  }).filter(r=>r.type);
+  return (data || []).map(r => ({
+    source     : 'new',
+    refCode    : r['RefCode']       || '',
+    type       : r['ประเภท']        || '',
+    title      : r['รายละเอียด']    || 'ไม่ระบุ',
+    location   : r['สถานที่']       || 'ไม่ระบุสถานที่',
+    date       : r['Timestamp']     || '',
+    dateObj    : parseDate(r['Timestamp']),
+    imgUrl     : driveThumb(r['URL รูปภาพ']),
+    status     : r['สถานะ']         || 'รอดำเนินการ',
+    actionText : r['การดำเนินการ']  || '',
+    name       : r['ชื่อ-นามสกุล'] || '',
+    personType : r['ประเภทบุคคล']  || '',
+    dept       : r['คณะ/หน่วยงาน'] || '',
+    phone      : r['เบอร์โทร']      || '',
+    time       : r['เวลา']          || ''
+  })).filter(r => r.type);
 }
 
-// ── Load all data ─────────────────────────────────────
+/* ── Load all ── */
 async function loadAll() {
-  document.getElementById('gallery').innerHTML='<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
-  const [r1,r2] = await Promise.allSettled([
-    fetch(OLD_SHEET_URL).then(r=>r.text()),
-    fetch(GAS_URL+'?action=getData').then(r=>r.json())
+  document.getElementById('gallery').innerHTML =
+    '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
+
+  const [r1, r2] = await Promise.allSettled([
+    fetch(OLD_SHEET_URL + '&t=' + Date.now()).then(r => r.text()),
+    fetch(GAS_URL + '?action=getData&t=' + Date.now()).then(r => r.json())
   ]);
-  const oldItems = r1.status==='fulfilled' ? parseOldSheet(r1.value) : [];
-  const newItems = r2.status==='fulfilled' && r2.value?.data ? parseNewSheet(r2.value.data) : [];
-  // ใหม่ก่อน เก่าหลัง
-  allItems = [...newItems, ...oldItems];
+
+  const oldItems = r1.status === 'fulfilled' ? parseOldSheet(r1.value) : [];
+  const newItems = (r2.status === 'fulfilled' && r2.value?.data)
+    ? parseNewSheet(r2.value.data) : [];
+
+  allItems = [...newItems, ...oldItems]; // ใหม่ก่อน
   updateCounts();
   applyFilters();
-  document.getElementById('update-time').textContent = 'อัปเดต: '+new Date().toLocaleTimeString('th-TH');
+  document.getElementById('update-time').textContent =
+    'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
 }
 
-function updateCounts(){
-  document.getElementById('cnt-all').textContent=allItems.length;
-  document.getElementById('cnt-lost').textContent=allItems.filter(i=>i.type==='สิ่งของสูญหาย').length;
-  document.getElementById('cnt-found').textContent=allItems.filter(i=>i.type==='พบสิ่งของ').length;
-  document.getElementById('cnt-pickup').textContent=allItems.filter(i=>i.type==='รับของคืน').length;
+/* ── Counts ── */
+function updateCounts() {
+  document.getElementById('cnt-all').textContent    = allItems.length;
+  document.getElementById('cnt-lost').textContent   = allItems.filter(i => i.type === 'สิ่งของสูญหาย').length;
+  document.getElementById('cnt-found').textContent  = allItems.filter(i => i.type === 'พบสิ่งของ').length;
+  document.getElementById('cnt-pickup').textContent = allItems.filter(i => i.type === 'รับของคืน').length;
 }
 
-function filterType(t){
-  currentFilter=t; currentPage=1;
-  ['all','lost','found','pickup'].forEach(x=>{
-    const el=document.getElementById('chip-'+x);
-    if(el) el.classList.remove('active');
-  });
-  const map={all:'chip-all','สิ่งของสูญหาย':'chip-lost','พบสิ่งของ':'chip-found','รับของคืน':'chip-pickup'};
-  if(map[t]) document.getElementById(map[t]).classList.add('active');
+/* ── Filter & sort ── */
+function filterType(t) {
+  currentFilter = t; currentPage = 1;
+  document.querySelectorAll('.stat-chip').forEach(c => c.classList.remove('active'));
+  const map = { all:'chip-all', 'สิ่งของสูญหาย':'chip-lost', 'พบสิ่งของ':'chip-found', 'รับของคืน':'chip-pickup' };
+  if (map[t]) document.getElementById(map[t]).classList.add('active');
   applyFilters();
 }
 
-function applyFilters(){
-  const q=document.getElementById('searchInput').value.toLowerCase().trim();
-  const sort=document.getElementById('sortSelect').value;
-  filtered=allItems.filter(it=>{
-    const matchT=currentFilter==='all'||it.type===currentFilter;
-    const searchStr=`${it.title} ${it.location} ${it.name} ${it.dept} ${it.phone}`.toLowerCase();
-    return matchT&&(!q||searchStr.includes(q));
+function applyFilters() {
+  const q    = document.getElementById('searchInput').value.toLowerCase().trim();
+  const sort = document.getElementById('sortSelect').value;
+
+  filtered = allItems.filter(it => {
+    const matchT = currentFilter === 'all' || it.type === currentFilter;
+    const txt = `${it.title} ${it.location} ${it.name} ${it.dept} ${it.phone}`.toLowerCase();
+    return matchT && (!q || txt.includes(q));
   });
-  if(sort==='newest') filtered.sort((a,b)=>(b.dateObj||0)-(a.dateObj||0));
-  else if(sort==='oldest') filtered.sort((a,b)=>(a.dateObj||0)-(b.dateObj||0));
-  else if(sort==='status'){
-    const o={'รับของคืนแล้ว':0,'รับของคืน':0,'ช่วยหาแล้วยังไม่พบ':1,'เจ้าของยังไม่มารับคืน':2,'รอดำเนินการ':3,'':4};
-    filtered.sort((a,b)=>(o[a.status]??5)-(o[b.status]??5));
-  }
-  currentPage=1; renderPage();
+
+  const statusOrder = { 'รับของคืนแล้ว':0,'รับของคืน':0,'ช่วยหาแล้วยังไม่พบ':1,'เจ้าของยังไม่มารับคืน':2,'รอดำเนินการ':3,'':4 };
+  if      (sort === 'newest') filtered.sort((a,b)=>(b.dateObj||0)-(a.dateObj||0));
+  else if (sort === 'oldest') filtered.sort((a,b)=>(a.dateObj||0)-(b.dateObj||0));
+  else if (sort === 'status') filtered.sort((a,b)=>(statusOrder[a.status]??5)-(statusOrder[b.status]??5));
+
+  currentPage = 1;
+  renderPage();
 }
 
-function renderPage(){
-  const gallery=document.getElementById('gallery');
-  const total=filtered.length;
-  const pages=Math.ceil(total/ITEMS_PER_PAGE);
-  const start=(currentPage-1)*ITEMS_PER_PAGE;
-  const items=filtered.slice(start,start+ITEMS_PER_PAGE);
-  if(!items.length){
-    gallery.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div>ไม่พบข้อมูลที่ตรงกับการค้นหา</div></div>';
-    document.getElementById('pagination').innerHTML=''; return;
+/* ── Render gallery ── */
+function renderPage() {
+  const gallery  = document.getElementById('gallery');
+  const total    = filtered.length;
+  const pages    = Math.ceil(total / ITEMS_PER_PAGE);
+  const start    = (currentPage - 1) * ITEMS_PER_PAGE;
+  const items    = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+  if (!items.length) {
+    gallery.innerHTML = `<div class="empty"><span class="empty-icon">🔍</span>ไม่พบข้อมูลที่ตรงกับการค้นหา</div>`;
+    document.getElementById('pagination').innerHTML = '';
+    return;
   }
-  gallery.innerHTML=items.map((it,i)=>renderCard(it,start+i)).join('');
+
+  gallery.innerHTML = items.map((it, i) => renderCard(it, start + i)).join('');
   renderPagination(pages);
 }
 
-function fmtDate(d){
-  try{if(d)return d.toLocaleString('th-TH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){}
-  return '-';
+function renderCard(it, idx) {
+  const tc  = it.type === 'สิ่งของสูญหาย' ? 'border-lost' : it.type === 'พบสิ่งของ' ? 'border-found' : 'border-pickup';
+  const bc  = it.type === 'สิ่งของสูญหาย' ? 'badge-lost'  : it.type === 'พบสิ่งของ' ? 'badge-found'  : 'badge-pickup';
+  const src = it.source === 'new' ? '<span class="source-badge">✨ ใหม่</span>' : '';
+
+  const imgHtml = it.imgUrl
+    ? `<img class="card-img" src="${it.imgUrl}" loading="lazy"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+         alt="รูปภาพสิ่งของ">
+       <div class="card-img-placeholder" style="display:none"><span class="ph-icon">🖼️</span>ไม่มีภาพ</div>`
+    : `<div class="card-img-placeholder"><span class="ph-icon">🖼️</span>ไม่มีภาพประกอบ</div>`;
+
+  const s = (it.status || '').trim();
+  let stHtml = '<div class="card-status status-wait">⏳ รอดำเนินการ</div>';
+  if (s.includes('รับของคืนแล้ว') || s.includes('รับของคืน'))
+    stHtml = '<div class="card-status status-done">✅ รับของคืนแล้ว</div>';
+  else if (s.includes('ช่วยหาแล้วยังไม่พบ'))
+    stHtml = '<div class="card-status status-notfound">🔎 ช่วยหาแล้วยังไม่พบ</div>';
+  else if (s.includes('เจ้าของยังไม่มารับคืน'))
+    stHtml = '<div class="card-status status-unclaimed">⏳ เจ้าของยังไม่มารับคืน</div>';
+
+  return `
+    <div class="card ${tc}" onclick="openModal(${idx})">
+      <div class="card-img-wrap">
+        ${imgHtml}
+        <span class="type-badge ${bc}">${it.type}</span>
+        ${src}
+      </div>
+      <div class="card-body">
+        <div class="card-title" title="${it.title}">${it.title}</div>
+        <div class="card-loc">📍 ${it.location}</div>
+        <div class="card-date">🕐 ${fmtDate(it.dateObj)}</div>
+        ${stHtml}
+      </div>
+    </div>`;
 }
 
-function renderCard(it,idx){
-  const tc=it.type==='สิ่งของสูญหาย'?'border-lost':it.type==='พบสิ่งของ'?'border-found':'border-pickup';
-  const bc=it.type==='สิ่งของสูญหาย'?'badge-lost':it.type==='พบสิ่งของ'?'badge-found':'badge-pickup';
-  const imgHtml=it.imgUrl
-    ?`<img class="card-img" src="${it.imgUrl}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-    :'';
-  const phHtml=`<div class="card-img-placeholder" style="${it.imgUrl?'display:none':''}">ไม่มีภาพประกอบ</div>`;
-  const s=(it.status||'').trim();
-  let stHtml='<div class="card-status status-wait">รอดำเนินการ</div>';
-  if(s.includes('รับของคืนแล้ว')||s.includes('รับของคืน')) stHtml='<div class="card-status status-done">✅ รับของคืนแล้ว</div>';
-  else if(s.includes('ช่วยหาแล้วยังไม่พบ')) stHtml='<div class="card-status status-notfound">🔎 ช่วยหาแล้วยังไม่พบ</div>';
-  else if(s.includes('เจ้าของยังไม่มารับคืน')) stHtml='<div class="card-status status-unclaimed">⏳ เจ้าของยังไม่มารับคืน</div>';
-  return `<div class="card ${tc}" onclick="openModal(${idx})">
-    <div class="card-img-wrap">${imgHtml}${phHtml}<span class="type-badge ${bc}">${it.type}</span></div>
-    <div class="card-body">
-      <div class="card-title" title="${it.title}">${it.title}</div>
-      <div class="card-loc">📍 ${it.location}</div>
-      <div class="card-date">🕐 ${fmtDate(it.dateObj)}</div>
-      ${stHtml}
-    </div></div>`;
-}
+/* ── Pagination ── */
+function renderPagination(pages) {
+  const pg = document.getElementById('pagination');
+  if (pages <= 1) { pg.innerHTML = ''; return; }
 
-function renderPagination(pages){
-  const pg=document.getElementById('pagination');
-  if(pages<=1){pg.innerHTML='';return;}
-  let h=`<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← ก่อนหน้า</button>`;
-  for(let i=1;i<=pages;i++){
-    if(i===1||i===pages||Math.abs(i-currentPage)<=2) h+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
-    else if(Math.abs(i-currentPage)===3) h+=`<span style="padding:8px 4px;color:var(--muted)">…</span>`;
+  let h = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← ก่อนหน้า</button>`;
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1 || i === pages || Math.abs(i - currentPage) <= 2)
+      h += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    else if (Math.abs(i - currentPage) === 3)
+      h += `<span style="padding:8px 2px;color:var(--muted)">…</span>`;
   }
-  h+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>ถัดไป →</button>`;
-  pg.innerHTML=h;
+  h += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>ถัดไป →</button>`;
+  pg.innerHTML = h;
 }
 
-function goPage(p){
-  const pages=Math.ceil(filtered.length/ITEMS_PER_PAGE);
-  if(p<1||p>pages)return;
-  currentPage=p; renderPage();
-  window.scrollTo({top:0,behavior:'smooth'});
+function goPage(p) {
+  const pages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  if (p < 1 || p > pages) return;
+  currentPage = p;
+  renderPage();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function openModal(idx){
-  const it=filtered[idx]; if(!it)return;
-  const color=it.type==='สิ่งของสูญหาย'?'#c0392b':it.type==='พบสิ่งของ'?'#1e7e44':'#1a5276';
-  const emoji=it.type==='สิ่งของสูญหาย'?'😟':it.type==='พบสิ่งของ'?'📦':'🤝';
-  document.getElementById('modal-banner').style.background=color;
-  document.getElementById('modal-type-text').textContent=`${emoji} ${it.type}`;
-  const img=document.getElementById('modal-img');
-  if(it.imgUrl){img.src=it.imgUrl.replace('sz=w400','sz=w1000');img.style.display='block';}
-  else img.style.display='none';
-  const rows=[
-    it.refCode?['เลขอ้างอิง',it.refCode]:null,
-    ['รายละเอียด',it.title],['สถานที่',it.location],
-    ['วันที่/เวลา',fmtDate(it.dateObj)],
-    ['ผู้แจ้ง',it.name],
-    it.personType?['ประเภทบุคคล',it.personType.split(' ')[0]]:null,
-    it.dept?['คณะ/หน่วยงาน',it.dept]:null,
-    it.phone?['เบอร์ติดต่อ',it.phone]:null,
-    it.actionText?['การดำเนินการ',it.actionText]:null
+/* ── Modal ── */
+function openModal(idx) {
+  const it = filtered[idx]; if (!it) return;
+
+  const color = it.type==='สิ่งของสูญหาย' ? '#c0392b' : it.type==='พบสิ่งของ' ? '#1e7e44' : '#1a5276';
+  const emoji = it.type==='สิ่งของสูญหาย' ? '😟' : it.type==='พบสิ่งของ' ? '📦' : '🤝';
+  document.getElementById('modal-banner').style.background = color;
+  document.getElementById('modal-type-text').textContent = `${emoji} ${it.type}`;
+
+  // Image
+  const imgWrap = document.getElementById('modal-img-wrap');
+  const img     = document.getElementById('modal-img');
+  if (it.imgUrl) {
+    img.src = driveThumb(it.imgUrl.replace(/sz=w\d+/,''), 'w1000') || it.imgUrl;
+    img.onerror = () => { imgWrap.style.display = 'none'; };
+    imgWrap.style.display = 'flex';
+  } else {
+    imgWrap.style.display = 'none';
+  }
+
+  // Rows
+  const rows = [
+    it.refCode    ? ['🔖 เลขอ้างอิง', it.refCode]                           : null,
+    it.title      ? ['📝 รายละเอียด', it.title]                             : null,
+    it.location && it.location !== '-' ? ['📍 สถานที่', it.location]         : null,
+    it.time       ? ['🕐 เวลา',       it.time]                              : null,
+    ['📅 วันที่',    fmtDate(it.dateObj)],
+    it.name       ? ['👤 ผู้แจ้ง',    it.name]                              : null,
+    it.personType ? ['🏷️ ประเภทบุคคล', it.personType.split(' ')[0]]         : null,
+    it.dept       ? ['🏢 คณะ/หน่วยงาน',it.dept]                             : null,
+    it.phone      ? ['📞 เบอร์ติดต่อ', it.phone]                            : null,
   ].filter(Boolean);
-  document.getElementById('modal-rows').innerHTML=rows.map(r=>
+
+  document.getElementById('modal-rows').innerHTML = rows.map(r =>
     `<div class="modal-row"><span class="modal-key">${r[0]}</span><span class="modal-val">${r[1]||'-'}</span></div>`
   ).join('');
-  const s=(it.status||'').trim();
-  const sb=document.getElementById('modal-status-box');
-  if(s.includes('รับของคืนแล้ว')||s.includes('รับของคืน')){sb.className='modal-status-box ms-done';sb.textContent='✅ รับของคืนแล้ว';}
-  else if(s.includes('ช่วยหาแล้วยังไม่พบ')){sb.className='modal-status-box ms-notfound';sb.textContent='🔎 ช่วยหาแล้วยังไม่พบ';}
-  else if(s.includes('เจ้าของยังไม่มารับคืน')){sb.className='modal-status-box ms-unclaimed';sb.textContent='⏳ เจ้าของยังไม่มารับคืน';}
-  else{sb.className='modal-status-box ms-wait';sb.textContent='รอดำเนินการ';}
+
+  // Status
+  const s  = (it.status || '').trim();
+  const sb = document.getElementById('modal-status-box');
+  if (s.includes('รับของคืนแล้ว') || s.includes('รับของคืน'))
+    { sb.className='modal-status-box ms-done';    sb.textContent='✅ รับของคืนแล้ว'; }
+  else if (s.includes('ช่วยหาแล้วยังไม่พบ'))
+    { sb.className='modal-status-box ms-notfound';sb.textContent='🔎 ช่วยหาแล้วยังไม่พบ'; }
+  else if (s.includes('เจ้าของยังไม่มารับคืน'))
+    { sb.className='modal-status-box ms-unclaimed';sb.textContent='⏳ เจ้าของยังไม่มารับคืน'; }
+  else
+    { sb.className='modal-status-box ms-wait';    sb.textContent='⏳ รอดำเนินการ'; }
+
+  // Action text
+  const actEl = document.getElementById('modal-action');
+  if (it.actionText) {
+    actEl.innerHTML = `<strong>📋 การดำเนินการ:</strong> ${it.actionText}`;
+    actEl.style.display = 'block';
+  } else {
+    actEl.style.display = 'none';
+  }
+
   document.getElementById('modal-bg').classList.add('show');
-  document.body.style.overflow='hidden';
+  document.body.style.overflow = 'hidden';
 }
 
-function bgClose(e){if(e.target===document.getElementById('modal-bg'))closeModal();}
-function closeModal(){document.getElementById('modal-bg').classList.remove('show');document.body.style.overflow='';}
+function bgClose(e) { if (e.target === document.getElementById('modal-bg')) closeModal(); }
+function closeModal() {
+  document.getElementById('modal-bg').classList.remove('show');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-window.onload=()=>{
+/* ── Init ── */
+window.onload = () => {
   loadAll();
-  setInterval(loadAll,5*60*1000);
+  setInterval(loadAll, 5 * 60 * 1000); // auto-refresh ทุก 5 นาที
 };
 </script>
 </body>
