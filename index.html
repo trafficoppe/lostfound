@@ -33,7 +33,8 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .content{max-width:1400px;margin:0 auto;padding:24px 20px;flex:1;}
 
 /* ─── STATS BAR ─── */
-.stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
+.stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;align-items:flex-start;}
+.chip-group{display:flex;flex-direction:column;gap:5px;align-items:flex-start;}
 .stat-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:2px solid transparent;user-select:none;}
 .stat-chip .count{font-size:15px;font-weight:800;}
 .chip-all{background:var(--primary);color:white;opacity:0.75;}
@@ -42,9 +43,49 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .chip-found{background:#edf7f1;color:var(--found);border-color:#b7e4c7;}
 .chip-pickup{background:#eaf1fb;color:var(--pickup);border-color:#b6d0ef;}
 .stat-chip:hover,.stat-chip.active{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+/* pending sub-button — ซ่อนก่อน โชว์เมื่อ chip active */
+.btn-pending{display:none;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed #e0a800;background:#fffbea;color:#b07d00;transition:all 0.2s;font-family:'Sarabun',sans-serif;}
+.btn-pending.visible{display:inline-flex;animation:fadeSlideIn 0.25s ease;}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
+.btn-pending:hover{background:#fff3c4;border-color:#c47a10;transform:translateY(-1px);}
+.btn-pending .pcount{font-weight:800;color:#d35400;}
 .btn-refresh{background:white;border:1.5px solid var(--border);padding:8px 14px;border-radius:10px;font-size:13.5px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;font-family:'Sarabun',sans-serif;}
 .btn-refresh:hover{border-color:var(--primary-mid);color:var(--primary);}
 .info-text{margin-left:auto;font-size:12.5px;color:var(--muted);}
+
+/* ─── PENDING PANEL ─── */
+.pending-panel{display:none;background:white;border-radius:var(--radius);box-shadow:0 4px 24px rgba(26,58,92,0.13);margin-bottom:20px;overflow:hidden;border:2px solid #f5c842;animation:slideDown 0.28s ease;}
+.pending-panel.show{display:block;}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+.pending-panel-head{background:linear-gradient(135deg,#b07d00,#e8a020);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.pending-panel-title{color:white;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;}
+.pending-panel-close{background:rgba(255,255,255,0.2);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;}
+.pending-panel-close:hover{background:rgba(255,255,255,0.35);}
+/* filter bar inside panel */
+.pending-filter{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fffdf5;}
+.pending-filter label{font-size:13px;font-weight:600;color:var(--muted);}
+.pf-btn{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:white;font-family:'Sarabun',sans-serif;transition:all 0.18s;color:var(--text);}
+.pf-btn:hover,.pf-btn.pf-active{background:#fff3c4;border-color:#e8a020;color:#b07d00;}
+.pf-custom{display:none;align-items:center;gap:8px;flex-wrap:wrap;}
+.pf-custom.show{display:flex;}
+.pf-custom input[type=date]{padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;outline:none;}
+.pf-custom input[type=date]:focus{border-color:var(--accent);}
+.pf-apply{padding:6px 14px;border-radius:8px;background:var(--accent);color:white;border:none;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+/* pending list */
+.pending-list{max-height:420px;overflow-y:auto;}
+.pending-item{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
+.pending-item:hover{background:#fffdf5;}
+.pending-item:last-child{border-bottom:none;}
+.pi-img{width:62px;height:62px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#f0f3f8;border:1px solid var(--border);}
+.pi-img-ph{width:62px;height:62px;border-radius:10px;flex-shrink:0;background:#f0f3f8;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;opacity:0.4;}
+.pi-info{flex:1;min-width:0;}
+.pi-title{font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px;}
+.pi-loc{font-size:12.5px;color:var(--muted);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pi-date{font-size:12px;color:var(--muted);}
+.pi-badge{flex-shrink:0;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;color:white;}
+.pending-empty{text-align:center;padding:30px;color:var(--muted);font-size:14px;}
+.pending-summary{padding:10px 18px;background:#fff8e6;border-top:1px solid #f5c842;font-size:13px;color:#7a5a00;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+.pending-summary strong{color:#d35400;}
 
 /* ─── SEARCH ─── */
 .search-row{display:flex;gap:10px;margin-bottom:20px;}
@@ -164,20 +205,72 @@ footer a:hover{color:white;}
 
   <!-- STATS BAR -->
   <div class="stats-bar">
-    <div class="stat-chip chip-all active" id="chip-all" onclick="filterType('all')">
-      ทั้งหมด <span class="count" id="cnt-all">-</span>
+    <div class="chip-group">
+      <div class="stat-chip chip-all active" id="chip-all" onclick="filterType('all')">
+        ทั้งหมด <span class="count" id="cnt-all">-</span>
+      </div>
     </div>
-    <div class="stat-chip chip-lost" id="chip-lost" onclick="filterType('สิ่งของสูญหาย')">
-      😟 สูญหาย <span class="count" id="cnt-lost">-</span>
+    <div class="chip-group">
+      <div class="stat-chip chip-lost" id="chip-lost" onclick="filterType('สิ่งของสูญหาย')">
+        😟 สูญหาย <span class="count" id="cnt-lost">-</span>
+      </div>
+      <button class="btn-pending" id="btn-pending-lost" onclick="openPending('สิ่งของสูญหาย')">
+        ⏳ รอดำเนินการ <span class="pcount" id="pcnt-lost">-</span>
+      </button>
     </div>
-    <div class="stat-chip chip-found" id="chip-found" onclick="filterType('พบสิ่งของ')">
-      📦 พบของ <span class="count" id="cnt-found">-</span>
+    <div class="chip-group">
+      <div class="stat-chip chip-found" id="chip-found" onclick="filterType('พบสิ่งของ')">
+        📦 พบของ <span class="count" id="cnt-found">-</span>
+      </div>
+      <button class="btn-pending" id="btn-pending-found" onclick="openPending('พบสิ่งของ')">
+        ⏳ รอดำเนินการ <span class="pcount" id="pcnt-found">-</span>
+      </button>
     </div>
-    <div class="stat-chip chip-pickup" id="chip-pickup" onclick="filterType('รับของคืน')">
-      🤝 รับคืนแล้ว <span class="count" id="cnt-pickup">-</span>
+    <div class="chip-group">
+      <div class="stat-chip chip-pickup" id="chip-pickup" onclick="filterType('รับของคืน')">
+        🤝 รับคืนแล้ว <span class="count" id="cnt-pickup">-</span>
+      </div>
     </div>
     <button class="btn-refresh" onclick="loadAll()">🔄 รีเฟรช</button>
     <div class="info-text" id="update-time"></div>
+  </div>
+
+  <!-- PENDING PANEL -->
+  <div class="pending-panel" id="pending-panel">
+    <div class="pending-panel-head">
+      <div class="pending-panel-title">
+        <span id="pending-panel-icon">⏳</span>
+        <span id="pending-panel-title-text">รายการรอดำเนินการ</span>
+      </div>
+      <button class="pending-panel-close" onclick="closePending()">✕</button>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="pending-filter">
+      <label>ดูตาม:</label>
+      <button class="pf-btn pf-active" id="pf-today"   onclick="setPfMode('today')">วันนี้</button>
+      <button class="pf-btn"           id="pf-week"    onclick="setPfMode('week')">7 วันล่าสุด</button>
+      <button class="pf-btn"           id="pf-month"   onclick="setPfMode('month')">เดือนนี้</button>
+      <button class="pf-btn"           id="pf-year"    onclick="setPfMode('year')">ปีนี้</button>
+      <button class="pf-btn"           id="pf-all"     onclick="setPfMode('all')">ทั้งหมด</button>
+      <button class="pf-btn"           id="pf-custom"  onclick="setPfMode('custom')">📅 กำหนดเอง</button>
+      <div class="pf-custom" id="pf-custom-range">
+        <label style="font-size:13px;color:var(--muted)">จาก</label>
+        <input type="date" id="pf-date-from">
+        <label style="font-size:13px;color:var(--muted)">ถึง</label>
+        <input type="date" id="pf-date-to">
+        <button class="pf-apply" onclick="applyCustomRange()">ค้นหา</button>
+      </div>
+    </div>
+
+    <!-- LIST -->
+    <div class="pending-list" id="pending-list"></div>
+
+    <!-- SUMMARY -->
+    <div class="pending-summary" id="pending-summary">
+      <span>พบ <strong id="pending-count">0</strong> รายการรอดำเนินการ</span>
+      <span id="pending-range-label" style="color:var(--muted)"></span>
+    </div>
   </div>
 
   <!-- SEARCH -->
@@ -221,7 +314,7 @@ footer a:hover{color:white;}
 
 <!-- FOOTER -->
 <footer>
-  <div><span class="footer-ver">Lost &amp; Found Web App — v1.1.0</span></div>
+  <div><span class="footer-ver">Lost &amp; Found Web App — v1.1.1</span></div>
   <div class="footer-copy">
     © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
@@ -231,14 +324,14 @@ footer a:hover{color:white;}
 <script>
 /* =====================================================
  * Lost & Found — index.html
- * Version : 1.1.0
+ * Version : 1.1.1
  * Author  : Traffic Control and Premises Security Unit,
  *           Mahidol University
  * © 2025–2026 Traffic Control and Premises Security Unit,
  *   Mahidol University. All rights reserved.
  * ===================================================== */
 
-const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec';
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
 const OLD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14MJgb81aVEjT2qVp6n9zNKCCpJNVimX1q0hiYkH0f5I/gviz/tq?tqx=out:json&gid=751456190';
 const ITEMS_PER_PAGE = 20;
 
@@ -389,14 +482,160 @@ function updateCounts() {
   document.getElementById('cnt-lost').textContent   = allItems.filter(i => i.type === 'สิ่งของสูญหาย').length;
   document.getElementById('cnt-found').textContent  = allItems.filter(i => i.type === 'พบสิ่งของ').length;
   document.getElementById('cnt-pickup').textContent = allItems.filter(i => i.type === 'รับของคืน').length;
+
+  // Pending counts (ไม่มีสถานะ หรือ รอดำเนินการ)
+  const isPending = s => !s || s.trim() === 'รอดำเนินการ' || s.trim() === '';
+  document.getElementById('pcnt-lost').textContent  =
+    allItems.filter(i => i.type==='สิ่งของสูญหาย' && isPending(i.status)).length;
+  document.getElementById('pcnt-found').textContent =
+    allItems.filter(i => i.type==='พบสิ่งของ'     && isPending(i.status)).length;
+}
+
+/* ══════════════════════════════════════════
+   PENDING PANEL
+══════════════════════════════════════════ */
+let pendingType = '';
+let pfMode      = 'today';
+let pfFrom      = null;
+let pfTo        = null;
+
+function openPending(type) {
+  pendingType = type;
+  pfMode      = 'today';
+
+  // reset UI
+  document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('pf-active'));
+  document.getElementById('pf-today').classList.add('pf-active');
+  document.getElementById('pf-custom-range').classList.remove('show');
+
+  // set title
+  const isLost = type === 'สิ่งของสูญหาย';
+  document.getElementById('pending-panel-icon').textContent   = isLost ? '😟' : '📦';
+  document.getElementById('pending-panel-title-text').textContent =
+    (isLost ? 'สิ่งของสูญหาย' : 'พบสิ่งของ') + ' — รายการรอดำเนินการ';
+
+  document.getElementById('pending-panel').classList.add('show');
+  document.getElementById('pending-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  // default dates for custom picker
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('pf-date-from').value = today;
+  document.getElementById('pf-date-to').value   = today;
+
+  renderPendingList();
+}
+
+function closePending() {
+  document.getElementById('pending-panel').classList.remove('show');
+}
+
+function setPfMode(mode) {
+  pfMode = mode;
+  document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('pf-active'));
+  document.getElementById('pf-'+mode).classList.add('pf-active');
+  document.getElementById('pf-custom-range').classList.toggle('show', mode === 'custom');
+  if (mode !== 'custom') renderPendingList();
+}
+
+function applyCustomRange() {
+  pfFrom = document.getElementById('pf-date-from').value;
+  pfTo   = document.getElementById('pf-date-to').value;
+  if (!pfFrom || !pfTo) { alert('กรุณาเลือกวันที่เริ่มต้นและสิ้นสุด'); return; }
+  renderPendingList();
+}
+
+function getPendingDateRange() {
+  const now   = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (pfMode === 'today') {
+    return { from: today, to: new Date(today.getTime() + 86400000 - 1) };
+  } else if (pfMode === 'week') {
+    return { from: new Date(today.getTime() - 6*86400000), to: new Date(today.getTime() + 86400000 - 1) };
+  } else if (pfMode === 'month') {
+    return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59) };
+  } else if (pfMode === 'year') {
+    return { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear(), 11, 31, 23, 59, 59) };
+  } else if (pfMode === 'custom' && pfFrom && pfTo) {
+    return { from: new Date(pfFrom), to: new Date(pfTo + 'T23:59:59') };
+  }
+  return null; // 'all'
+}
+
+function fmtRangeLabel(range) {
+  if (!range) return 'ทุกช่วงเวลา';
+  const opt = { year:'numeric', month:'short', day:'numeric' };
+  const f = range.from.toLocaleDateString('th-TH', opt);
+  const t = range.to.toLocaleDateString('th-TH', opt);
+  if (f === t) return f;
+  return `${f} — ${t}`;
+}
+
+function renderPendingList() {
+  const isPending = s => !s || s.trim() === 'รอดำเนินการ' || s.trim() === '';
+  const range     = getPendingDateRange();
+
+  let items = allItems.filter(it => {
+    if (it.type !== pendingType) return false;
+    if (!isPending(it.status))   return false;
+    if (range && it.dateObj) {
+      return it.dateObj >= range.from && it.dateObj <= range.to;
+    }
+    return !range; // 'all' mode
+  });
+
+  // sort newest first
+  items.sort((a,b) => (b.dateObj||0) - (a.dateObj||0));
+
+  document.getElementById('pending-count').textContent = items.length;
+  document.getElementById('pending-range-label').textContent = fmtRangeLabel(range);
+
+  const listEl = document.getElementById('pending-list');
+  if (!items.length) {
+    listEl.innerHTML = `<div class="pending-empty">✅ ไม่มีรายการรอดำเนินการในช่วงเวลานี้</div>`;
+    return;
+  }
+
+  const badgeColor = pendingType === 'สิ่งของสูญหาย' ? '#c0392b' : '#1e7e44';
+
+  listEl.innerHTML = items.map(it => {
+    const imgHtml = it.imgUrl
+      ? `<img class="pi-img" src="${it.imgUrl}" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="pi-img-ph">🖼️</div>`;
+    // find index in filtered for modal open
+    const idx = filtered.indexOf(it);
+    const clickAttr = idx >= 0 ? `onclick="openModal(${idx})"` : '';
+    return `
+      <div class="pending-item" ${clickAttr}>
+        ${imgHtml}
+        <div class="pi-info">
+          <div class="pi-title" title="${it.title}">${it.title}</div>
+          <div class="pi-loc">📍 ${it.location}</div>
+          <div class="pi-date">🕐 ${fmtDate(it.dateObj)}</div>
+          ${it.name ? `<div class="pi-date" style="margin-top:2px;">👤 ${it.name}${it.phone ? ' · ' + it.phone : ''}</div>` : ''}
+        </div>
+        <span class="pi-badge" style="background:${badgeColor}">${pendingType === 'สิ่งของสูญหาย' ? 'สูญหาย' : 'พบของ'}</span>
+      </div>`;
+  }).join('');
 }
 
 /* ── Filter & sort ── */
 function filterType(t) {
   currentFilter = t; currentPage = 1;
+
+  // อัปเดต chip active
   document.querySelectorAll('.stat-chip').forEach(c => c.classList.remove('active'));
   const map = { all:'chip-all', 'สิ่งของสูญหาย':'chip-lost', 'พบสิ่งของ':'chip-found', 'รับของคืน':'chip-pickup' };
   if (map[t]) document.getElementById(map[t]).classList.add('active');
+
+  // แสดง/ซ่อนปุ่ม ⏳ รอดำเนินการ เฉพาะเมื่อ chip สูญหาย/พบของ ถูก active
+  const btnLost  = document.getElementById('btn-pending-lost');
+  const btnFound = document.getElementById('btn-pending-found');
+  btnLost.classList.toggle('visible',  t === 'สิ่งของสูญหาย');
+  btnFound.classList.toggle('visible', t === 'พบสิ่งของ');
+
+  // ถ้าเปลี่ยน chip → ปิด pending panel ถ้าไม่ตรงกับประเภทใหม่
+  if (pendingType && pendingType !== t) closePending();
+
   applyFilters();
 }
 
