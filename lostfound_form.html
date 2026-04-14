@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แจ้งของหาย / เก็บของได้ | งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #1a3a5c;
+  --primary-mid: #2d5f8f;
+  --accent: #e8a020;
+  --lost: #c0392b;
+  --lost-light: #fdf0ee;
+  --found: #1e7e44;
+  --found-light: #edf7f1;
+  --pickup: #1a5276;
+  --pickup-light: #eaf1fb;
+  --bg: #f0f3f8;
+  --white: #ffffff;
+  --text: #1c2833;
+  --muted: #6c7a89;
+  --border: #d5dce8;
+  --radius: 14px;
+  --shadow: 0 4px 20px rgba(26,58,92,0.10);
+  --shadow-lg: 0 8px 40px rgba(26,58,92,0.15);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* HEADER */
+.header {
+  background: linear-gradient(135deg, #1a3a5c 0%, #2d5f8f 100%);
+  padding: 16px 20px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 16px rgba(26,58,92,0.3);
+}
+.header-inner { max-width: 660px; margin: auto; display: flex; align-items: center; gap: 14px; }
+.header-icon { width: 46px; height: 46px; background: rgba(255,255,255,0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.header-title { color: white; font-size: 15px; font-weight: 700; line-height: 1.3; }
+.header-sub { color: rgba(255,255,255,0.72); font-size: 11.5px; margin-top: 1px; }
+
+/* PROGRESS BAR */
+.progress-bar-wrap { background: white; border-bottom: 1px solid var(--border); }
+.progress-bar-inner { max-width: 660px; margin: auto; display: flex; }
+.prog-step { flex: 1; text-align: center; padding: 11px 4px 9px; font-size: 11px; color: var(--muted); border-bottom: 3px solid transparent; transition: all 0.25s; }
+.prog-step .pnum { width: 22px; height: 22px; border-radius: 50%; background: var(--border); color: var(--muted); font-size: 11px; font-weight: 700; line-height: 22px; display: inline-block; margin-bottom: 3px; transition: all 0.25s; }
+.prog-step.active { color: var(--primary); border-bottom-color: var(--accent); font-weight: 600; }
+.prog-step.active .pnum { background: var(--accent); color: white; }
+.prog-step.done { color: var(--found); border-bottom-color: var(--found); }
+.prog-step.done .pnum { background: var(--found); color: white; }
+.prog-step.done .pnum::before { content: '✓'; }
+
+/* MAIN */
+.main { max-width: 660px; margin: 0 auto; padding: 24px 16px 60px; }
+.page { display: none; animation: fadeUp 0.3s ease; }
+.page.active { display: block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+
+/* PAGE HEADER */
+.page-head { margin-bottom: 22px; }
+.page-head h2 { font-family: 'Noto Serif Thai', serif; font-size: 22px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+.page-head p { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+/* CARDS */
+.card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+.card-head { padding: 12px 18px; font-size: 13px; font-weight: 700; color: white; display: flex; align-items: center; gap: 8px; }
+.card-head.blue { background: var(--primary); }
+.card-head.red { background: var(--lost); }
+.card-head.green { background: var(--found); }
+.card-head.navy { background: var(--pickup); }
+.card-body { padding: 18px; }
+
+/* FORM ELEMENTS */
+.field { margin-bottom: 18px; }
+.field:last-child { margin-bottom: 0; }
+.field label { font-size: 13.5px; font-weight: 600; display: block; margin-bottom: 7px; color: var(--text); }
+.field label .req { color: var(--lost); margin-left: 3px; }
+.field .hint { font-size: 12px; color: var(--muted); margin-bottom: 7px; line-height: 1.5; }
+input[type=text], input[type=tel], input[type=date], input[type=time], select, textarea {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
+  border-radius: 9px; font-family: 'Sarabun', sans-serif; font-size: 14.5px;
+  color: var(--text); background: #fafbfd; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary-mid); box-shadow: 0 0 0 3px rgba(45,95,143,0.09); background: white;
+}
+textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* AUTOCOMPLETE */
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute; top: 100%; left: 0; right: 0; background: white;
+  border: 1.5px solid var(--primary-mid); border-top: none; border-radius: 0 0 9px 9px;
+  max-height: 200px; overflow-y: auto; z-index: 200; box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  display: none;
+}
+.autocomplete-list.show { display: block; }
+.ac-item { padding: 10px 14px; font-size: 14px; cursor: pointer; transition: background 0.15s; }
+.ac-item:hover, .ac-item.highlighted { background: #eef3fb; color: var(--primary); }
+.ac-item mark { background: #fff3cd; color: var(--text); border-radius: 2px; padding: 0 2px; }
+
+/* RADIO CARDS (TYPE SELECTION) */
+.type-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.type-card {
+  background: white; border: 2px solid var(--border); border-radius: var(--radius);
+  padding: 20px; cursor: pointer; display: flex; align-items: center; gap: 16px;
+  transition: all 0.2s; box-shadow: var(--shadow);
+}
+.type-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.type-card.sel-lost { border-color: var(--lost); background: var(--lost-light); }
+.type-card.sel-found { border-color: var(--found); background: var(--found-light); }
+.type-card.sel-pickup { border-color: var(--pickup); background: var(--pickup-light); }
+.type-icon { width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
+.type-icon.lost { background: #fdecea; }
+.type-icon.found { background: #e6f4eb; }
+.type-icon.pickup { background: #e8f0fb; }
+.type-info .t-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+.type-info .t-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.t-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
+.badge-lost { background: #fdecea; color: var(--lost); }
+.badge-found { background: #e6f4eb; color: var(--found); }
+.badge-pickup { background: #e8f0fb; color: var(--pickup); }
+
+/* RADIO GROUP */
+.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 9px; cursor: pointer; transition: all 0.18s; background: #fafbfd; }
+.radio-item:hover { border-color: var(--primary-mid); background: #f0f5ff; }
+.radio-item.checked { border-color: var(--primary); background: #f0f5ff; }
+.radio-item input[type=radio] { accent-color: var(--primary); width: 16px; height: 16px; }
+.radio-item label { font-size: 14px; cursor: pointer; flex: 1; }
+
+/* FILE UPLOAD */
+.file-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; background: #fafbfd; position: relative; transition: all 0.2s; }
+.file-zone:hover { border-color: var(--primary-mid); background: #f0f5ff; }
+.file-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.file-zone-icon { font-size: 28px; margin-bottom: 6px; }
+.file-zone-text { font-size: 13px; color: var(--muted); }
+.file-zone-text strong { color: var(--primary); }
+.file-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.file-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border); }
+
+/* NOTICE */
+.notice { background: #fffbeb; border: 1.5px solid #f5c442; border-radius: 9px; padding: 11px 14px; font-size: 13px; color: #6b4c00; display: flex; gap: 8px; align-items: flex-start; margin-bottom: 16px; line-height: 1.5; }
+
+/* NAV BUTTONS */
+.nav-bar { display: flex; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.btn { padding: 13px 24px; border-radius: 10px; font-family: 'Sarabun', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; flex: 1; }
+.btn-back { background: white; border: 1.5px solid var(--border); color: var(--muted); }
+.btn-back:hover { background: var(--bg); }
+.btn-next { background: var(--primary); color: white; box-shadow: 0 4px 14px rgba(26,58,92,0.28); }
+.btn-next:hover { background: var(--primary-mid); transform: translateY(-1px); }
+.btn-submit { background: linear-gradient(135deg, var(--accent), #c47a10); color: white; box-shadow: 0 4px 16px rgba(232,160,32,0.35); }
+.btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(232,160,32,0.45); }
+
+/* SUMMARY */
+.summary-type-banner { padding: 14px 18px; display: flex; align-items: center; gap: 10px; color: white; font-weight: 700; font-size: 15px; }
+.summary-type-banner.red { background: var(--lost); }
+.summary-type-banner.green { background: var(--found); }
+.summary-type-banner.navy { background: var(--pickup); }
+.sum-row { display: flex; padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.sum-row:last-child { border-bottom: none; }
+.sum-k { color: var(--muted); min-width: 130px; flex-shrink: 0; }
+.sum-v { font-weight: 500; flex: 1; }
+
+/* SUCCESS */
+.success-wrap { text-align: center; padding: 40px 16px; }
+.success-icon { font-size: 68px; display: block; margin-bottom: 14px; animation: pop 0.5s ease; }
+@keyframes pop { 0%,100% { transform:scale(1); } 50% { transform:scale(1.18); } }
+.success-title { font-family: 'Noto Serif Thai', serif; font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+.ref-box { display: inline-block; background: #fff8e6; border: 2px solid var(--accent); color: var(--primary); font-size: 19px; font-weight: 700; padding: 10px 28px; border-radius: 12px; letter-spacing: 2px; margin: 14px 0; }
+.success-msg { font-size: 14px; color: var(--muted); line-height: 1.8; }
+.btn-new-wrap { margin-top: 22px; }
+.btn-new { background: var(--primary); color: white; padding: 13px 36px; border-radius: 10px; font-family: 'Sarabun', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+
+/* SENDING OVERLAY */
+.sending-overlay { display: none; position: fixed; inset: 0; background: rgba(26,40,60,0.55); backdrop-filter: blur(4px); z-index: 999; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
+.sending-overlay.show { display: flex; }
+.send-spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.25); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.send-text { color: white; font-size: 16px; font-weight: 600; }
+
+@media (max-width: 420px) {
+  .row2 { grid-template-columns: 1fr; }
+  .type-icon { width: 44px; height: 44px; font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="header-icon">🔍</div>
+    <div>
+      <div class="header-title">แจ้งของหาย / เก็บของได้ / รับของคืน</div>
+      <div class="header-sub">งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-bar-wrap">
+  <div class="progress-bar-inner">
+    <div class="prog-step active" id="ps1"><div class="pnum" id="pn1">1</div><br>ประเภท</div>
+    <div class="prog-step" id="ps2"><div class="pnum" id="pn2">2</div><br>ข้อมูลผู้แจ้ง</div>
+    <div class="prog-step" id="ps3"><div class="pnum" id="pn3">3</div><br>รายละเอียด</div>
+    <div class="prog-step" id="ps4"><div class="pnum" id="pn4">4</div><br>ยืนยัน</div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- STEP 1: TYPE -->
+<div class="page active" id="s1">
+  <div class="page-head">
+    <h2>เลือกประเภทการแจ้ง</h2>
+    <p>กรุณาเลือกประเภทที่ตรงกับสถานการณ์ของท่าน</p>
+  </div>
+  <div class="type-grid">
+    <div class="type-card" id="tc-lost" onclick="pickType('lost')">
+      <div class="type-icon lost">😟</div>
+      <div class="type-info">
+        <div class="t-title" style="color:var(--lost)">สิ่งของสูญหาย</div>
+        <div class="t-desc">ท่านทำของหายและต้องการแจ้งเพื่อติดตาม</div>
+        <span class="t-badge badge-lost">Report Lost Item</span>
+      </div>
+    </div>
+    <div class="type-card" id="tc-found" onclick="pickType('found')">
+      <div class="type-icon found">📦</div>
+      <div class="type-info">
+        <div class="t-title" style="color:var(--found)">พบสิ่งของ</div>
+        <div class="t-desc">ท่านพบของและนำมาส่งงานจราจรฯ (กรอกเพียงไม่กี่ข้อ!)</div>
+        <span class="t-badge badge-found">Report Found Item</span>
+      </div>
+    </div>
+    <div class="type-card" id="tc-pickup" onclick="pickType('pickup')">
+      <div class="type-icon pickup">🤝</div>
+      <div class="type-info">
+        <div class="t-title" style="color:var(--pickup)">รับของคืน</div>
+        <div class="t-desc">ท่านมาติดต่อรับสิ่งของคืนที่งานจราจรฯ</div>
+        <span class="t-badge badge-pickup">Claim Item</span>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar" style="border:none;padding-top:12px;">
+    <button class="btn btn-next" style="max-width:200px;margin-left:auto" onclick="go(2)">ถัดไป →</button>
+  </div>
+</div>
+
+<!-- STEP 2: REPORTER -->
+<div class="page" id="s2">
+  <div class="page-head">
+    <h2>ข้อมูลผู้แจ้ง</h2>
+    <p>กรอกข้อมูลของท่านเพื่อให้เราติดต่อกลับได้</p>
+  </div>
+  <div class="card">
+    <div class="card-head blue">👤 ข้อมูลส่วนตัว</div>
+    <div class="card-body">
+      <div class="field">
+        <label>ชื่อ-นามสกุล <span class="req">*</span></label>
+        <input type="text" id="f-name" placeholder="ชื่อ นามสกุล">
+      </div>
+      <div class="field">
+        <label>ประเภทบุคคล <span class="req">*</span></label>
+        <div class="radio-group" id="rg-ptype">
+          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา มหาวิทยาลัยมหิดล Student Of Mahidol University"><label>🎓 นักศึกษา มหาวิทยาลัยมหิดล</label></label>
+          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา คณะ/สถาบันอื่น Student Of Other University"><label>🎓 นักศึกษา คณะ/สถาบันอื่น</label></label>
+          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคลากรมหาวิทยาลัยมหิดล Staff Of Mahidol University"><label>👔 บุคลากรมหาวิทยาลัยมหิดล</label></label>
+          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคคลภายนอก External Person"><label>🌐 บุคคลภายนอก</label></label>
+          <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักเรียน"><label>📚 นักเรียน</label></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>คณะ/สถาบัน/หน่วยงาน <span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="f-dept" placeholder="พิมพ์เพื่อค้นหาหรือระบุ..." oninput="acSearch(this.value,'ac-dept','DEPTS')" autocomplete="off">
+          <div class="autocomplete-list" id="ac-dept"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>เบอร์โทรศัพท์ <span class="req">*</span></label>
+        <input type="tel" id="f-phone" placeholder="0XX-XXX-XXXX">
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(1)">← กลับ</button>
+    <button class="btn btn-next" onclick="go(3)">ถัดไป →</button>
+  </div>
+</div>
+
+<!-- STEP 3A: LOST -->
+<div class="page" id="s3-lost">
+  <div class="page-head"><h2 style="color:var(--lost)">😟 รายละเอียดของที่หาย</h2></div>
+  <div class="card">
+    <div class="card-head red">📅 วันและเวลาที่หาย</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field"><label>วันที่ <span class="req">*</span></label><input type="date" id="d-lost-date"></div>
+        <div class="field"><label>เวลา <span class="req">*</span></label><input type="time" id="d-lost-time"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head red">🔎 รายละเอียดสิ่งของที่หาย</div>
+    <div class="card-body">
+      <div class="field">
+        <label>รายการสิ่งของสูญหาย <span class="req">*</span></label>
+        <div class="hint">ระบุ: ประเภท / ยี่ห้อ-รุ่น / สี / ลักษณะเด่น / สิ่งของภายใน</div>
+        <textarea id="d-lost-desc" placeholder="เช่น: กระเป๋าสตางค์สีดำ ยี่ห้อ Fossil มีบัตรประชาชนและบัตร ATM"></textarea>
+      </div>
+      <div class="field">
+        <label>บริเวณที่สูญหาย <span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="d-lost-loc" placeholder="อาคาร/ห้อง/ชั้น/บริเวณ" oninput="acSearch(this.value,'ac-lost-loc','PLACES')" autocomplete="off">
+          <div class="autocomplete-list" id="ac-lost-loc"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>รูปภาพสิ่งของ (ถ้ามี)</label>
+        <div class="file-zone">
+          <input type="file" accept="image/*" onchange="previewFile(this,'pv-lost')" multiple>
+          <div class="file-zone-icon">📷</div>
+          <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+        </div>
+        <div class="file-preview" id="pv-lost"></div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(2)">← กลับ</button>
+    <button class="btn btn-next" onclick="go(4)">ตรวจสอบ →</button>
+  </div>
+</div>
+
+<!-- STEP 3B: FOUND -->
+<div class="page" id="s3-found">
+  <div class="page-head"><h2 style="color:var(--found)">📦 รายละเอียดของที่พบ</h2></div>
+  <div class="notice">💚 <span>ขอบคุณที่นำของมาส่ง! กรอกแค่ข้อมูลสำคัญไม่กี่ข้อเท่านั้นครับ</span></div>
+  <div class="card">
+    <div class="card-head green">📅 วันและเวลาที่พบ</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field"><label>วันที่ <span class="req">*</span></label><input type="date" id="d-found-date"></div>
+        <div class="field"><label>เวลา <span class="req">*</span></label><input type="time" id="d-found-time"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head green">📝 สิ่งของที่พบ</div>
+    <div class="card-body">
+      <div class="field">
+        <label>รายละเอียดสิ่งของที่พบ <span class="req">*</span></label>
+        <div class="hint">ระบุ: ประเภท สี ยี่ห้อ ลักษณะที่สังเกตได้</div>
+        <textarea id="d-found-desc" placeholder="เช่น: กุญแจ พวงกุญแจสีแดง มีพวงกุญแจรูปหมี"></textarea>
+      </div>
+      <div class="field">
+        <label>สถานที่ที่พบ <span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="d-found-loc" placeholder="อาคาร/จุดที่พบ" oninput="acSearch(this.value,'ac-found-loc','PLACES')" autocomplete="off">
+          <div class="autocomplete-list" id="ac-found-loc"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>รูปภาพสิ่งของ <span style="color:var(--found);font-size:12px;">(แนะนำให้ถ่ายมาด้วย)</span></label>
+        <div class="file-zone">
+          <input type="file" accept="image/*" onchange="previewFile(this,'pv-found')" multiple>
+          <div class="file-zone-icon">📷</div>
+          <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+        </div>
+        <div class="file-preview" id="pv-found"></div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(2)">← กลับ</button>
+    <button class="btn btn-next" onclick="go(4)">ตรวจสอบ →</button>
+  </div>
+</div>
+
+<!-- STEP 3C: PICKUP -->
+<div class="page" id="s3-pickup">
+  <div class="page-head"><h2 style="color:var(--pickup)">🤝 รับของคืน</h2></div>
+  <div class="card">
+    <div class="card-head navy">📅 วันและเวลาที่มารับ</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field"><label>วันที่ <span class="req">*</span></label><input type="date" id="d-pickup-date"></div>
+        <div class="field"><label>เวลา <span class="req">*</span></label><input type="time" id="d-pickup-time"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head navy">📋 รายละเอียดการรับของคืน</div>
+    <div class="card-body">
+      <div class="field">
+        <label>รายละเอียดสิ่งของที่รับคืน <span class="req">*</span></label>
+        <div class="hint">ระบุสิ่งของที่ท่านมารับ เพื่อยืนยันความเป็นเจ้าของ</div>
+        <textarea id="d-pickup-desc" placeholder="เช่น: กระเป๋าสตางค์สีดำ มีบัตรนักศึกษา ม.มหิดล ภายใน"></textarea>
+      </div>
+      <div class="field">
+        <label>รูปภาพหลักฐาน (บัตรประจำตัว) <span class="req">*</span></label>
+        <div class="hint">แนบรูปบัตรประจำตัวเพื่อยืนยันตัวตน</div>
+        <div class="file-zone">
+          <input type="file" accept="image/*" onchange="previewFile(this,'pv-pickup')">
+          <div class="file-zone-icon">🪪</div>
+          <div class="file-zone-text">แตะเพื่อแนบรูปบัตร<br><strong>1 ไฟล์ ไม่เกิน 10MB</strong></div>
+        </div>
+        <div class="file-preview" id="pv-pickup"></div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(2)">← กลับ</button>
+    <button class="btn btn-next" onclick="go(4)">ตรวจสอบ →</button>
+  </div>
+</div>
+
+<!-- STEP 4: CONFIRM -->
+<div class="page" id="s4">
+  <div class="page-head"><h2>ตรวจสอบข้อมูลก่อนส่ง</h2><p>กรุณาตรวจสอบให้ถูกต้องก่อนกดยืนยัน</p></div>
+  <div class="card" id="sum-card"></div>
+  <div class="nav-bar">
+    <button class="btn btn-back" id="btn-back-sum">← แก้ไข</button>
+    <button class="btn btn-submit" onclick="submitForm()">✅ ยืนยันและส่ง</button>
+  </div>
+</div>
+
+<!-- STEP 5: SUCCESS -->
+<div class="page" id="s5">
+  <div class="success-wrap">
+    <span class="success-icon" id="suc-icon">✅</span>
+    <div class="success-title" id="suc-title">ส่งข้อมูลเรียบร้อยแล้ว!</div>
+    <div class="ref-box" id="suc-ref"></div>
+    <div class="success-msg" id="suc-msg"></div>
+    <div class="btn-new-wrap"><button class="btn-new" onclick="resetAll()">+ แจ้งรายการใหม่</button></div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- SENDING OVERLAY -->
+<div class="sending-overlay" id="sending-overlay">
+  <div class="send-spinner"></div>
+  <div class="send-text">กำลังส่งข้อมูล...</div>
+</div>
+
+<script>
+// ========= CONFIG =========
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmsDs5NFQAE85jU4b8Im82MxbftGJGOXcIco5L8XA8UD4GIt114lowmma55Wai5iuN/exec';
+
+// ========= DATA =========
+const DEPTS = ["กองกฎหมาย","กองกิจการนักศึกษา","กองกายภาพและสิ่งแวดล้อม","กองคลัง","กองทรัพยากรบุคคล","กองเทคโนโลยีสารสนเทศ","กองบริหารการศึกษา","กองบริหารงานทั่วไป","กองบริหารงานวิจัย","กองแผนงาน","กองพัฒนาคุณภาพ","กองวิเทศสัมพันธ์","คณะกายภาพบำบัด","คณะทันตแพทยศาสตร์","คณะเทคนิคการแพทย์","คณะเทคโนโลยีสารสนเทศและการสื่อสาร","คณะพยาบาลศาสตร์","คณะเภสัชศาสตร์","คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี","คณะแพทยศาสตร์ศิริราชพยาบาล","คณะวิทยาศาสตร์","คณะวิศวกรรมศาสตร์","คณะเวชศาสตร์เขตร้อน","คณะศิลปศาสตร์","คณะสังคมศาสตร์และมนุษยศาสตร์","คณะสัตวแพทยศาสตร์","คณะสาธารณสุขศาสตร์","คณะสิ่งแวดล้อมและทรัพยากรศาสตร์","บัณฑิตวิทยาลัย","โรงเรียนสาธิตนานาชาติ","วิทยาเขตกาญจนบุรี","วิทยาลัยการจัดการ","วิทยาลัยดุริยางคศิลป์","วิทยาลัยนานาชาติ","วิทยาลัยวิทยาศาสตร์และเทคโนโลยีการกีฬา","วิทยาลัยศาสนศึกษา","ศูนย์การแพทย์กาญจนาภิเษก","ศูนย์จิตตปัญญาศึกษา","ศูนย์บริหารสินทรัพย์","ศูนย์ส่งเสริมการเรียนรู้แบบบูรณาการชีวิต","ศูนย์สัตว์ทดลองแห่งชาติ","สถาบันชีววิทยาศาสตร์โมเลกุล","สถาบันนวัตกรรมการเรียนรู้","สถาบันพัฒนาสุขภาพอาเซียน","สถาบันวิจัยประชากรและสังคม","สถาบันวิจัยภาษาและวัฒนธรรมเอเชีย","สถาบันโภชนาการ","สำนักงานคณะกรรมการตรวจสอบการบริหารงานประจำมหาวิทยาลัย","สำนักงานสภามหาวิทยาลัยมหิดล","หอสมุดและคลังความรู้มหาวิทยาลัยมหิดล","บุคคลภายนอก","อื่นๆ"];
+
+const PLACES = ["ถนนชนนีประทาน","ถนนเทิดจักรี","ถนนผสานเทศไทย","ถนนการุณยมิตร","ถนนกันภัยมหิดล","ถนนถื่นวิทยาการ","ถนนจิตตสมาน","ถนนสานสัตยา","ถนนมานะมั่นคง","ถนนดำรงวิจัย","ถนนพูนผลประชา","ถนนส่องไทยทัศน์","ถนนปัญญาแผ่นดิน","ถนนวิชาชื่นชน","ถนนวิถีปัญญา","ถนนสาย D","ประตู 1","ประตู 2","ประตู 3","ประตู 4","ประตู 5","ประตู 6","ประตู 7","ประตู 8","ประตูคณะพยาบาลศาสตร์","ประตูวิทยาลัยดุริยางคศิลป์","หอพักนักศึกษา 1","หอพักนักศึกษา 2","หอพักนักศึกษา 3","หอพักนักศึกษา 4","หอพักนักศึกษา 5","หอพักนักศึกษา 6","หอพักนักศึกษา 7","หอพักนักศึกษา 8","หอพักนักศึกษา 9","หอพักนักศึกษา 10","หอพักนักศึกษา 11","อาคารเจรจานวัตกรรม","ลานจอดรถ P1","ลานจอดรถ P2","ลานจอดรถ P3","ลานจอดรถ P4","ลานจอดรถ P5","ลานจอดรถ อาคารเจรจานวัตกรรม","อาคารสิริวิทยา","ลานจอดรถเรือนไทย","งานจราจรและความปลอดภัย","ศูนย์การเรียนรู้มหิดล (MLC)","อาคาร OP","อาคาร SC","อาคาร MB","ลานพระบิดา","สนามกีฬา","สนามบาสเกตบอล","สนามฟุตบอล","MU Lake","รถราง","ตะกร้าจักรยาน Anywheel"];
+
+// ========= STATE =========
+let currentType = null;
+let currentStep = 1;
+let uploadedFiles = { lost: [], found: [], pickup: [] };
+
+// ========= AUTOCOMPLETE =========
+function acSearch(q, listId, dataKey) {
+  const list = document.getElementById(listId);
+  const data = dataKey === 'DEPTS' ? DEPTS : PLACES;
+  if (!q.trim()) { list.classList.remove('show'); return; }
+  const matches = data.filter(d => d.toLowerCase().includes(q.toLowerCase()));
+  if (!matches.length) { list.classList.remove('show'); return; }
+  list.innerHTML = matches.slice(0, 8).map(m => {
+    const hi = m.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark>$1</mark>');
+    return `<div class="ac-item" onclick="pickAc('${listId}','${m}')">${hi}</div>`;
+  }).join('');
+  list.classList.add('show');
+}
+function pickAc(listId, val) {
+  const list = document.getElementById(listId);
+  const input = list.previousElementSibling;
+  input.value = val;
+  list.classList.remove('show');
+}
+document.addEventListener('click', e => {
+  document.querySelectorAll('.autocomplete-list').forEach(l => {
+    if (!l.parentElement.contains(e.target)) l.classList.remove('show');
+  });
+});
+
+// ========= TYPE SELECTION =========
+function pickType(type) {
+  currentType = type;
+  ['lost','found','pickup'].forEach(t => {
+    document.getElementById('tc-'+t).className = 'type-card' + (t===type ? ' sel-'+t : '');
+  });
+}
+
+// ========= RADIO =========
+function chkRad(el, groupId) {
+  document.querySelectorAll('#'+groupId+' .radio-item').forEach(r => r.classList.remove('checked'));
+  el.classList.add('checked');
+}
+
+// ========= FILE PREVIEW =========
+function previewFile(input, previewId) {
+  const preview = document.getElementById(previewId);
+  preview.innerHTML = '';
+  const typeKey = previewId.replace('pv-','');
+  uploadedFiles[typeKey] = Array.from(input.files);
+  uploadedFiles[typeKey].forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'file-thumb';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ========= NAVIGATION =========
+function go(n) {
+  if (n === 2 && currentStep === 1) {
+    if (!currentType) { alert('กรุณาเลือกประเภทการแจ้ง'); return; }
+  }
+  if (n === 3 && currentStep === 2) {
+    if (!document.getElementById('f-name').value.trim()) { alert('กรุณากรอกชื่อ-นามสกุล'); return; }
+    if (!document.querySelector('input[name="ptype"]:checked')) { alert('กรุณาเลือกประเภทบุคคล'); return; }
+    if (!document.getElementById('f-dept').value.trim()) { alert('กรุณากรอกคณะ/หน่วยงาน'); return; }
+    if (!document.getElementById('f-phone').value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์'); return; }
+  }
+  if (n === 4) {
+    buildSummary();
+    document.getElementById('btn-back-sum').onclick = () => { showStep('s3-'+currentType); setProgress(3); currentStep=3; };
+  }
+
+  if (n === 3) { showStep('s3-'+currentType); setProgress(3); currentStep=3; return; }
+  const stepMap = { 1:'s1', 2:'s2', 4:'s4', 5:'s5' };
+  showStep(stepMap[n]);
+  setProgress(n);
+  currentStep = n;
+}
+
+function showStep(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setProgress(n) {
+  for (let i = 1; i <= 4; i++) {
+    const ps = document.getElementById('ps'+i);
+    const pn = document.getElementById('pn'+i);
+    ps.className = 'prog-step';
+    pn.style.cssText = '';
+    if (i < n) { ps.classList.add('done'); pn.textContent = ''; }
+    else if (i === n) { ps.classList.add('active'); pn.textContent = i; }
+    else { pn.textContent = i; }
+  }
+}
+
+// ========= SUMMARY =========
+function buildSummary() {
+  const ptype = document.querySelector('input[name="ptype"]:checked')?.value || '-';
+  const typeLabel = { lost:'😟 สิ่งของสูญหาย', found:'📦 พบสิ่งของ', pickup:'🤝 รับของคืน' };
+  const typeBanner = { lost:'red', found:'green', pickup:'navy' };
+  let details = '';
+  if (currentType==='lost') {
+    details = `
+      <div class="sum-row"><span class="sum-k">วันที่หาย</span><span class="sum-v">${document.getElementById('d-lost-date').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${document.getElementById('d-lost-time').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${document.getElementById('d-lost-desc').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">สถานที่</span><span class="sum-v">${document.getElementById('d-lost-loc').value||'-'}</span></div>`;
+  } else if (currentType==='found') {
+    details = `
+      <div class="sum-row"><span class="sum-k">วันที่พบ</span><span class="sum-v">${document.getElementById('d-found-date').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${document.getElementById('d-found-time').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${document.getElementById('d-found-desc').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">สถานที่พบ</span><span class="sum-v">${document.getElementById('d-found-loc').value||'-'}</span></div>`;
+  } else {
+    details = `
+      <div class="sum-row"><span class="sum-k">วันที่มารับ</span><span class="sum-v">${document.getElementById('d-pickup-date').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${document.getElementById('d-pickup-time').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${document.getElementById('d-pickup-desc').value||'-'}</span></div>`;
+  }
+  document.getElementById('sum-card').innerHTML = `
+    <div class="summary-type-banner ${typeBanner[currentType]}">${typeLabel[currentType]}</div>
+    <div class="sum-row"><span class="sum-k">ชื่อ-นามสกุล</span><span class="sum-v">${document.getElementById('f-name').value}</span></div>
+    <div class="sum-row"><span class="sum-k">ประเภทบุคคล</span><span class="sum-v">${ptype.split(' ')[0]}</span></div>
+    <div class="sum-row"><span class="sum-k">คณะ/หน่วยงาน</span><span class="sum-v">${document.getElementById('f-dept').value}</span></div>
+    <div class="sum-row"><span class="sum-k">โทรศัพท์</span><span class="sum-v">${document.getElementById('f-phone').value}</span></div>
+    ${details}`;
+}
+
+// ========= GENERATE REF =========
+function genRef() {
+  const pfix = { lost:'LOS', found:'FND', pickup:'PKP' };
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const rnd = String(Math.floor(Math.random()*9000)+1000);
+  return `${pfix[currentType]}-${yy}${mm}${dd}-${rnd}`;
+}
+
+// ========= FILE TO BASE64 =========
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = () => rej();
+    r.readAsDataURL(file);
+  });
+}
+
+// ========= SUBMIT =========
+async function submitForm() {
+  const ref = genRef();
+  const now = new Date();
+  const ptype = document.querySelector('input[name="ptype"]:checked')?.value || '';
+
+  // Collect data by type
+  let itemDate = '', itemTime = '', itemDesc = '', itemLoc = '';
+  if (currentType==='lost') {
+    itemDate = document.getElementById('d-lost-date').value;
+    itemTime = document.getElementById('d-lost-time').value;
+    itemDesc = document.getElementById('d-lost-desc').value;
+    itemLoc  = document.getElementById('d-lost-loc').value;
+  } else if (currentType==='found') {
+    itemDate = document.getElementById('d-found-date').value;
+    itemTime = document.getElementById('d-found-time').value;
+    itemDesc = document.getElementById('d-found-desc').value;
+    itemLoc  = document.getElementById('d-found-loc').value;
+  } else {
+    itemDate = document.getElementById('d-pickup-date').value;
+    itemTime = document.getElementById('d-pickup-time').value;
+    itemDesc = document.getElementById('d-pickup-desc').value;
+  }
+
+  // Convert files to base64
+  const typeKey = currentType;
+  const files = uploadedFiles[typeKey] || [];
+  const fileData = [];
+  for (const f of files.slice(0,5)) {
+    try {
+      const b64 = await fileToBase64(f);
+      fileData.push({ name: f.name, mime: f.type, data: b64 });
+    } catch(e) {}
+  }
+
+  const payload = {
+    timestamp: now.toISOString(),
+    refCode: ref,
+    type: currentType === 'lost' ? 'สิ่งของสูญหาย' : currentType === 'found' ? 'พบสิ่งของ' : 'รับของคืน',
+    name: document.getElementById('f-name').value,
+    personType: ptype,
+    department: document.getElementById('f-dept').value,
+    phone: document.getElementById('f-phone').value,
+    itemDate, itemTime, itemDesc, itemLoc,
+    status: 'รอดำเนินการ',
+    files: fileData
+  };
+
+  // Show sending overlay
+  document.getElementById('sending-overlay').classList.add('show');
+
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch(e) {
+    // Continue even if fetch fails (for testing without GAS)
+    console.log('GAS not connected yet:', e);
+  }
+
+  document.getElementById('sending-overlay').classList.remove('show');
+
+  // Show success
+  const icons = { lost:'📋', found:'✅', pickup:'🎉' };
+  const titles = { lost:'แจ้งของหายสำเร็จ', found:'แจ้งพบของสำเร็จ ขอบคุณ! 🙏', pickup:'บันทึกการรับของคืนแล้ว' };
+  const msgs = {
+    lost: `เราได้รับแจ้งของหายของท่านแล้ว เจ้าหน้าที่จะดำเนินการและติดต่อกลับ<br><br>📞 สอบถาม: 02-441-4400, 02-441-9318`,
+    found: `ขอบคุณที่นำของมาส่ง! ข้อมูลถูกบันทึกเรียบร้อย เจ้าหน้าที่จะประกาศตามหาเจ้าของต่อไป<br><br>📞 สอบถาม: 02-441-4400, 02-441-9318`,
+    pickup: `บันทึกการรับของคืนเรียบร้อยแล้ว<br><br>📞 สอบถาม: 02-441-4400, 02-441-9318`
+  };
+  document.getElementById('suc-icon').textContent = icons[currentType];
+  document.getElementById('suc-title').textContent = titles[currentType];
+  document.getElementById('suc-ref').textContent = ref;
+  document.getElementById('suc-msg').innerHTML = msgs[currentType];
+
+  document.querySelector('.progress-bar-wrap').style.display = 'none';
+  showStep('s5');
+}
+
+// ========= RESET =========
+function resetAll() {
+  currentType = null;
+  currentStep = 1;
+  uploadedFiles = { lost:[], found:[], pickup:[] };
+  document.querySelectorAll('input[type=text], input[type=tel], textarea').forEach(el => el.value='');
+  document.querySelectorAll('input[type=date], input[type=time]').forEach(el => el.value='');
+  document.querySelectorAll('input[type=radio]').forEach(r => r.checked=false);
+  document.querySelectorAll('.radio-item').forEach(r => r.classList.remove('checked'));
+  document.querySelectorAll('.type-card').forEach(c => c.className='type-card');
+  document.querySelectorAll('.file-preview').forEach(p => p.innerHTML='');
+  document.querySelector('.progress-bar-wrap').style.display='';
+  showStep('s1');
+  setProgress(1);
+}
+
+// ========= INIT =========
+window.onload = () => {
+  const today = new Date().toISOString().split('T')[0];
+  const nowTime = new Date().toTimeString().slice(0,5);
+  ['lost','found','pickup'].forEach(t => {
+    const d = document.getElementById('d-'+t+'-date');
+    const ti = document.getElementById('d-'+t+'-time');
+    if (d) d.value = today;
+    if (ti) ti.value = nowTime;
+  });
+};
+</script>
+</body>
+</html>
