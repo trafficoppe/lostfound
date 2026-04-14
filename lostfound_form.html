@@ -973,27 +973,26 @@ async function submitForm() {
 
   let submitOk = false;
   try {
-    // GAS ต้องรับแบบ FormData (no-cors) เพราะ CORS ไม่รองรับ JSON POST โดยตรง
-    const formData = new FormData();
+    // ส่งแบบ URLSearchParams + no-cors → GAS รับได้ผ่าน e.parameter
+    const params = new URLSearchParams();
+    params.append('action', 'submit');
     Object.keys(payload).forEach(k => {
       if (k === 'files') {
-        formData.append('files', JSON.stringify(payload.files));
+        params.append('files', JSON.stringify(payload.files));
       } else {
-        formData.append(k, payload[k] || '');
+        params.append(k, String(payload[k] || ''));
       }
     });
-    formData.append('action', 'submit');
 
-    const response = await fetch(GAS_URL, {
+    await fetch(GAS_URL, {
       method: 'POST',
-      body: formData,
-      mode: 'no-cors' // จำเป็นสำหรับ GAS
+      body: params,
+      mode: 'no-cors'
     });
     submitOk = true;
     console.log('✅ ส่งข้อมูลไป GAS สำเร็จ');
   } catch(e) {
     console.warn('⚠️ GAS fetch error:', e);
-    // ยังแสดงหน้าสำเร็จ แต่แจ้งเตือนในกรณีที่ GAS ยังไม่พร้อม
     submitOk = false;
   }
 
