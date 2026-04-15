@@ -411,7 +411,8 @@ async function loadDashboard() {
     }));
   }
 
-  allData = [...newItems, ...oldItems];
+  const today2 = new Date();
+  allData = [...newItems, ...oldItems].filter(it => !it.dateObj || it.dateObj <= today2);
   buildYearFilter();
   applyDashFilter();
 }
