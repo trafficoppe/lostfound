@@ -248,67 +248,21 @@ tbody td { padding: 10px 14px; }
       </div>
     </div>
 
-    <!-- REFRESH BAR -->
-    <div class="refresh-bar">
-      <div class="refresh-info">
-        <div class="dot-live"></div>
+    <!-- LINK TO LIST PAGE -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+      <a href="lostfound_list.html" style="flex:1;min-width:260px;background:linear-gradient(135deg,#1a3a5c,#2d5f8f);color:white;border-radius:14px;padding:20px 24px;text-decoration:none;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(26,58,92,0.2);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
         <div>
-          <div style="font-weight:700;font-size:14px;">🔴 Live — อัปเดตอัตโนมัติทุก 5 นาที</div>
-          <div class="refresh-countdown" id="countdown-text">รีเฟรชครั้งถัดไปใน 5:00</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:4px;">📋 ตรวจสอบรายการทั้งหมด</div>
+          <div style="font-size:13px;opacity:0.75;">อัปเดตสถานะ · ค้นหา · กรองปี 2567/2568</div>
         </div>
-      </div>
-      <button class="btn-refresh-main" id="btn-refresh-main" onclick="manualRefresh()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-        รีเฟรชข้อมูล
-      </button>
-    </div>
-
-    <!-- TABLE -->
-    <div class="table-card">
-      <div class="table-head">
-        <h3>📋 รายการทั้งหมด <span id="overdue-badge" style="display:none;background:#c0392b;color:white;font-size:11px;padding:2px 8px;border-radius:20px;margin-left:8px;font-weight:600;"></span></h3>
-        <input type="text" class="table-search" id="table-search" placeholder="ค้นหา..." oninput="renderTable()">
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>RefCode</th><th>ประเภท</th><th>รายละเอียด</th>
-              <th>ผู้แจ้ง</th><th>คณะ/หน่วยงาน</th>
-              <th>วันที่</th><th>สถานะ</th><th>หมายเหตุ</th><th>แก้ไข</th>
-            </tr>
-          </thead>
-          <tbody id="table-body">
-            <tr><td colspan="9" class="dash-loading"><div class="spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
+        <span style="font-size:24px;">→</span>
+      </a>
     </div>
 
   </div>
 </div>
 
-<!-- STATUS MODAL -->
-<div class="status-modal" id="status-modal">
-  <div class="status-modal-box">
-    <h3>อัปเดตสถานะ</h3>
-    <div style="font-size:13.5px;color:var(--muted);margin-bottom:14px">รายการ: <strong id="modal-ref"></strong></div>
-    <select id="modal-status-select">
-      <option value="รอดำเนินการ">รอดำเนินการ</option>
-      <option value="ช่วยหาแล้วยังไม่พบ">ช่วยหาแล้วยังไม่พบ</option>
-      <option value="รับของคืนแล้ว">รับของคืนแล้ว</option>
-      <option value="เจ้าของยังไม่มารับคืน">เจ้าของยังไม่มารับคืน</option>
-    </select>
-    <textarea id="modal-action-text" placeholder="บันทึกการดำเนินการ (ถ้ามี)..."></textarea>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeStatusModal()">ยกเลิก</button>
-      <button class="btn-save" onclick="saveStatus()">💾 บันทึก</button>
-    </div>
-  </div>
-</div>
+
 
 <script>
 /* =====================================================
@@ -507,7 +461,6 @@ function applyDashFilter() {
   });
   updateKPIs();
   updateCharts();
-  renderTable();
 }
 
 // ============================================
@@ -681,129 +634,7 @@ function drawItemChart() {
 }
 
 // ============================================
-// TABLE
-// ============================================
-function renderTable() {
-  const q = document.getElementById('table-search').value.toLowerCase();
-  let data = filteredData.filter(d => !q || `${d.title} ${d.name} ${d.dept} ${d.refCode}`.toLowerCase().includes(q));
-  data = data.slice(0, 100);
-
-  const tbody = document.getElementById('table-body');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--muted)">ไม่พบข้อมูล</td></tr>'; return; }
-
-  const now = new Date();
-  let overdueCount = 0;
-
-  tbody.innerHTML = data.map(d => {
-    const typeTag = d.type==='สิ่งของสูญหาย' ? 'tag-lost' : d.type==='พบสิ่งของ' ? 'tag-found' : 'tag-pickup';
-    const s = (d.status||'').trim();
-    let statusTag = 'tag-wait', statusText = 'รอดำเนินการ';
-    if (s.includes('รับของคืนแล้ว')) { statusTag='tag-done'; statusText='รับของคืนแล้ว'; }
-    else if (s.includes('ช่วยหาแล้วยังไม่พบ')) { statusTag='tag-notfound'; statusText='ช่วยหาแล้วยังไม่พบ'; }
-    else if (s.includes('เจ้าของยังไม่มารับคืน')) { statusTag='tag-unclaimed'; statusText='เจ้าของยังไม่มารับคืน'; }
-
-    // ตรวจสอบ overdue: รอดำเนินการ > 3 วัน
-    let overdueHtml = '';
-    let rowClass = '';
-    const isPending = s === '' || s === 'รอดำเนินการ';
-    if (isPending && d.dateObj) {
-      const daysDiff = Math.floor((now - d.dateObj) / 86400000);
-      if (daysDiff > 3) {
-        overdueHtml = `<span class="overdue-warn">⚠️ รอดำเนินการเกิน ${daysDiff} วัน</span>`;
-        rowClass = 'row-overdue';
-        overdueCount++;
-      }
-    }
-
-    let dateStr = d.date || '-';
-    try { if (d.dateObj) dateStr = d.dateObj.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}); } catch(e){}
-
-    const canEdit = d.source === 'new' && d.refCode;
-    const noteText = (d.actionText||'').trim();
-
-    return `<tr class="${rowClass}">
-      <td style="font-size:12px;color:var(--muted)">${d.refCode||'-'}</td>
-      <td><span class="tag ${typeTag}">${d.type}</span></td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.title}">${d.title||'-'}</td>
-      <td>${d.name||'-'}</td>
-      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.dept||'-'}</td>
-      <td style="white-space:nowrap">${dateStr}${overdueHtml}</td>
-      <td><span class="tag ${statusTag}">${statusText}</span></td>
-      <td class="note-cell" title="${noteText}">${noteText || '<span style="color:#ccc">-</span>'}</td>
-      <td>${canEdit ? `<button class="btn-status" onclick="openStatusModal('${d.refCode}','${s}','${noteText.replace(/'/g,"\'")}')">✏️ แก้ไข</button>` : '<span style="font-size:12px;color:var(--muted)">-</span>'}</td>
-    </tr>`;
-  }).join('');
-
-  // อัปเดต overdue badge
-  const badge = document.getElementById('overdue-badge');
-  if (overdueCount > 0) {
-    badge.textContent = `⚠️ ${overdueCount} รายการเกิน 3 วัน`;
-    badge.style.display = 'inline';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-// ============================================
-// STATUS UPDATE
-// ============================================
-function openStatusModal(refCode, currentStatus, currentNote) {
-  editingRef = refCode;
-  document.getElementById('modal-ref').textContent = refCode;
-  document.getElementById('modal-status-select').value = currentStatus || 'รอดำเนินการ';
-  document.getElementById('modal-action-text').value = currentNote || '';
-  document.getElementById('status-modal').classList.add('show');
-}
-function closeStatusModal() { document.getElementById('status-modal').classList.remove('show'); }
-
-async function saveStatus() {
-  const status = document.getElementById('modal-status-select').value;
-  const actionText = document.getElementById('modal-action-text').value;
-  if (!editingRef) { alert('ไม่พบ RefCode'); return; }
-
-  const btn = document.querySelector('.btn-save');
-  btn.textContent = '⏳ กำลังบันทึก...';
-  btn.disabled = true;
-
-  try {
-    // ใช้ URLSearchParams + no-cors เหมือน form submit
-    const params = new URLSearchParams();
-    params.append('action', 'updateStatus');
-    params.append('refCode', editingRef);
-    params.append('status', status);
-    params.append('actionText', actionText);
-    params.append('updatedBy', 'admin01');
-
-    await fetch(GAS_URL, { method:'POST', body:params, mode:'no-cors' });
-
-    closeStatusModal();
-    // อัปเดต local data ทันที ไม่ต้องรอโหลดใหม่
-    const item = allData.find(d => d.refCode === editingRef);
-    if (item) {
-      item.status = status;
-      item.actionText = actionText;
-    }
-    applyDashFilter();
-    // โหลดใหม่หลัง 2 วิ (รอ GAS เขียนเสร็จ)
-    setTimeout(loadDashboard, 2000);
-
-    // แจ้งเตือน toast แทน alert
-    showSaveToast('✅ อัปเดตสถานะ "' + status + '" สำเร็จ');
-  } catch(e) {
-    alert('❌ เชื่อมต่อไม่ได้: ' + e);
-  } finally {
-    btn.textContent = '💾 บันทึก';
-    btn.disabled = false;
-  }
-}
-
-function showSaveToast(msg) {
-  const t = document.createElement('div');
-  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1e7e44;color:white;padding:12px 20px;border-radius:10px;font-family:Sarabun,sans-serif;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:9999;animation:slideUp 0.3s ease';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
-}
+// รายการทั้งหมดอยู่ที่หน้า lostfound_list.html
 </script>
 
 <!-- FOOTER -->
