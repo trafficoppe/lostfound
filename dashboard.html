@@ -196,8 +196,15 @@ tbody td { padding: 10px 14px; }
     <!-- FILTER -->
     <div class="filter-bar">
       <label>ช่วงเวลา:</label>
-      <select id="filter-year" onchange="applyDashFilter()">
+      <select id="filter-year" onchange="onYearChange()">
         <option value="all">ทุกปี</option>
+      </select>
+      <select id="filter-quarter" onchange="onQuarterChange()">
+        <option value="all">ทุกไตรมาส</option>
+        <option value="q1">ไตรมาส 1 (ม.ค.–มี.ค.)</option>
+        <option value="q2">ไตรมาส 2 (เม.ย.–มิ.ย.)</option>
+        <option value="q3">ไตรมาส 3 (ก.ค.–ก.ย.)</option>
+        <option value="q4">ไตรมาส 4 (ต.ค.–ธ.ค.)</option>
       </select>
       <select id="filter-month" onchange="applyDashFilter()">
         <option value="all">ทุกเดือน</option>
@@ -208,7 +215,7 @@ tbody td { padding: 10px 14px; }
         <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
         <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
       </select>
-      <button onclick="loadDashboard()" style="padding:9px 16px;background:var(--primary);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;">🔄 รีเฟรช</button>
+      <button onclick="manualRefresh()" style="padding:9px 16px;background:var(--primary);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;">🔄 รีเฟรช</button>
     </div>
 
     <!-- KPI -->
@@ -451,14 +458,35 @@ function buildYearFilter() {
   sel.innerHTML = '<option value="all">ทุกปี</option>' + years.map(y => `<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
 }
 
+function onYearChange() {
+  document.getElementById('filter-quarter').value = 'all';
+  document.getElementById('filter-month').value = 'all';
+  applyDashFilter();
+}
+
+function onQuarterChange() {
+  const q = document.getElementById('filter-quarter').value;
+  document.getElementById('filter-month').value = 'all';
+  applyDashFilter();
+}
+
 function applyDashFilter() {
   const yr = document.getElementById('filter-year').value;
   const mo = document.getElementById('filter-month').value;
+  const q  = document.getElementById('filter-quarter').value;
+
+  const quarterMonths = {
+    q1: [1,2,3], q2: [4,5,6], q3: [7,8,9], q4: [10,11,12]
+  };
+
   filteredData = allData.filter(d => {
     if (!d.dateObj) return yr === 'all';
     const y = d.dateObj.getFullYear().toString();
-    const m = (d.dateObj.getMonth()+1).toString();
-    return (yr === 'all' || y === yr) && (mo === 'all' || m === mo);
+    const m = d.dateObj.getMonth()+1;
+    const yearOk = yr === 'all' || y === yr;
+    const monthOk = mo === 'all' || m === parseInt(mo);
+    const quarterOk = q === 'all' || (quarterMonths[q]||[]).includes(m);
+    return yearOk && monthOk && quarterOk;
   });
   updateKPIs();
   updateCharts();
@@ -642,7 +670,7 @@ function drawItemChart() {
 <footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
   <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Dashboard — San v1.2.1</span></div>
   <div style="font-size:11.5px;margin-top:3px;">
-    © 2025–2026 Traffic Control and Premises Security Unit, Division of Physical and Environmental, Mahidol University. All rights reserved.<br>
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
   </div>
 </footer>
