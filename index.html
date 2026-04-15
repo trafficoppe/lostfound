@@ -521,6 +521,7 @@ function parseNewSheet(data) {
 }
 
 /* ── Load all ── */
+/* ── Load all ── */
 async function loadAll() {
   document.getElementById('gallery').innerHTML =
     '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
@@ -535,35 +536,25 @@ async function loadAll() {
     ? parseNewSheet(r2.value.data) : [];
 
   const today = new Date();
-  // รวมทั้งหมด กรองเฉพาะไม่ให้แสดงวันที่ในอนาคต
   allItems = [...newItems, ...oldItems].filter(it => {
     if (!it.dateObj) return true;
     return it.dateObj <= today;
   });
-  applyYearFilter();
+
+  // แสดงทั้งหมด ไม่กรองปี
+  window._displayItems = allItems;
+  updateCounts();
   applyFilters();
   document.getElementById('update-time').textContent =
     'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
 }
 
-/* ── Year Filter ── */
+/* ── Year Filter (คงไว้เพื่อ backward compat แต่แสดงทั้งหมด) ── */
 function applyYearFilter() {
-  const yr = document.getElementById('year-filter-select')?.value || '2025';
-  const today = new Date();
-  
-  if (yr === 'all') {
-    window._displayItems = allItems;
-  } else {
-    const yearCE = parseInt(yr);
-    window._displayItems = allItems.filter(it => {
-      if (!it.dateObj) return yearCE === 2025; // default show in 2568
-      return it.dateObj.getFullYear() === yearCE;
-    });
-  }
+  window._displayItems = allItems;
   updateCounts();
   applyFilters();
 }
-
 /* ── Counts ── */
 function updateCounts() {
   const items = window._displayItems || allItems;
