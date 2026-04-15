@@ -313,8 +313,9 @@ footer a:hover{color:white;}
 </div>
 
 <!-- FOOTER -->
+<!-- FOOTER -->
 <footer>
-  <div><span class="footer-ver">Lost &amp; Found Web App — v1.1.1</span></div>
+  <div><span class="footer-ver">Lost &amp; Found Web App — San v1.1.1</span></div>
   <div class="footer-copy">
     © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
@@ -517,34 +518,49 @@ async function loadAll() {
   const newItems = (r2.status === 'fulfilled' && r2.value?.data)
     ? parseNewSheet(r2.value.data) : [];
 
-  // รวมทั้งหมด แต่กรองเฉพาะปี 2568 (2025) ลงมาสำหรับแสดงผล
   const today = new Date();
+  // รวมทั้งหมด กรองเฉพาะไม่ให้แสดงวันที่ในอนาคต
   allItems = [...newItems, ...oldItems].filter(it => {
-    if (!it.dateObj) return true; // ถ้าไม่มีวันที่ แสดงไว้ก่อน
-    // กรองออกถ้าวันที่ล่วงหน้ากว่าปัจจุบัน
-    if (it.dateObj > today) return false;
-    // แสดงเฉพาะปี 2025 (2568) เป็นต้นไป
-    return it.dateObj.getFullYear() >= 2025;
+    if (!it.dateObj) return true;
+    return it.dateObj <= today;
   });
-  updateCounts();
+  applyYearFilter();
   applyFilters();
   document.getElementById('update-time').textContent =
     'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
 }
 
+/* ── Year Filter ── */
+function applyYearFilter() {
+  const yr = document.getElementById('year-filter-select')?.value || '2025';
+  const today = new Date();
+  
+  if (yr === 'all') {
+    window._displayItems = allItems;
+  } else {
+    const yearCE = parseInt(yr);
+    window._displayItems = allItems.filter(it => {
+      if (!it.dateObj) return yearCE === 2025; // default show in 2568
+      return it.dateObj.getFullYear() === yearCE;
+    });
+  }
+  updateCounts();
+  applyFilters();
+}
+
 /* ── Counts ── */
 function updateCounts() {
-  document.getElementById('cnt-all').textContent    = allItems.length;
-  document.getElementById('cnt-lost').textContent   = allItems.filter(i => i.type === 'สิ่งของสูญหาย').length;
-  document.getElementById('cnt-found').textContent  = allItems.filter(i => i.type === 'พบสิ่งของ').length;
-  document.getElementById('cnt-pickup').textContent = allItems.filter(i => i.type === 'รับของคืน').length;
+  const items = window._displayItems || allItems;
+  document.getElementById('cnt-all').textContent    = items.length;
+  document.getElementById('cnt-lost').textContent   = items.filter(i => i.type === 'สิ่งของสูญหาย').length;
+  document.getElementById('cnt-found').textContent  = items.filter(i => i.type === 'พบสิ่งของ').length;
+  document.getElementById('cnt-pickup').textContent = items.filter(i => i.type === 'รับของคืน').length;
 
-  // Pending counts (ไม่มีสถานะ หรือ รอดำเนินการ)
   const isPending = s => !s || s.trim() === 'รอดำเนินการ' || s.trim() === '';
   document.getElementById('pcnt-lost').textContent  =
-    allItems.filter(i => i.type==='สิ่งของสูญหาย' && isPending(i.status)).length;
+    items.filter(i => i.type==='สิ่งของสูญหาย' && isPending(i.status)).length;
   document.getElementById('pcnt-found').textContent =
-    allItems.filter(i => i.type==='พบสิ่งของ'     && isPending(i.status)).length;
+    items.filter(i => i.type==='พบสิ่งของ'     && isPending(i.status)).length;
 }
 
 /* ══════════════════════════════════════════
@@ -699,7 +715,8 @@ function applyFilters() {
   const q    = document.getElementById('searchInput').value.toLowerCase().trim();
   const sort = document.getElementById('sortSelect').value;
 
-  filtered = allItems.filter(it => {
+  const baseItems = window._displayItems || allItems;
+  filtered = baseItems.filter(it => {
     const matchT = currentFilter === 'all' || it.type === currentFilter;
     const txt = `${it.title} ${it.location} ${it.name} ${it.dept} ${it.phone}`.toLowerCase();
     return matchT && (!q || txt.includes(q));
