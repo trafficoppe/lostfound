@@ -277,6 +277,42 @@ function logout() {
 }
 
 // ── Parse date dd/MM/yyyy หรือ ISO ──
+
+// ── normalize วันที่จาก Col B ของ Sheet เดิม ──
+// รองรับ: ค.ศ., พ.ศ.(2500+), ปี 2 หลัก(67/68), ปีผิด, D/M สลับ
+function normalizeLostDate(colBStr, tsObj) {
+  if (!colBStr || !tsObj || isNaN(tsObj)) return tsObj;
+  const s = String(colBStr).trim();
+  const parts = s.split('/');
+  if (parts.length !== 3) return tsObj;
+  let p1=parseInt(parts[0]), p2=parseInt(parts[1]), p3=parseInt(parts[2]);
+  if (isNaN(p1)||isNaN(p2)||isNaN(p3)) return tsObj;
+
+  const tsYear = tsObj.getFullYear();
+
+  // แก้ปี
+  if (p3 >= 2500 && p3 <= 2600) { p3 -= 543; }            // พ.ศ. → ค.ศ.
+  else if (p3 >= 60 && p3 <= 75) { p3 = (p3+2500)-543; }  // 67 → 2567 → 2024
+  else if (p3 < 2000 || Math.abs(p3-tsYear) > 5) { return tsObj; } // ผิดปกติ
+
+  // D/M vs M/D
+  let month, day;
+  if (p1 > 12) { day=p1; month=p2; }
+  else { month=p1; day=p2; }
+  if (month<1||month>12||day<1||day>31) return tsObj;
+
+  try {
+    const result = new Date(p3, month-1, day,
+      tsObj.getHours(), tsObj.getMinutes(), tsObj.getSeconds());
+    if (isNaN(result)) return tsObj;
+    // วันหายอยู่ในอนาคตกว่า timestamp → ใช้ timestamp
+    if (result > tsObj && (result-tsObj) > 86400000) return tsObj;
+    // ห่างเกิน 60 วัน → ผิดปกติ → ใช้ timestamp
+    if ((tsObj-result)/86400000 > 60) return tsObj;
+    return result;
+  } catch(e) { return tsObj; }
+}
+
 function parseAnyDate(str) {
   if (!str) return null;
   const s = String(str).trim();
@@ -349,7 +385,8 @@ function parseOldSheet(text) {
       else{title=g(13);}
       const phone=g(5);
       if(/^[\d\s\-\+]{7,15}$/.test(title.trim())||!title) title=`${g(2)||'ไม่ระบุ'}`;
-      const dateObj=parseAnyDate(g(0));
+      const tsObj2=parseAnyDate(g(0));
+      const dateObj=normalizeLostDate(g(1), tsObj2) || tsObj2;
       return {
         source:'old', refCode:'', type,
         title:title||'ไม่ระบุ', location:loc||'-',
