@@ -517,7 +517,15 @@ async function loadAll() {
   const newItems = (r2.status === 'fulfilled' && r2.value?.data)
     ? parseNewSheet(r2.value.data) : [];
 
-  allItems = [...newItems, ...oldItems]; // ใหม่ก่อน
+  // รวมทั้งหมด แต่กรองเฉพาะปี 2568 (2025) ลงมาสำหรับแสดงผล
+  const today = new Date();
+  allItems = [...newItems, ...oldItems].filter(it => {
+    if (!it.dateObj) return true; // ถ้าไม่มีวันที่ แสดงไว้ก่อน
+    // กรองออกถ้าวันที่ล่วงหน้ากว่าปัจจุบัน
+    if (it.dateObj > today) return false;
+    // แสดงเฉพาะปี 2025 (2568) เป็นต้นไป
+    return it.dateObj.getFullYear() >= 2025;
+  });
   updateCounts();
   applyFilters();
   document.getElementById('update-time').textContent =
