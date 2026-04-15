@@ -420,45 +420,61 @@ function parseOldSheet(text) {
 
     return rows.map(row => {
       if (!row?.c) return null;
-      const g = i => {
-        const cell = row.c[i];
-        if (!cell) return '';
-        return String(cell.f || cell.v || '').trim();
-      };
+      const g = i => row.c[i] ? String(row.c[i].f || row.c[i].v || '').trim() : '';
 
-      // Col G (index 6) = ประเภท
-      const subj = g(6);
+      // ⛔ ข้ามแถวที่ไม่มี Timestamp (แถวกิจกรรม/ว่าง)
+      const ts = g(0);
+      if (!ts || !ts.includes('/') && !ts.includes('-')) return null;
+      const tsObj = parseDate(ts);
+      if (!tsObj || tsObj.getFullYear() < 2020) return null;
+
+      // ── ตรวจสอบ Col G, H, K เพื่อหา type ──
+      const colG = g(6);   // ประเภท (สูญหาย/พบของ/คืน)
+      const colH = g(7);   // รายละเอียดของสูญหาย
+      const colK = g(10);  // รายละเอียดของที่พบ
+      const colN = g(13);  // รายละเอียดของที่รับคืน
+
       let type = '';
-      if (subj.includes('สูญหาย') || subj.includes('หาย')) type = 'สิ่งของสูญหาย';
-      else if (subj.includes('พบ') || subj.includes('เก็บ')) type = 'พบสิ่งของ';
-      else if (subj.includes('คืน')) type = 'รับของคืน';
-      else return null;
 
-      // ดึง title/location/image ตามประเภท
+      // 1. ดู Col G ก่อน
+      if (colG.includes('สูญหาย') || colG.includes('หาย')) type = 'สิ่งของสูญหาย';
+      else if (colG.includes('พบ') || colG.includes('เก็บ')) type = 'พบสิ่งของ';
+      else if (colG.includes('คืน')) type = 'รับของคืน';
+
+      // 2. ถ้า Col G ว่าง → fallback ดูว่ามีข้อมูลใน Col H หรือ K
+      if (!type) {
+        if (colH && colH.length > 2) type = 'สิ่งของสูญหาย';
+        else if (colK && colK.length > 2) type = 'พบสิ่งของ';
+        else if (colN && colN.length > 2) type = 'รับของคืน';
+      }
+
+      // ยังไม่ได้ type → ข้ามแถวนี้
+      if (!type) return null;
+
+      // ── ดึง title/location/image ตามประเภท ──
       let title = '', loc = '', imgRaw = '';
       if (type === 'สิ่งของสูญหาย') {
-        title  = g(7);   // Col H: รายละเอียดของสูญหาย
-        loc    = g(8);   // Col I: สถานที่สูญหาย
-        imgRaw = g(9);   // Col J: รูปของสูญหาย
+        title  = g(7);   // Col H
+        loc    = g(8);   // Col I
+        imgRaw = g(9);   // Col J
       } else if (type === 'พบสิ่งของ') {
-        title  = g(10);  // Col K: รายละเอียดของที่พบ
-        loc    = g(11);  // Col L: สถานที่พบ
-        imgRaw = g(12);  // Col M: รูปของที่พบ
+        title  = g(10);  // Col K
+        loc    = g(11);  // Col L
+        imgRaw = g(12);  // Col M
       } else {
-        title  = g(13);  // Col N: รายละเอียดของที่รับคืน
-        imgRaw = g(14);  // Col O: รูปของที่รับคืน
+        title  = g(13);  // Col N
+        imgRaw = g(14);  // Col O
         loc    = '-';
       }
 
-      // Fallback: ถ้า title ว่างหรือเป็นเบอร์โทร → ใช้ชื่อผู้แจ้งแทน
-      const phone = g(5);
-      const isPhone = /^[\d\s\-\+]{7,15}$/.test(title.trim());
+      // Fallback title
+      const isPhone = /^[\d\s\-\+]{7,15}$/.test((title||'').trim());
       if (!title || isPhone) {
-        title = type === 'สิ่งของสูญหาย' ? `[ของหาย] ${g(2)}` :
-                type === 'พบสิ่งของ'     ? `[ของที่พบ] ${g(2)}` : `[รับคืน] ${g(2)}`;
+        const name = g(2);
+        title = type === 'สิ่งของสูญหาย' ? `[ของหาย] ${name}` :
+                type === 'พบสิ่งของ'     ? `[ของที่พบ] ${name}` : `[รับคืน] ${name}`;
       }
 
-      const tsObj = parseDate(g(0));
       const lostDateObj = normalizeLostDate(g(1), tsObj);
       return {
         source     : 'old',
@@ -473,10 +489,10 @@ function parseOldSheet(text) {
         name       : g(2),
         personType : g(3),
         dept       : g(4),
-        phone,
+        phone      : g(5),
         time       : g(15)
       };
-    }).filter(Boolean).reverse();
+    }).filter(Boolean);
   } catch(e) {
     console.error('parseOldSheet error:', e);
     return [];
