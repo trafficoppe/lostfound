@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รายการทั้งหมด | Lost & Found มหาวิทยาลัยมหิดล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary:#1a3a5c;--primary-mid:#2d5f8f;--accent:#e8a020;
+  --lost:#c0392b;--found:#1e7e44;--pickup:#1a5276;
+  --bg:#f0f3f8;--white:#fff;--border:#d5dce8;--muted:#6c7a89;--text:#1c2833;
+  --shadow:0 2px 16px rgba(26,58,92,0.10);--radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* TOP BAR */
+.top-bar{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-mid) 100%);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
+.top-bar-left{display:flex;align-items:center;gap:12px;color:white;}
+.top-bar-left h1{font-size:16px;font-weight:700;}
+.top-bar-right{display:flex;gap:10px;align-items:center;}
+.btn-nav{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13.5px;display:flex;align-items:center;gap:5px;padding:7px 14px;border:1px solid rgba(255,255,255,0.3);border-radius:8px;transition:all 0.2s;font-family:'Sarabun',sans-serif;cursor:pointer;background:transparent;}
+.btn-nav:hover{background:rgba(255,255,255,0.15);color:white;}
+.btn-logout{background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);padding:7px 14px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13.5px;cursor:pointer;}
+.btn-logout:hover{background:rgba(255,255,255,0.22);}
+
+.content{max-width:1400px;margin:0 auto;padding:20px;}
+
+/* REFRESH BAR */
+.refresh-bar{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#1a3a5c,#2d5f8f);border-radius:12px;padding:12px 20px;margin-bottom:16px;box-shadow:0 4px 16px rgba(26,58,92,0.2);}
+.refresh-info{color:rgba(255,255,255,0.85);font-size:13px;display:flex;align-items:center;gap:10px;}
+.dot-live{width:8px;height:8px;background:#2ecc71;border-radius:50%;animation:pulse 2s infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(1.3);}}
+.refresh-countdown{font-size:12px;color:rgba(255,255,255,0.6);}
+.btn-refresh-main{background:#e8a020;color:white;border:none;padding:9px 20px;border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;box-shadow:0 3px 10px rgba(232,160,32,0.4);}
+.btn-refresh-main:hover{transform:translateY(-2px);}
+.btn-refresh-main.spinning svg{animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* YEAR TABS */
+.year-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.year-tab{padding:8px 20px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:white;font-family:'Sarabun',sans-serif;transition:all 0.2s;color:var(--muted);}
+.year-tab.active{background:var(--primary);color:white;border-color:var(--primary);}
+.year-tab:hover:not(.active){border-color:var(--primary-mid);color:var(--primary);}
+.year-tab .tab-count{font-size:12px;background:rgba(0,0,0,0.1);padding:1px 7px;border-radius:10px;margin-left:5px;}
+.year-tab.active .tab-count{background:rgba(255,255,255,0.25);}
+
+/* FILTER ROW */
+.filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+.filter-row select,.filter-row input{padding:9px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;background:white;outline:none;cursor:pointer;color:var(--text);}
+.filter-row input{flex:1;min-width:200px;}
+.filter-row input:focus{border-color:var(--primary-mid);}
+
+/* TABLE CARD */
+.table-card{background:white;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.table-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.table-head h3{font-size:15px;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:8px;}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+thead th{background:#f0f3f8;padding:11px 14px;text-align:left;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:2px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.15s;}
+tbody tr:hover{background:#f8fafd;}
+tbody td{padding:10px 14px;vertical-align:middle;}
+
+/* TAGS */
+.tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;}
+.tag-lost{background:#fdecea;color:var(--lost);}
+.tag-found{background:#edf7f1;color:var(--found);}
+.tag-pickup{background:#eaf1fb;color:var(--pickup);}
+.tag-wait{background:#f8f9fa;color:var(--muted);}
+.tag-done{background:#edf7f1;color:var(--found);}
+.tag-notfound{background:#fff3e0;color:#d35400;}
+.tag-unclaimed{background:#f3e5f5;color:#8e44ad;}
+
+/* OVERDUE */
+.overdue-warn{font-size:11px;color:#c0392b;font-weight:700;display:block;margin-top:3px;white-space:nowrap;}
+tr.row-overdue td{background:#fff5f5 !important;}
+tr.row-overdue td:first-child{border-left:3px solid #c0392b;}
+
+/* STATUS BTN */
+.btn-status{padding:6px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:'Sarabun',sans-serif;font-size:12.5px;cursor:pointer;background:white;transition:all 0.2s;color:var(--primary);display:inline-flex;align-items:center;gap:4px;}
+.btn-status:hover{border-color:var(--primary);background:#f0f5ff;}
+
+/* NOTE CELL */
+.note-cell{font-size:12px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* EMPTY/LOADING */
+.dash-loading{text-align:center;padding:40px;color:var(--muted);}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
+
+/* STATUS MODAL */
+.status-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:600;align-items:center;justify-content:center;padding:20px;}
+.status-modal.show{display:flex;}
+.status-modal-box{background:white;border-radius:16px;padding:28px;max-width:460px;width:100%;box-shadow:0 16px 50px rgba(0,0,0,0.25);}
+.status-modal-box h3{font-size:17px;font-weight:700;color:var(--primary);margin-bottom:6px;}
+.status-modal-box select,.status-modal-box textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14px;margin-bottom:12px;outline:none;}
+.status-modal-box textarea{min-height:80px;resize:vertical;}
+.status-modal-box select:focus,.status-modal-box textarea:focus{border-color:var(--primary-mid);}
+.modal-btns{display:flex;gap:10px;}
+.btn-cancel{flex:1;padding:11px;background:#f8f9fa;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;cursor:pointer;}
+.btn-save{flex:2;padding:11px;background:var(--primary);color:white;border:none;border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:700;cursor:pointer;}
+.btn-save:hover{background:var(--primary-mid);}
+.btn-save:disabled{opacity:0.6;cursor:not-allowed;}
+
+/* PAGINATION */
+.pagination{display:flex;justify-content:center;gap:8px;padding:16px 20px;flex-wrap:wrap;border-top:1px solid var(--border);}
+.page-btn{padding:7px 13px;border:1.5px solid var(--border);border-radius:8px;background:white;font-family:'Sarabun',sans-serif;font-size:13.5px;cursor:pointer;transition:all 0.18s;}
+.page-btn:hover:not(:disabled){border-color:var(--primary-mid);color:var(--primary);}
+.page-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
+.page-btn:disabled{opacity:0.38;cursor:not-allowed;}
+
+@keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="top-bar-left">
+    <span style="font-size:20px;">📋</span>
+    <h1>รายการทั้งหมด
+      <span style="font-size:11px;background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:10px;font-weight:400;margin-left:6px;">v1.2.1</span>
+    </h1>
+  </div>
+  <div class="top-bar-right">
+    <a href="dashboard.html" class="btn-nav">📊 Dashboard</a>
+    <a href="index.html" class="btn-nav">← หน้าหลัก</a>
+    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- REFRESH BAR -->
+  <div class="refresh-bar">
+    <div class="refresh-info">
+      <div class="dot-live"></div>
+      <div>
+        <div style="font-weight:700;font-size:14px;">🔴 Live — อัปเดตอัตโนมัติทุก 5 นาที</div>
+        <div class="refresh-countdown" id="countdown-text">รีเฟรชครั้งถัดไปใน 5:00</div>
+      </div>
+    </div>
+    <button class="btn-refresh-main" id="btn-refresh-main" onclick="manualRefresh()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+      </svg>
+      รีเฟรชข้อมูล
+    </button>
+  </div>
+
+  <!-- YEAR TABS -->
+  <div class="year-tabs">
+    <span style="font-size:13.5px;font-weight:600;color:var(--muted);">ดูปี:</span>
+    <button class="year-tab active" id="tab-2568" onclick="setYear(2025)">
+      พ.ศ. 2568 <span class="tab-count" id="cnt-2568">-</span>
+    </button>
+    <button class="year-tab" id="tab-2567" onclick="setYear(2024)">
+      พ.ศ. 2567 <span class="tab-count" id="cnt-2567">-</span>
+    </button>
+    <button class="year-tab" id="tab-all" onclick="setYear('all')">
+      ทั้งหมด <span class="tab-count" id="cnt-all-tab">-</span>
+    </button>
+  </div>
+
+  <!-- FILTER ROW -->
+  <div class="filter-row">
+    <input type="text" id="searchInput" placeholder="🔎 ค้นหา RefCode, ชื่อ, รายละเอียด, สถานที่..." oninput="applyFilters()">
+    <select id="filter-type" onchange="applyFilters()">
+      <option value="all">ทุกประเภท</option>
+      <option value="สิ่งของสูญหาย">😟 สิ่งของสูญหาย</option>
+      <option value="พบสิ่งของ">📦 พบสิ่งของ</option>
+      <option value="รับของคืน">🤝 รับของคืน</option>
+    </select>
+    <select id="filter-status" onchange="applyFilters()">
+      <option value="all">ทุกสถานะ</option>
+      <option value="รอดำเนินการ">⏳ รอดำเนินการ</option>
+      <option value="ช่วยหาแล้วยังไม่พบ">🔎 ช่วยหาแล้วยังไม่พบ</option>
+      <option value="รับของคืนแล้ว">✅ รับของคืนแล้ว</option>
+      <option value="เจ้าของยังไม่มารับคืน">⏳ เจ้าของยังไม่มารับคืน</option>
+    </select>
+    <select id="filter-month" onchange="applyFilters()">
+      <option value="all">ทุกเดือน</option>
+      <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
+      <option value="3">มีนาคม</option><option value="4">เมษายน</option>
+      <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+      <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
+      <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
+      <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+    </select>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-card">
+    <div class="table-head">
+      <h3>
+        📋 รายการ
+        <span id="overdue-badge" style="display:none;background:#c0392b;color:white;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;"></span>
+      </h3>
+      <span style="font-size:13px;color:var(--muted)" id="result-count"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>RefCode</th>
+            <th>ประเภท</th>
+            <th>รายละเอียด</th>
+            <th>ผู้แจ้ง</th>
+            <th>คณะ/หน่วยงาน</th>
+            <th>วันที่แจ้ง</th>
+            <th>สถานะ</th>
+            <th>หมายเหตุ</th>
+            <th>อัปเดตล่าสุด</th>
+            <th>แก้ไข</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="10" class="dash-loading"><div class="spinner"></div>กำลังโหลด...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+</div>
+
+<!-- STATUS MODAL -->
+<div class="status-modal" id="status-modal">
+  <div class="status-modal-box">
+    <h3>✏️ อัปเดตสถานะ</h3>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">
+      รายการ: <strong id="modal-ref" style="color:var(--primary)"></strong>
+    </div>
+    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">สถานะ</label>
+    <select id="modal-status-select">
+      <option value="รอดำเนินการ">⏳ รอดำเนินการ</option>
+      <option value="ช่วยหาแล้วยังไม่พบ">🔎 ช่วยหาแล้วยังไม่พบ</option>
+      <option value="รับของคืนแล้ว">✅ รับของคืนแล้ว</option>
+      <option value="เจ้าของยังไม่มารับคืน">⏳ เจ้าของยังไม่มารับคืน</option>
+    </select>
+    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">บันทึกการดำเนินการ (ถ้ามี)</label>
+    <textarea id="modal-action-text" placeholder="เช่น: โทรแจ้งเจ้าของแล้ว, ส่งมอบของคืนเรียบร้อย..."></textarea>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeStatusModal()">ยกเลิก</button>
+      <button class="btn-save" id="btn-save-modal" onclick="saveStatus()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================
+ * Lost & Found Web App — lostfound_list.html
+ * Version : 1.2.1
+ * © 2025–2026 Traffic Control and Premises Security Unit,
+ *   Division of Physical and Environmental, Mahidol University.
+ * ===================================================== */
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
+const OLD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/14MJgb81aVEjT2qVp6n9zNKCCpJNVimX1q0hiYkH0f5I/gviz/tq?tqx=out:json&gid=751456190';
+const ITEMS_PER_PAGE = 50;
+
+let allData = [], filtered = [], currentPage = 1;
+let selectedYear = 2025; // default ปี 2568 (ค.ศ.2025)
+let editingRef = '';
+
+// ── Auth check ──
+function checkAuth() {
+  if (!sessionStorage.getItem('lf_auth')) {
+    window.location.href = 'dashboard.html';
+  }
+}
+function logout() {
+  sessionStorage.removeItem('lf_auth');
+  window.location.href = 'dashboard.html';
+}
+
+// ── Parse date dd/MM/yyyy หรือ ISO ──
+
+// ── normalize วันที่จาก Col B ของ Sheet เดิม ──
+// รองรับ: ค.ศ., พ.ศ.(2500+), ปี 2 หลัก(67/68), ปีผิด, D/M สลับ
+function normalizeLostDate(colBStr, tsObj) {
+  if (!colBStr || !tsObj || isNaN(tsObj)) return tsObj;
+  const s = String(colBStr).trim();
+  const parts = s.split('/');
+  if (parts.length !== 3) return tsObj;
+  let p1=parseInt(parts[0]), p2=parseInt(parts[1]), p3=parseInt(parts[2]);
+  if (isNaN(p1)||isNaN(p2)||isNaN(p3)) return tsObj;
+
+  const tsYear = tsObj.getFullYear();
+
+  // แก้ปี
+  if (p3 >= 2500 && p3 <= 2600) { p3 -= 543; }            // พ.ศ. → ค.ศ.
+  else if (p3 >= 60 && p3 <= 75) { p3 = (p3+2500)-543; }  // 67 → 2567 → 2024
+  else if (p3 < 2000 || Math.abs(p3-tsYear) > 5) { return tsObj; } // ผิดปกติ
+
+  // D/M vs M/D
+  let month, day;
+  if (p1 > 12) { day=p1; month=p2; }
+  else { month=p1; day=p2; }
+  if (month<1||month>12||day<1||day>31) return tsObj;
+
+  try {
+    const result = new Date(p3, month-1, day,
+      tsObj.getHours(), tsObj.getMinutes(), tsObj.getSeconds());
+    if (isNaN(result)) return tsObj;
+    // วันหายอยู่ในอนาคตกว่า timestamp → ใช้ timestamp
+    if (result > tsObj && (result-tsObj) > 86400000) return tsObj;
+    // ห่างเกิน 60 วัน → ผิดปกติ → ใช้ timestamp
+    if ((tsObj-result)/86400000 > 60) return tsObj;
+    return result;
+  } catch(e) { return tsObj; }
+}
+
+function parseAnyDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    const d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]),
+                       parseInt(m[4]||0), parseInt(m[5]||0), parseInt(m[6]||0));
+    if (!isNaN(d)) return d;
+  }
+  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e){}
+  return null;
+}
+
+function fmtDate(d) {
+  if (!d) return '-';
+  try { return d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'}); } catch(e){ return '-'; }
+}
+function fmtDateTime(d) {
+  if (!d) return '-';
+  try { return d.toLocaleString('th-TH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch(e){ return '-'; }
+}
+
+// ── Load data ──
+async function loadData() {
+  const [r1, r2] = await Promise.allSettled([
+    fetch(OLD_SHEET_URL + '&t=' + Date.now()).then(r => r.text()),
+    fetch(GAS_URL + '?action=getData&t=' + Date.now()).then(r => r.json())
+  ]);
+
+  let oldItems = r1.status === 'fulfilled' ? parseOldSheet(r1.value) : [];
+  let newItems = (r2.status === 'fulfilled' && r2.value?.data) ? parseNewSheet(r2.value.data) : [];
+
+  // รวม: ใหม่ก่อน เก่าหลัง แล้วเรียงจากเก่า→ใหม่
+  const todayFilter = new Date();
+  allData = [...newItems, ...oldItems]
+    .filter(it => !it.dateObj || it.dateObj <= todayFilter);
+  allData.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+
+  updateYearCounts();
+  applyFilters();
+}
+
+function parseNewSheet(data) {
+  return (data||[]).map(r => ({
+    source:'new', refCode:r['RefCode']||'', type:r['ประเภท']||'',
+    title:r['รายละเอียด']||'ไม่ระบุ', location:r['สถานที่']||'-',
+    date:r['Timestamp']||'', dateObj:parseAnyDate(r['Timestamp']),
+    name:r['ชื่อ-นามสกุล']||'', dept:r['คณะ/หน่วยงาน']||'',
+    phone:r['เบอร์โทร']||'', status:r['สถานะ']||'รอดำเนินการ',
+    actionText:r['การดำเนินการ']||'', updatedAt:r['วันที่อัปเดต']||'',
+    updatedBy:r['อัปเดตโดย']||''
+  })).filter(r => r.type);
+}
+
+function parseOldSheet(text) {
+  try {
+    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+?)\);?\s*$/);
+    if (!m) return [];
+    const rows = JSON.parse(m[1]).table?.rows || [];
+    return rows.map(row => {
+      if (!row?.c) return null;
+      const g = i => row.c[i] ? String(row.c[i].f||row.c[i].v||'').trim() : '';
+      const subj = g(6);
+      let type='';
+      if (subj.includes('สูญหาย')||subj.includes('หาย')) type='สิ่งของสูญหาย';
+      else if (subj.includes('พบ')||subj.includes('เก็บ')) type='พบสิ่งของ';
+      else if (subj.includes('คืน')) type='รับของคืน';
+      else return null;
+      let title='',loc='';
+      if(type==='สิ่งของสูญหาย'){title=g(7);loc=g(8);}
+      else if(type==='พบสิ่งของ'){title=g(10);loc=g(11);}
+      else{title=g(13);}
+      const phone=g(5);
+      if(/^[\d\s\-\+]{7,15}$/.test(title.trim())||!title) title=`${g(2)||'ไม่ระบุ'}`;
+      const tsObj2=parseAnyDate(g(0));
+      const dateObj=normalizeLostDate(g(1), tsObj2) || tsObj2;
+      return {
+        source:'old', refCode:'', type,
+        title:title||'ไม่ระบุ', location:loc||'-',
+        date:g(0), dateObj,
+        name:g(2), dept:g(4), phone,
+        status:g(18)||'', actionText:g(17)||'',
+        updatedAt:'', updatedBy:''
+      };
+    }).filter(Boolean);
+  } catch(e){ return []; }
+}
+
+// ── Year tabs ──
+function updateYearCounts() {
+  const c2568 = allData.filter(d => d.dateObj?.getFullYear() === 2025).length;
+  const c2567 = allData.filter(d => d.dateObj?.getFullYear() === 2024).length;
+  document.getElementById('cnt-2568').textContent = c2568;
+  document.getElementById('cnt-2567').textContent = c2567;
+  document.getElementById('cnt-all-tab').textContent = allData.length;
+}
+
+function setYear(yr) {
+  selectedYear = yr;
+  ['2568','2567','all'].forEach(t => document.getElementById('tab-'+t).classList.remove('active'));
+  if (yr === 2025) document.getElementById('tab-2568').classList.add('active');
+  else if (yr === 2024) document.getElementById('tab-2567').classList.add('active');
+  else document.getElementById('tab-all').classList.add('active');
+  currentPage = 1;
+  applyFilters();
+}
+
+// ── Filter ──
+function applyFilters() {
+  const q       = document.getElementById('searchInput').value.toLowerCase().trim();
+  const type    = document.getElementById('filter-type').value;
+  const status  = document.getElementById('filter-status').value;
+  const month   = document.getElementById('filter-month').value;
+
+  filtered = allData.filter(d => {
+    // year filter
+    if (selectedYear !== 'all') {
+      if (!d.dateObj || d.dateObj.getFullYear() !== selectedYear) return false;
+    }
+    // type
+    if (type !== 'all' && d.type !== type) return false;
+    // status
+    if (status !== 'all' && !(d.status||'').includes(status)) return false;
+    // month
+    if (month !== 'all' && d.dateObj && String(d.dateObj.getMonth()+1) !== month) return false;
+    // search
+    if (q) {
+      const txt = `${d.title} ${d.name} ${d.dept} ${d.refCode} ${d.location}`.toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // เรียงใหม่→เก่า (ล่าสุดบนสุด ตาม request)
+  filtered.sort((a,b) => (b.dateObj||0) - (a.dateObj||0));
+
+  currentPage = 1;
+  renderTable();
+}
+
+// ── Render table ──
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  const total = filtered.length;
+  const pages = Math.ceil(total / ITEMS_PER_PAGE);
+  const start = (currentPage-1) * ITEMS_PER_PAGE;
+  const items = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+  document.getElementById('result-count').textContent = `แสดง ${Math.min(start+1,total)}–${Math.min(start+items.length,total)} จาก ${total} รายการ`;
+
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted)">ไม่พบข้อมูลในช่วงเวลาที่เลือก</td></tr>`;
+    document.getElementById('pagination').innerHTML = '';
+    document.getElementById('overdue-badge').style.display = 'none';
+    return;
+  }
+
+  const now = new Date();
+  let overdueCount = 0;
+
+  tbody.innerHTML = items.map(d => {
+    const typeTag = d.type==='สิ่งของสูญหาย'?'tag-lost':d.type==='พบสิ่งของ'?'tag-found':'tag-pickup';
+    const s = (d.status||'').trim();
+    let statusTag='tag-wait', statusText='รอดำเนินการ';
+    if(s.includes('รับของคืนแล้ว')){statusTag='tag-done';statusText='รับของคืนแล้ว';}
+    else if(s.includes('ช่วยหาแล้วยังไม่พบ')){statusTag='tag-notfound';statusText='ช่วยหาแล้วยังไม่พบ';}
+    else if(s.includes('เจ้าของยังไม่มารับคืน')){statusTag='tag-unclaimed';statusText='เจ้าของยังไม่มารับคืน';}
+
+    // overdue check
+    let overdueHtml = '', rowClass = '';
+    const isPending = s===''||s==='รอดำเนินการ';
+    if (isPending && d.dateObj) {
+      const days = Math.floor((now - d.dateObj) / 86400000);
+      if (days > 3) {
+        overdueHtml = `<span class="overdue-warn">⚠️ เกิน ${days} วัน กรุณาอัปเดตสถานะ</span>`;
+        rowClass = 'row-overdue';
+        overdueCount++;
+      }
+    }
+
+    const canEdit = d.source==='new' && d.refCode;
+    const note = (d.actionText||'').trim();
+    const updatedStr = d.updatedAt ? fmtDate(parseAnyDate(d.updatedAt)) : '-';
+    const refDisplay = d.refCode || `<span style="color:#ccc;font-size:11px">ข้อมูลเดิม</span>`;
+
+    return `<tr class="${rowClass}">
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap">${refDisplay}</td>
+      <td><span class="tag ${typeTag}">${d.type}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.title}">${d.title||'-'}</td>
+      <td style="white-space:nowrap">${d.name||'-'}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.dept}">${d.dept||'-'}</td>
+      <td style="white-space:nowrap">${fmtDate(d.dateObj)}${overdueHtml}</td>
+      <td><span class="tag ${statusTag}">${statusText}</span></td>
+      <td class="note-cell" title="${note}">${note||'<span style="color:#ddd">—</span>'}</td>
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap">${updatedStr}</td>
+      <td>${canEdit
+        ? `<button class="btn-status" onclick="openStatusModal('${d.refCode}','${s}','${note.replace(/'/g,"\\'")}')">✏️ แก้ไข</button>`
+        : `<span style="font-size:11px;color:#ccc">—</span>`}
+      </td>
+    </tr>`;
+  }).join('');
+
+  // overdue badge
+  const badge = document.getElementById('overdue-badge');
+  if (overdueCount > 0) { badge.textContent = `⚠️ ${overdueCount} รายการเกิน 3 วัน`; badge.style.display='inline'; }
+  else badge.style.display='none';
+
+  renderPagination(pages);
+}
+
+function renderPagination(pages) {
+  const pg = document.getElementById('pagination');
+  if (pages <= 1) { pg.innerHTML=''; return; }
+  let h = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← ก่อนหน้า</button>`;
+  for (let i=1;i<=pages;i++) {
+    if(i===1||i===pages||Math.abs(i-currentPage)<=2)
+      h+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    else if(Math.abs(i-currentPage)===3)
+      h+=`<span style="padding:7px 4px;color:var(--muted)">…</span>`;
+  }
+  h+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>ถัดไป →</button>`;
+  pg.innerHTML = h;
+}
+function goPage(p) {
+  const pages=Math.ceil(filtered.length/ITEMS_PER_PAGE);
+  if(p<1||p>pages)return;
+  currentPage=p; renderTable();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Status Modal ──
+function openStatusModal(refCode, currentStatus, currentNote) {
+  editingRef = refCode;
+  document.getElementById('modal-ref').textContent = refCode;
+  document.getElementById('modal-status-select').value = currentStatus||'รอดำเนินการ';
+  document.getElementById('modal-action-text').value = currentNote||'';
+  document.getElementById('status-modal').classList.add('show');
+}
+function closeStatusModal() { document.getElementById('status-modal').classList.remove('show'); }
+
+async function saveStatus() {
+  const status = document.getElementById('modal-status-select').value;
+  const actionText = document.getElementById('modal-action-text').value;
+  if (!editingRef) return;
+
+  const btn = document.getElementById('btn-save-modal');
+  btn.textContent='⏳ กำลังบันทึก...'; btn.disabled=true;
+
+  try {
+    const params = new URLSearchParams();
+    params.append('action','updateStatus');
+    params.append('refCode',editingRef);
+    params.append('status',status);
+    params.append('actionText',actionText);
+    params.append('updatedBy','admin01');
+
+    await fetch(GAS_URL, {method:'POST', body:params, mode:'no-cors'});
+
+    // อัปเดต local
+    const item = allData.find(d => d.refCode===editingRef);
+    if (item) { item.status=status; item.actionText=actionText; item.updatedAt=new Date().toLocaleDateString('th-TH'); }
+    closeStatusModal();
+    applyFilters();
+    setTimeout(loadData, 2000);
+    showToast('✅ อัปเดตสถานะ "' + status + '" สำเร็จ');
+  } catch(e) { alert('❌ เชื่อมต่อไม่ได้: '+e); }
+  finally { btn.textContent='💾 บันทึก'; btn.disabled=false; }
+}
+
+function showToast(msg) {
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:#1e7e44;color:white;padding:12px 20px;border-radius:10px;font-family:Sarabun,sans-serif;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:9999;animation:slideUp 0.3s ease';
+  t.textContent=msg; document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+// ── Auto-refresh ──
+let refreshInterval=null, countdownInterval=null;
+const REFRESH_SEC=300;
+let secondsLeft=REFRESH_SEC;
+
+function startAutoRefresh() {
+  clearInterval(refreshInterval); clearInterval(countdownInterval);
+  secondsLeft=REFRESH_SEC;
+  refreshInterval=setInterval(()=>{ loadData(); secondsLeft=REFRESH_SEC; }, REFRESH_SEC*1000);
+  countdownInterval=setInterval(()=>{
+    secondsLeft--;
+    const m=Math.floor(secondsLeft/60), s=String(secondsLeft%60).padStart(2,'0');
+    const el=document.getElementById('countdown-text');
+    if(el) el.textContent=`รีเฟรชครั้งถัดไปใน ${m}:${s}`;
+  },1000);
+}
+
+async function manualRefresh() {
+  const btn=document.getElementById('btn-refresh-main');
+  btn.classList.add('spinning'); btn.disabled=true;
+  await loadData();
+  secondsLeft=REFRESH_SEC;
+  btn.classList.remove('spinning'); btn.disabled=false;
+  showToast('🔄 โหลดข้อมูลใหม่แล้ว');
+}
+
+// ── Init ──
+window.onload = () => {
+  checkAuth();
+  loadData();
+  startAutoRefresh();
+};
+</script>
+
+<!-- FOOTER -->
+<footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
+  <div><span style="font-weight:700;color:#e8a020;">Lost &amp; Found Web App — San v1.2.1</span></div>
+  <div style="font-size:11.5px;margin-top:3px;">
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
+  </div>
+</footer>
+</body>
+</html>
