@@ -346,8 +346,10 @@ async function loadData() {
   let newItems = (r2.status === 'fulfilled' && r2.value?.data) ? parseNewSheet(r2.value.data) : [];
 
   // รวม: ใหม่ก่อน เก่าหลัง แล้วเรียงจากเก่า→ใหม่
-  allData = [...newItems, ...oldItems];
-  allData.sort((a,b) => (a.dateObj||0) - (b.dateObj||0)); // เก่าสุดก่อน → ใหม่สุดอยู่บน
+  const todayFilter = new Date();
+  allData = [...newItems, ...oldItems]
+    .filter(it => !it.dateObj || it.dateObj <= todayFilter);
+  allData.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
 
   updateYearCounts();
   applyFilters();
