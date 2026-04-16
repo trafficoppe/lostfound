@@ -283,10 +283,11 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 <div class="header">
   <div class="header-inner">
     <div class="header-icon">🔍</div>
-    <div>
+    <div style="flex:1">
       <div class="header-title">แจ้งของหาย / เก็บของได้ / รับของคืน</div>
       <div class="header-sub">งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล</div>
     </div>
+    <a href="lostfound_form_en.html" style="background:rgba(255,255,255,0.18);color:white;border:1.5px solid rgba(255,255,255,0.5);padding:8px 14px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;">🌐 English Form</a>
   </div>
 </div>
 
@@ -829,10 +830,11 @@ function go(n) {
       if (!document.getElementById('d-found-time').value) errors3.push('เวลาที่พบ — ยังไม่ได้กรอก');
       if (!document.getElementById('d-found-desc').value.trim()) errors3.push('รายละเอียดสิ่งของที่พบ — ยังไม่ได้กรอก');
       if (!document.getElementById('d-found-loc').value.trim()) errors3.push('สถานที่ที่พบ — ยังไม่ได้กรอก');
-    } else if (currentType === 'pickup') {
-      if (!document.getElementById('d-pickup-date').value) errors3.push('วันที่มารับ — ยังไม่ได้กรอก');
-      if (!document.getElementById('d-pickup-time').value) errors3.push('เวลาที่มารับ — ยังไม่ได้กรอก');
-      if (!document.getElementById('d-pickup-desc').value.trim()) errors3.push('รายละเอียดสิ่งของที่รับคืน — ยังไม่ได้กรอก');
+ } else if (currentType === 'pickup') {
+  if (!document.getElementById('d-pickup-date').value) errors3.push('วันที่มารับ — ยังไม่ได้กรอก');
+  if (!document.getElementById('d-pickup-time').value) errors3.push('เวลาที่มารับ — ยังไม่ได้กรอก');
+  if (!document.getElementById('d-pickup-desc').value.trim()) errors3.push('รายละเอียดสิ่งของที่รับคืน — ยังไม่ได้กรอก');
+  if (!uploadedFiles.pickup || uploadedFiles.pickup.length === 0) errors3.push('รูปภาพหลักฐาน (บัตรประจำตัว) — กรุณาแนบรูปภาพก่อนดำเนินการต่อ');
     }
     if (errors3.length) { showToast(errors3); return; }
 
