@@ -748,9 +748,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
    เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในครั้งแรก ── */
 window.onload = () => {
   loadAll();
-  setInterval(loadAll, 5 * 60 * 1000);
-};
-  // retry 3 ครั้ง ห่างกัน 3, 6, 10 วินาที เผื่อ gviz ยังไม่พร้อม
   setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 3000);
   setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 6000);
   setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 10000);
