@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lost & Found Report Form | Mahidol University</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #1a3a5c;
+  --primary-mid: #2d5f8f;
+  --accent: #e8a020;
+  --lost: #c0392b;
+  --lost-light: #fdf0ee;
+  --found: #1e7e44;
+  --found-light: #edf7f1;
+  --pickup: #1a5276;
+  --pickup-light: #eaf1fb;
+  --bg: #f0f3f8;
+  --white: #ffffff;
+  --text: #1c2833;
+  --muted: #6c7a89;
+  --border: #d5dce8;
+  --radius: 14px;
+  --shadow: 0 4px 20px rgba(26,58,92,0.10);
+  --shadow-lg: 0 8px 40px rgba(26,58,92,0.15);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.prefix-name-row { display: flex; gap: 10px; }
+.prefix-select {
+  width: 140px; flex-shrink: 0;
+  padding: 11px 10px; border: 1.5px solid var(--border);
+  border-radius: 9px; font-family: 'Sarabun', sans-serif; font-size: 14.5px;
+  color: var(--text); background: #fafbfd; outline: none;
+  transition: border-color 0.2s;
+}
+.prefix-select:focus { border-color: var(--primary-mid); background: white; }
+.prefix-name-row input { flex: 1; }
+
+.card-section { padding: 0 18px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.card-section:last-child { border-bottom: none; }
+.card-section-head {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--muted);
+  padding: 12px 0 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-section-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+.card-section-head.red .dot { background: var(--lost); }
+.card-section-head.green .dot { background: var(--found); }
+.card-section-body { padding: 4px 0 16px; }
+
+.toast-wrap {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: flex-start; justify-content: center;
+  z-index: 9999; pointer-events: none; padding-top: 80px;
+}
+.toast-wrap.show { pointer-events: auto; }
+.toast-box {
+  background: white; border-radius: 14px; padding: 20px 24px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  max-width: 380px; width: 90%;
+  transform: translateY(-20px); opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  border-left: 5px solid var(--lost);
+}
+.toast-wrap.show .toast-box { transform: translateY(0); opacity: 1; }
+.toast-title { font-size: 15px; font-weight: 700; color: var(--lost); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.toast-list { list-style: none; padding: 0; margin: 0 0 16px; }
+.toast-list li { font-size: 14px; color: var(--text); padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-start; }
+.toast-list li:last-child { border-bottom: none; }
+.toast-list li::before { content: '•'; color: var(--lost); font-weight: 900; flex-shrink: 0; }
+.toast-close { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 9px; font-family: 'Sarabun',sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+.toast-close:hover { background: var(--primary-mid); }
+
+.header {
+  background: linear-gradient(135deg, #1a3a5c 0%, #2d5f8f 100%);
+  padding: 16px 20px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 16px rgba(26,58,92,0.3);
+}
+.header-inner { max-width: 660px; margin: auto; display: flex; align-items: center; gap: 14px; }
+.header-icon { width: 46px; height: 46px; background: rgba(255,255,255,0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.header-title { color: white; font-size: 15px; font-weight: 700; line-height: 1.3; flex: 1; }
+.header-sub { color: rgba(255,255,255,0.72); font-size: 11.5px; margin-top: 1px; }
+
+.progress-bar-wrap { background: white; border-bottom: 1px solid var(--border); }
+.progress-bar-inner { max-width: 660px; margin: auto; display: flex; }
+.prog-step { flex: 1; text-align: center; padding: 11px 4px 9px; font-size: 11px; color: var(--muted); border-bottom: 3px solid transparent; transition: all 0.25s; }
+.prog-step .pnum { width: 22px; height: 22px; border-radius: 50%; background: var(--border); color: var(--muted); font-size: 11px; font-weight: 700; line-height: 22px; display: inline-block; margin-bottom: 3px; transition: all 0.25s; }
+.prog-step.active { color: var(--primary); border-bottom-color: var(--accent); font-weight: 600; }
+.prog-step.active .pnum { background: var(--accent); color: white; }
+.prog-step.done { color: var(--found); border-bottom-color: var(--found); }
+.prog-step.done .pnum { background: var(--found); color: white; }
+.prog-step.done .pnum::before { content: '✓'; }
+
+.main { max-width: 660px; margin: 0 auto; padding: 24px 16px 60px; }
+.page { display: none; animation: fadeUp 0.3s ease; overflow: hidden; }
+.page.active { display: block; overflow: visible; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+
+.page-head { margin-bottom: 22px; }
+.page-head h2 { font-family: 'Noto Serif Thai', serif; font-size: 22px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+.page-head p { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+.card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+.card-head { padding: 12px 18px; font-size: 13px; font-weight: 700; color: white; display: flex; align-items: center; gap: 8px; }
+.card-head.blue { background: var(--primary); }
+.card-head.red { background: var(--lost); }
+.card-head.green { background: var(--found); }
+.card-head.navy { background: var(--pickup); }
+.card-body { padding: 18px; }
+
+.field { margin-bottom: 18px; }
+.field:last-child { margin-bottom: 0; }
+.field label { font-size: 13.5px; font-weight: 600; display: block; margin-bottom: 7px; color: var(--text); }
+.field label .req { color: var(--lost); margin-left: 3px; }
+.field .hint { font-size: 12px; color: var(--muted); margin-bottom: 7px; line-height: 1.5; }
+input[type=text], input[type=tel], input[type=date], input[type=time], select, textarea {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
+  border-radius: 9px; font-family: 'Sarabun', sans-serif; font-size: 14.5px;
+  color: var(--text); background: #fafbfd; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary-mid); box-shadow: 0 0 0 3px rgba(45,95,143,0.09); background: white;
+}
+textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute; top: 100%; left: 0; right: 0; background: white;
+  border: 1.5px solid var(--primary-mid); border-top: none; border-radius: 0 0 9px 9px;
+  max-height: 200px; overflow-y: auto; z-index: 200; box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  display: none;
+}
+.autocomplete-list.show { display: block; }
+.ac-item { padding: 10px 14px; font-size: 14px; cursor: pointer; transition: background 0.15s; }
+.ac-item:hover, .ac-item.highlighted { background: #eef3fb; color: var(--primary); }
+.ac-item mark { background: #fff3cd; color: var(--text); border-radius: 2px; padding: 0 2px; }
+
+.type-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.type-card {
+  background: white; border: 2px solid var(--border); border-radius: var(--radius);
+  padding: 20px; cursor: pointer; display: flex; align-items: center; gap: 16px;
+  transition: all 0.2s; box-shadow: var(--shadow);
+}
+.type-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.type-card.sel-lost { border-color: var(--lost); background: var(--lost-light); }
+.type-card.sel-found { border-color: var(--found); background: var(--found-light); }
+.type-card.sel-pickup { border-color: var(--pickup); background: var(--pickup-light); }
+.type-icon { width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
+.type-icon.lost { background: #fdecea; }
+.type-icon.found { background: #e6f4eb; }
+.type-icon.pickup { background: #e8f0fb; }
+.type-info .t-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+.type-info .t-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.t-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
+.badge-lost { background: #fdecea; color: var(--lost); }
+.badge-found { background: #e6f4eb; color: var(--found); }
+.badge-pickup { background: #e8f0fb; color: var(--pickup); }
+
+.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 9px; cursor: pointer; transition: all 0.18s; background: #fafbfd; }
+.radio-item:hover { border-color: var(--primary-mid); background: #f0f5ff; }
+.radio-item.checked { border-color: var(--primary); background: #f0f5ff; }
+.radio-item input[type=radio] { accent-color: var(--primary); width: 16px; height: 16px; }
+.radio-item label { font-size: 14px; cursor: pointer; flex: 1; }
+
+.file-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; background: #fafbfd; position: relative; transition: all 0.2s; }
+.file-zone:hover { border-color: var(--primary-mid); background: #f0f5ff; }
+.file-zone.required-empty { border-color: var(--lost); background: #fff5f5; }
+.file-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.file-zone-icon { font-size: 28px; margin-bottom: 6px; }
+.file-zone-text { font-size: 13px; color: var(--muted); }
+.file-zone-text strong { color: var(--primary); }
+.file-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.file-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border); }
+
+.notice { background: #fffbeb; border: 1.5px solid #f5c442; border-radius: 9px; padding: 11px 14px; font-size: 13px; color: #6b4c00; display: flex; gap: 8px; align-items: flex-start; margin-bottom: 16px; line-height: 1.5; }
+
+.nav-bar { display: flex; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.page:not(.active) .nav-bar { display: none !important; }
+.page:not(.active) { display: none !important; height: 0 !important; overflow: hidden !important; }
+.btn { padding: 13px 24px; border-radius: 10px; font-family: 'Sarabun', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; flex: 1; }
+.btn-back { background: white; border: 1.5px solid var(--border); color: var(--muted); }
+.btn-back:hover { background: var(--bg); }
+.btn-next { background: var(--primary); color: white; box-shadow: 0 4px 14px rgba(26,58,92,0.28); }
+.btn-next:hover { background: var(--primary-mid); transform: translateY(-1px); }
+.btn-submit { background: linear-gradient(135deg, var(--accent), #c47a10); color: white; box-shadow: 0 4px 16px rgba(232,160,32,0.35); }
+.btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(232,160,32,0.45); }
+
+.summary-type-banner { padding: 14px 18px; display: flex; align-items: center; gap: 10px; color: white; font-weight: 700; font-size: 15px; }
+.summary-type-banner.red { background: var(--lost); }
+.summary-type-banner.green { background: var(--found); }
+.summary-type-banner.navy { background: var(--pickup); }
+.sum-row { display: flex; padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.sum-row:last-child { border-bottom: none; }
+.sum-k { color: var(--muted); min-width: 130px; flex-shrink: 0; }
+.sum-v { font-weight: 500; flex: 1; }
+
+.success-wrap { text-align: center; padding: 40px 16px; }
+.success-icon { font-size: 68px; display: block; margin-bottom: 14px; animation: pop 0.5s ease; }
+@keyframes pop { 0%,100% { transform:scale(1); } 50% { transform:scale(1.18); } }
+.success-title { font-family: 'Noto Serif Thai', serif; font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+.ref-box { display: inline-block; background: #fff8e6; border: 2px solid var(--accent); color: var(--primary); font-size: 19px; font-weight: 700; padding: 10px 28px; border-radius: 12px; letter-spacing: 2px; margin: 14px 0; }
+.success-msg { font-size: 14px; color: var(--muted); line-height: 1.8; }
+.btn-new-wrap { margin-top: 22px; }
+.btn-new { background: var(--primary); color: white; padding: 13px 36px; border-radius: 10px; font-family: 'Sarabun', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+
+.sending-overlay { display: none; position: fixed; inset: 0; background: rgba(26,40,60,0.55); backdrop-filter: blur(4px); z-index: 999; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
+.sending-overlay.show { display: flex; }
+.send-spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.25); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.send-text { color: white; font-size: 16px; font-weight: 600; }
+
+@media (max-width: 420px) {
+  .row2 { grid-template-columns: 1fr; }
+  .type-icon { width: 44px; height: 44px; font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="header-icon">🔍</div>
+    <div style="flex:1">
+      <div class="header-title">Lost & Found Report Form</div>
+      <div class="header-sub">Traffic Control and Safety Unit, Mahidol University</div>
+    </div>
+    <a href="lostfound_form.html" style="background:rgba(255,255,255,0.18);color:white;border:1.5px solid rgba(255,255,255,0.5);padding:8px 14px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;">🇹🇭 Thai Version</a>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-bar-wrap">
+  <div class="progress-bar-inner">
+    <div class="prog-step active" id="ps1"><div class="pnum" id="pn1">1</div><br>Type</div>
+    <div class="prog-step" id="ps2"><div class="pnum" id="pn2">2</div><br>Reporter</div>
+    <div class="prog-step" id="ps3"><div class="pnum" id="pn3">3</div><br>Details</div>
+    <div class="prog-step" id="ps4"><div class="pnum" id="pn4">4</div><br>Confirm</div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- STEP 1: TYPE -->
+<div class="page active" id="s1">
+  <div class="page-head">
+    <h2>Select Report Type</h2>
+    <p>Please select the type that matches your situation.</p>
+  </div>
+  <div class="type-grid">
+    <div class="type-card" id="tc-lost" onclick="pickType('lost')">
+      <div class="type-icon lost">😟</div>
+      <div class="type-info">
+        <div class="t-title" style="color:var(--lost)">Lost Item</div>
+        <div class="t-desc">You lost something and want to report it for tracking.</div>
+        <span class="t-badge badge-lost">แจ้งของหาย</span>
+      </div>
+    </div>
+    <div class="type-card" id="tc-found" onclick="pickType('found')">
+      <div class="type-icon found">📦</div>
+      <div class="type-info">
+        <div class="t-title" style="color:var(--found)">Found Item</div>
+        <div class="t-desc">You found something and want to hand it in. (Only a few fields!)</div>
+        <span class="t-badge badge-found">แจ้งพบของ</span>
+      </div>
+    </div>
+    <div class="type-card" id="tc-pickup" onclick="pickType('pickup')">
+      <div class="type-icon pickup">🤝</div>
+      <div class="type-info">
+        <div class="t-title" style="color:var(--pickup)">Claim Item</div>
+        <div class="t-desc">You are coming to collect your belongings at the Traffic Office.</div>
+        <span class="t-badge badge-pickup">รับของคืน</span>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar" style="border:none;padding-top:12px;">
+    <button class="btn btn-next" style="max-width:200px;margin-left:auto" onclick="go(2)">Next →</button>
+  </div>
+</div>
+
+<!-- STEP 2: REPORTER -->
+<div class="page" id="s2">
+  <div class="page-head">
+    <h2>Reporter Information</h2>
+    <p>Please provide your details so we can contact you.</p>
+  </div>
+  <div class="card">
+    <div class="card-head blue">👤 Reporter Details</div>
+
+    <div class="card-section">
+      <div class="card-section-head"><span class="dot"></span>Personal Information</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Title — Full Name <span class="req">*</span></label>
+          <div class="prefix-name-row">
+            <select id="f-prefix" class="prefix-select">
+              <option value="">-- Title --</option>
+              <option value="Mr.">Mr.</option>
+              <option value="Mrs.">Mrs.</option>
+              <option value="Miss">Miss</option>
+              <option value="Ms.">Ms.</option>
+              <option value="Dr.">Dr.</option>
+              <option value="Prof.">Prof.</option>
+              <option value="N/A">N/A</option>
+            </select>
+            <input type="text" id="f-name" placeholder="First Name Last Name">
+          </div>
+        </div>
+        <div class="field">
+          <label>Person Type <span class="req">*</span></label>
+          <div class="radio-group" id="rg-ptype">
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา มหาวิทยาลัยมหิดล Student Of Mahidol University"><label>🎓 Student — Mahidol University</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักศึกษา คณะ/สถาบันอื่น Student Of Other University"><label>🎓 Student — Other Institution</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคลากรมหาวิทยาลัยมหิดล Staff Of Mahidol University"><label>👔 Staff — Mahidol University</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="บุคคลภายนอก External Person"><label>🌐 External / Visitor</label></label>
+            <label class="radio-item" onclick="chkRad(this,'rg-ptype')"><input type="radio" name="ptype" value="นักเรียน"><label>📚 School Student</label></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-head"><span class="dot"></span>Contact Information</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Faculty / Department / Organization <span class="req">*</span></label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="f-dept" placeholder="Type to search or enter..." oninput="acSearch(this.value,'ac-dept','DEPTS')" autocomplete="off">
+            <div class="autocomplete-list" id="ac-dept"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Phone Number <span class="req">*</span></label>
+          <input type="tel" id="f-phone" placeholder="e.g. 081-234-5678">
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(1)">← Back</button>
+    <button class="btn btn-next" onclick="go(3)">Next →</button>
+  </div>
+</div>
+
+<!-- STEP 3A: LOST -->
+<div class="page" id="s3-lost">
+  <div class="page-head"><h2 style="color:var(--lost)">😟 Lost Item Details</h2></div>
+  <div class="card">
+    <div class="card-head red">📅 Date & Time Lost</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="d-lost-date"></div>
+        <div class="field"><label>Time <span class="req">*</span></label><input type="time" id="d-lost-time"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head red">🔎 Item Description</div>
+    <div class="card-section">
+      <div class="card-section-head red"><span class="dot"></span>Item Details</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Description of Lost Item <span class="req">*</span></label>
+          <div class="hint">Include: type / brand-model / color / distinguishing features / contents</div>
+          <textarea id="d-lost-desc" placeholder="e.g. Black wallet, Fossil brand, contains student ID and ATM card"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="card-section-head red"><span class="dot"></span>Location</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Location Where Item Was Lost <span class="req">*</span></label>
+          <div class="hint">Please be as specific as possible (building / room / floor / area)</div>
+          <div class="autocomplete-wrap">
+            <input type="text" id="d-lost-loc" placeholder="Type to search location..." oninput="acSearch(this.value,'ac-lost-loc','PLACES')" autocomplete="off">
+            <div class="autocomplete-list" id="ac-lost-loc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="card-section-head red"><span class="dot"></span>Photo (Optional)</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Photo of Item (if available)</label>
+          <div class="file-zone">
+            <input type="file" accept="image/*" onchange="previewFile(this,'pv-lost')" multiple>
+            <div class="file-zone-icon">📷</div>
+            <div class="file-zone-text">Tap to attach photo<br><strong>Up to 5 files, max 100MB</strong></div>
+          </div>
+          <div class="file-preview" id="pv-lost"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(2)">← Back</button>
+    <button class="btn btn-next" onclick="go(4)">Next →</button>
+  </div>
+</div>
+
+<!-- STEP 3B: FOUND -->
+<div class="page" id="s3-found">
+  <div class="page-head"><h2 style="color:var(--found)">📦 Found Item Details</h2></div>
+  <div class="notice">💚 <span>Thank you for handing this in! Just a few quick fields to fill in.</span></div>
+  <div class="card">
+    <div class="card-head green">📅 Date & Time Found</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="d-found-date"></div>
+        <div class="field"><label>Time <span class="req">*</span></label><input type="time" id="d-found-time"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head green">📝 Found Item</div>
+    <div class="card-section">
+      <div class="card-section-head green"><span class="dot"></span>Item Details</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Description of Found Item <span class="req">*</span></label>
+          <div class="hint">Include: type, color, brand, any notable features</div>
+          <textarea id="d-found-desc" placeholder="e.g. Key with red keychain and a small bear charm"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="card-section-head green"><span class="dot"></span>Location</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Location Where Item Was Found <span class="req">*</span></label>
+          <div class="hint">Please be as specific as possible</div>
+          <div class="autocomplete-wrap">
+            <input type="text" id="d-found-loc" placeholder="Type to search location..." oninput="acSearch(this.value,'ac-found-loc','PLACES')" autocomplete="off">
+            <div class="autocomplete-list" id="ac-found-loc"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="card-section-head green"><span class="dot"></span>Photo</div>
+      <div class="card-section-body">
+        <div class="field">
+          <label>Photo of Item <span style="color:var(--found);font-size:12px;">(Recommended)</span></label>
+          <div class="file-zone">
+            <input type="file" accept="image/*" onchange="previewFile(this,'pv-found')" multiple>
+            <div class="file-zone-icon">📷</div>
+            <div class="file-zone-text">Tap to attach photo<br><strong>Up to 5 files, max 100MB</strong></div>
+          </div>
+          <div class="file-preview" id="pv-found"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(2)">← Back</button>
+    <button class="btn btn-next" onclick="go(4)">Next →</button>
+  </div>
+</div>
+
+<!-- STEP 3C: PICKUP -->
+<div class="page" id="s3-pickup">
+  <div class="page-head"><h2 style="color:var(--pickup)">🤝 Claim Item Details</h2></div>
+  <div class="card">
+    <div class="card-head navy">📅 Date & Time of Collection</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="d-pickup-date"></div>
+        <div class="field"><label>Time <span class="req">*</span></label><input type="time" id="d-pickup-time"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head navy">📋 Claim Details</div>
+    <div class="card-body">
+      <div class="field">
+        <label>Description of Item Being Claimed <span class="req">*</span></label>
+        <div class="hint">Describe the item to verify ownership</div>
+        <textarea id="d-pickup-desc" placeholder="e.g. Black wallet, contains Mahidol University student ID inside"></textarea>
+      </div>
+      <div class="field">
+        <label>ID Card / Proof of Identity Photo <span class="req">*</span></label>
+        <div class="hint">Please attach a photo of your ID card to verify your identity. <strong style="color:var(--lost);">Required — cannot proceed without this.</strong></div>
+        <div class="file-zone" id="pickup-file-zone">
+          <input type="file" accept="image/*" onchange="previewFile(this,'pv-pickup')" id="pickup-file-input">
+          <div class="file-zone-icon">🪪</div>
+          <div class="file-zone-text">Tap to attach ID card photo<br><strong>1 file, max 10MB</strong></div>
+        </div>
+        <div class="file-preview" id="pv-pickup"></div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="btn btn-back" onclick="go(2)">← Back</button>
+    <button class="btn btn-next" onclick="go(4)">Next →</button>
+  </div>
+</div>
+
+<!-- STEP 4: CONFIRM -->
+<div class="page" id="s4">
+  <div class="page-head"><h2>Review Before Submitting</h2><p>Please verify all information is correct before confirming.</p></div>
+  <div class="card" id="sum-card"></div>
+  <div class="nav-bar">
+    <button class="btn btn-back" id="btn-back-sum">← Edit</button>
+    <button class="btn btn-submit" onclick="submitForm()">✅ Confirm & Submit</button>
+  </div>
+</div>
+
+<!-- STEP 5: SUCCESS -->
+<div class="page" id="s5">
+  <div class="success-wrap">
+    <span class="success-icon" id="suc-icon">✅</span>
+    <div class="success-title" id="suc-title">Submission Successful!</div>
+    <div class="ref-box" id="suc-ref"></div>
+    <div class="success-msg" id="suc-msg"></div>
+    <div class="btn-new-wrap"><button class="btn-new" onclick="resetAll()">+ New Report</button></div>
+  </div>
+</div>
+
+<!-- VALIDATION TOAST -->
+<div class="toast-wrap" id="toast-wrap">
+  <div class="toast-box" id="toast-box">
+    <div class="toast-title">⚠️ Please complete all required fields</div>
+    <ul class="toast-list" id="toast-list"></ul>
+    <button class="toast-close" onclick="closeToast()">OK — Go back to fill in</button>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- SENDING OVERLAY -->
+<div class="sending-overlay" id="sending-overlay">
+  <div class="send-spinner"></div>
+  <div class="send-text">Submitting...</div>
+</div>
+
+<script>
+/* =====================================================
+ * Lost & Found Web App — lostfound_form_en.html
+ * Version : 1.0.0 (English)
+ * © 2025–2026 Traffic Control and Premises Security Unit,
+ *   Mahidol University. All rights reserved.
+ * ===================================================== */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
+
+const DEPTS = ["Faculty of Allied Health Sciences","Faculty of Dentistry","Faculty of Engineering","Faculty of Environment and Resource Studies","Faculty of Graduate Studies","Faculty of Information and Communication Technology","Faculty of Liberal Arts","Faculty of Medicine Ramathibodi Hospital","Faculty of Medicine Siriraj Hospital","Faculty of Nursing","Faculty of Pharmacy","Faculty of Physical Therapy","Faculty of Public Health","Faculty of Science","Faculty of Social Sciences and Humanities","Faculty of Tropical Medicine","Faculty of Veterinary Science","College of Management","College of Music","College of Religious Studies","College of Sports Science and Technology","International College","Mahidol University International Demonstration School","Mahidol University Kanchanaburi Campus","Institute of Molecular Biosciences","Institute of Nutrition","Institute for Population and Social Research","Research Institute for Languages and Cultures of Asia","Siriraj Medical Research Center","Office of the President","Division of Physical and Environmental","Office of Human Resources","Office of Finance","Office of Information Technology","External / Visitor","Other"];
+
+const PLACES = ["Charoen Nakhon Road","Therdchart Road","Phasan Thaethai Road","Karunyamit Road","Kanphai Mahidol Road","Thunvitthayakan Road","Jittasaman Road","Sansatya Road","Manakhankhong Road","Damrongwichai Road","Phunphol Pracha Road","Songthaithat Road","Panyaphaendin Road","Wichachunchan Road","Withipanya Road","Road D","Gate 1","Gate 2","Gate 3","Gate 4","Gate 5","Gate 6","Gate 7","Gate 8","Faculty of Nursing Gate","College of Music Gate","Student Dormitory 1","Student Dormitory 2","Student Dormitory 3","Student Dormitory 4","Student Dormitory 5","Student Dormitory 6","Student Dormitory 7","Student Dormitory 8","Student Dormitory 9","Student Dormitory 10","Student Dormitory 11","Chalernnakornnavatoranon Building","Parking Lot P1","Parking Lot P2","Parking Lot P3","Parking Lot P4","Parking Lot P5","Parking Lot - Chalernnakornnavatoranon Building","Siriwittaya Building","Thai House Parking","Traffic & Safety Office","Mahidol Learning Center (MLC)","OP Building","SC Building","MB Building","Royal Father Plaza","Sports Field","Basketball Court","Football Field","MU Lake","Tram / Shuttle","Inside University Area","Anywheel Bicycle Rack"];
+
+let currentType = null;
+let currentStep = 1;
+let uploadedFiles = { lost: [], found: [], pickup: [] };
+
+function acSearch(q, listId, dataKey) {
+  const list = document.getElementById(listId);
+  const data = dataKey === 'DEPTS' ? DEPTS : PLACES;
+  if (!q.trim()) { list.classList.remove('show'); return; }
+  const matches = data.filter(d => d.toLowerCase().includes(q.toLowerCase()));
+  if (!matches.length) { list.classList.remove('show'); return; }
+  list.innerHTML = matches.slice(0, 8).map(m => {
+    const hi = m.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark>$1</mark>');
+    return `<div class="ac-item" onclick="pickAc('${listId}','${m.replace(/'/g,"\\'")}')">${hi}</div>`;
+  }).join('');
+  list.classList.add('show');
+}
+function pickAc(listId, val) {
+  const list = document.getElementById(listId);
+  const input = list.previousElementSibling;
+  input.value = val;
+  list.classList.remove('show');
+}
+document.addEventListener('click', e => {
+  document.querySelectorAll('.autocomplete-list').forEach(l => {
+    if (!l.parentElement.contains(e.target)) l.classList.remove('show');
+  });
+});
+
+function pickType(type) {
+  currentType = type;
+  ['lost','found','pickup'].forEach(t => {
+    document.getElementById('tc-'+t).className = 'type-card' + (t===type ? ' sel-'+t : '');
+  });
+}
+
+function chkRad(el, groupId) {
+  document.querySelectorAll('#'+groupId+' .radio-item').forEach(r => r.classList.remove('checked'));
+  el.classList.add('checked');
+}
+
+function previewFile(input, previewId) {
+  const preview = document.getElementById(previewId);
+  preview.innerHTML = '';
+  const typeKey = previewId.replace('pv-','');
+  uploadedFiles[typeKey] = Array.from(input.files);
+  uploadedFiles[typeKey].forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'file-thumb';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+  // Remove required-empty styling when file is selected
+  if (typeKey === 'pickup') {
+    document.getElementById('pickup-file-zone').classList.remove('required-empty');
+  }
+}
+
+function showToast(errors) {
+  const list = document.getElementById('toast-list');
+  list.innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+  document.getElementById('toast-wrap').classList.add('show');
+  window.scrollTo({ top: 60, behavior: 'smooth' });
+}
+function closeToast() {
+  document.getElementById('toast-wrap').classList.remove('show');
+}
+
+function go(n) {
+  closeToast();
+
+  if (n === 2 && currentStep === 1) {
+    if (!currentType) {
+      showToast(['Please select a report type (Lost Item / Found Item / Claim Item)']);
+      return;
+    }
+  }
+
+  if (n === 3 && currentStep === 2) {
+    const errors = [];
+    if (!document.getElementById('f-prefix').value)
+      errors.push('Title — Not selected');
+    if (!document.getElementById('f-name').value.trim())
+      errors.push('Full Name — Not filled in');
+    if (!document.querySelector('input[name="ptype"]:checked'))
+      errors.push('Person Type — Not selected');
+    if (!document.getElementById('f-dept').value.trim())
+      errors.push('Faculty / Department — Not filled in');
+    const phone = document.getElementById('f-phone').value.trim();
+    if (!phone)
+      errors.push('Phone Number — Not filled in');
+    else if (!/^[0-9\-\+\s]{9,15}$/.test(phone))
+      errors.push('Phone Number — Invalid format (9–15 digits)');
+    if (errors.length) { showToast(errors); return; }
+  }
+
+  if (n === 4 && currentStep === 3) {
+    const errors3 = [];
+    if (currentType === 'lost') {
+      if (!document.getElementById('d-lost-date').value) errors3.push('Date lost — Not filled in');
+      if (!document.getElementById('d-lost-time').value) errors3.push('Time lost — Not filled in');
+      if (!document.getElementById('d-lost-desc').value.trim()) errors3.push('Description of lost item — Not filled in');
+      if (!document.getElementById('d-lost-loc').value.trim()) errors3.push('Location where item was lost — Not filled in');
+    } else if (currentType === 'found') {
+      if (!document.getElementById('d-found-date').value) errors3.push('Date found — Not filled in');
+      if (!document.getElementById('d-found-time').value) errors3.push('Time found — Not filled in');
+      if (!document.getElementById('d-found-desc').value.trim()) errors3.push('Description of found item — Not filled in');
+      if (!document.getElementById('d-found-loc').value.trim()) errors3.push('Location where item was found — Not filled in');
+    } else if (currentType === 'pickup') {
+      if (!document.getElementById('d-pickup-date').value) errors3.push('Date of collection — Not filled in');
+      if (!document.getElementById('d-pickup-time').value) errors3.push('Time of collection — Not filled in');
+      if (!document.getElementById('d-pickup-desc').value.trim()) errors3.push('Description of item being claimed — Not filled in');
+      if (!uploadedFiles.pickup || uploadedFiles.pickup.length === 0) {
+        errors3.push('ID Card / Proof of Identity photo — Required. Please attach before proceeding.');
+        document.getElementById('pickup-file-zone').classList.add('required-empty');
+      }
+    }
+    if (errors3.length) { showToast(errors3); return; }
+
+    buildSummary();
+    document.getElementById('btn-back-sum').onclick = () => { showStep('s3-'+currentType); setProgress(3); currentStep=3; };
+  }
+
+  if (n === 3) { showStep('s3-'+currentType); setProgress(3); currentStep=3; return; }
+  const stepMap = { 1:'s1', 2:'s2', 4:'s4', 5:'s5' };
+  showStep(stepMap[n]);
+  setProgress(n);
+  currentStep = n;
+}
+
+function showStep(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setProgress(n) {
+  for (let i = 1; i <= 4; i++) {
+    const ps = document.getElementById('ps'+i);
+    const pn = document.getElementById('pn'+i);
+    ps.className = 'prog-step';
+    pn.style.cssText = '';
+    if (i < n) { ps.classList.add('done'); pn.textContent = ''; }
+    else if (i === n) { ps.classList.add('active'); pn.textContent = i; }
+    else { pn.textContent = i; }
+  }
+}
+
+function buildSummary() {
+  const ptype = document.querySelector('input[name="ptype"]:checked')?.value || '-';
+  const typeLabel = { lost:'😟 Lost Item', found:'📦 Found Item', pickup:'🤝 Claim Item' };
+  const typeBanner = { lost:'red', found:'green', pickup:'navy' };
+  let details = '';
+  if (currentType==='lost') {
+    details = `
+      <div class="sum-row"><span class="sum-k">Date Lost</span><span class="sum-v">${document.getElementById('d-lost-date').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Time</span><span class="sum-v">${document.getElementById('d-lost-time').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Description</span><span class="sum-v">${document.getElementById('d-lost-desc').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Location</span><span class="sum-v">${document.getElementById('d-lost-loc').value||'-'}</span></div>`;
+  } else if (currentType==='found') {
+    details = `
+      <div class="sum-row"><span class="sum-k">Date Found</span><span class="sum-v">${document.getElementById('d-found-date').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Time</span><span class="sum-v">${document.getElementById('d-found-time').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Description</span><span class="sum-v">${document.getElementById('d-found-desc').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Location Found</span><span class="sum-v">${document.getElementById('d-found-loc').value||'-'}</span></div>`;
+  } else {
+    details = `
+      <div class="sum-row"><span class="sum-k">Date</span><span class="sum-v">${document.getElementById('d-pickup-date').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Time</span><span class="sum-v">${document.getElementById('d-pickup-time').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">Item Description</span><span class="sum-v">${document.getElementById('d-pickup-desc').value||'-'}</span></div>
+      <div class="sum-row"><span class="sum-k">ID Photo</span><span class="sum-v">${(uploadedFiles.pickup&&uploadedFiles.pickup.length>0)?'✅ Attached':'—'}</span></div>`;
+  }
+  document.getElementById('sum-card').innerHTML = `
+    <div class="summary-type-banner ${typeBanner[currentType]}">${typeLabel[currentType]}</div>
+    <div class="sum-row"><span class="sum-k">Full Name</span><span class="sum-v">${(document.getElementById('f-prefix').value||'')+' '+document.getElementById('f-name').value}</span></div>
+    <div class="sum-row"><span class="sum-k">Person Type</span><span class="sum-v">${ptype.split(' ').slice(-3).join(' ')}</span></div>
+    <div class="sum-row"><span class="sum-k">Faculty / Dept.</span><span class="sum-v">${document.getElementById('f-dept').value}</span></div>
+    <div class="sum-row"><span class="sum-k">Phone</span><span class="sum-v">${document.getElementById('f-phone').value}</span></div>
+    ${details}`;
+}
+
+function genRef() {
+  const pfix = { lost:'LOS', found:'FND', pickup:'PKP' };
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const rnd = String(Math.floor(Math.random()*9000)+1000);
+  return `${pfix[currentType]}-${yy}${mm}${dd}-${rnd}`;
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = () => rej();
+    r.readAsDataURL(file);
+  });
+}
+
+async function submitForm() {
+  const ref = genRef();
+  const ptype = document.querySelector('input[name="ptype"]:checked')?.value || '';
+  let itemDate = '', itemTime = '', itemDesc = '', itemLoc = '';
+  if (currentType==='lost') {
+    itemDate = document.getElementById('d-lost-date').value;
+    itemTime = document.getElementById('d-lost-time').value;
+    itemDesc = document.getElementById('d-lost-desc').value;
+    itemLoc  = document.getElementById('d-lost-loc').value;
+  } else if (currentType==='found') {
+    itemDate = document.getElementById('d-found-date').value;
+    itemTime = document.getElementById('d-found-time').value;
+    itemDesc = document.getElementById('d-found-desc').value;
+    itemLoc  = document.getElementById('d-found-loc').value;
+  } else {
+    itemDate = document.getElementById('d-pickup-date').value;
+    itemTime = document.getElementById('d-pickup-time').value;
+    itemDesc = document.getElementById('d-pickup-desc').value;
+  }
+
+  const files = uploadedFiles[currentType] || [];
+  const fileData = [];
+  for (const f of files.slice(0,5)) {
+    try {
+      const b64 = await fileToBase64(f);
+      fileData.push({ name: f.name, mime: f.type, data: b64 });
+    } catch(e) {}
+  }
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    refCode: ref,
+    type: currentType === 'lost' ? 'สิ่งของสูญหาย' : currentType === 'found' ? 'พบสิ่งของ' : 'รับของคืน',
+    prefix: document.getElementById('f-prefix').value,
+    name: (document.getElementById('f-prefix').value ? document.getElementById('f-prefix').value + ' ' : '') + document.getElementById('f-name').value,
+    personType: ptype,
+    department: document.getElementById('f-dept').value,
+    phone: document.getElementById('f-phone').value,
+    itemDate, itemTime, itemDesc, itemLoc,
+    status: 'รอดำเนินการ',
+    files: fileData
+  };
+
+  document.getElementById('sending-overlay').classList.add('show');
+
+  try {
+    const params = new URLSearchParams();
+    params.append('action', 'submit');
+    Object.keys(payload).forEach(k => {
+      if (k === 'files') params.append('files', JSON.stringify(payload.files));
+      else params.append(k, String(payload[k] || ''));
+    });
+    await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
+  } catch(e) { console.warn('GAS error:', e); }
+
+  document.getElementById('sending-overlay').classList.remove('show');
+
+  const icons = { lost:'📋', found:'✅', pickup:'🎉' };
+  const titles = { lost:'Report Submitted Successfully!', found:'Found Item Reported — Thank You! 🙏', pickup:'Claim Recorded Successfully!' };
+  const msgs = {
+    lost: `Your lost item report has been received. Our staff will look into it and contact you back.<br><br>📞 Enquiries: 02-441-4400, 02-441-9318`,
+    found: `Thank you for handing it in! Your report has been recorded. Staff will announce to find the owner.<br><br>📞 Enquiries: 02-441-4400, 02-441-9318`,
+    pickup: `Your claim has been recorded successfully.<br><br>📞 Enquiries: 02-441-4400, 02-441-9318`
+  };
+  document.getElementById('suc-icon').textContent = icons[currentType];
+  document.getElementById('suc-title').textContent = titles[currentType];
+  document.getElementById('suc-ref').textContent = ref;
+  document.getElementById('suc-msg').innerHTML = msgs[currentType];
+  document.querySelector('.progress-bar-wrap').style.display = 'none';
+  showStep('s5');
+}
+
+function resetAll() {
+  currentType = null; currentStep = 1;
+  uploadedFiles = { lost:[], found:[], pickup:[] };
+  document.querySelectorAll('input[type=text], input[type=tel], textarea').forEach(el => el.value='');
+  const pfEl = document.getElementById('f-prefix'); if(pfEl) pfEl.value='';
+  document.querySelectorAll('input[type=date], input[type=time]').forEach(el => el.value='');
+  document.querySelectorAll('input[type=radio]').forEach(r => r.checked=false);
+  document.querySelectorAll('.radio-item').forEach(r => r.classList.remove('checked'));
+  document.querySelectorAll('.type-card').forEach(c => c.className='type-card');
+  document.querySelectorAll('.file-preview').forEach(p => p.innerHTML='');
+  document.getElementById('pickup-file-zone').classList.remove('required-empty');
+  document.querySelector('.progress-bar-wrap').style.display='';
+  showStep('s1'); setProgress(1);
+}
+
+window.onload = () => {
+  const today = new Date().toISOString().split('T')[0];
+  const nowTime = new Date().toTimeString().slice(0,5);
+  ['lost','found','pickup'].forEach(t => {
+    const d = document.getElementById('d-'+t+'-date');
+    const ti = document.getElementById('d-'+t+'-time');
+    if (d) d.value = today;
+    if (ti) ti.value = nowTime;
+  });
+};
+</script>
+
+<footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
+  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Web App — San v1.0.0 (EN)</span></div>
+  <div style="font-size:11.5px;margin-top:3px;">
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
+  </div>
+</footer>
+</body>
+</html>
