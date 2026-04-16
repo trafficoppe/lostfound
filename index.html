@@ -399,6 +399,52 @@ function parseOldSheet(text) {
   }
 }
 
+function parseOldSheetRaw(rows) {
+  if (!rows || rows.length < 2) return [];
+  return rows.slice(1).map(row => {
+    const g = i => String(row[i] || '').trim();
+    const ts = g(0);
+    if (!ts) return null;
+    const tsObj = parseDate(ts);
+    if (!tsObj || tsObj.getFullYear() < 2020) return null;
+
+    const colG = g(6), colH = g(7), colK = g(10), colN = g(13);
+    let type = '';
+    if (colG.includes('สูญหาย') || colG.includes('หาย')) type = 'สิ่งของสูญหาย';
+    else if (colG.includes('พบ') || colG.includes('เก็บ')) type = 'พบสิ่งของ';
+    else if (colG.includes('คืน')) type = 'รับของคืน';
+    if (!type) {
+      if (colH && colH.length > 2) type = 'สิ่งของสูญหาย';
+      else if (colK && colK.length > 2) type = 'พบสิ่งของ';
+      else if (colN && colN.length > 2) type = 'รับของคืน';
+    }
+    if (!type) return null;
+
+    let title = '', loc = '', imgRaw = '';
+    if (type === 'สิ่งของสูญหาย') { title=g(7); loc=g(8); imgRaw=g(9); }
+    else if (type === 'พบสิ่งของ') { title=g(10); loc=g(11); imgRaw=g(12); }
+    else { title=g(13); imgRaw=g(14); loc='-'; }
+
+    const isPhone = /^[\d\s\-\+]{7,15}$/.test(title.trim());
+    if (!title || isPhone) {
+      const name = g(2);
+      title = type === 'สิ่งของสูญหาย' ? `[ของหาย] ${name}` :
+              type === 'พบสิ่งของ' ? `[ของที่พบ] ${name}` : `[รับคืน] ${name}`;
+    }
+
+    return {
+      source: 'old', type,
+      title: title || 'ไม่ระบุ',
+      location: loc || 'ไม่ระบุสถานที่',
+      date: g(0), dateObj: tsObj,
+      imgUrl: driveThumb(imgRaw),
+      status: g(18) || '',
+      actionText: g(17) || '',
+      name: g(2), personType: g(3), dept: g(4), phone: g(5), time: g(15)
+    };
+  }).filter(Boolean);
+}
+  
 /* ── Parse Sheet ใหม่ (GAS JSON) ── */
 function parseNewSheet(data) {
   return (data || []).map(r => ({
@@ -427,21 +473,15 @@ async function loadAll() {
   document.getElementById('gallery').innerHTML =
     '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
 
-  // ✅ fetch ทีละตัว ไม่ parallel เพื่อหลีกเลี่ยง gviz truncation
   let oldItems = [];
   let newItems = [];
 
   try {
-    const r1 = await fetch(OLD_SHEET_URL + '&t=' + Date.now());
-    const text = await r1.text();
-    oldItems = parseOldSheet(text);
-  } catch(e) { console.error('gviz error:', e); }
-
-  try {
-    const r2 = await fetch(GAS_URL + '?action=getData&t=' + Date.now());
-    const json = await r2.json();
-    if (json?.data) newItems = parseNewSheet(json.data);
-  } catch(e) { console.error('GAS error:', e); }
+    const r = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+    const json = await r.json();
+    if (json?.newData) newItems = parseNewSheet(json.newData);
+    if (json?.oldData) oldItems = parseOldSheetRaw(json.oldData);
+  } catch(e) { console.error('getAllData error:', e); }
 
   const today = new Date();
   allItems = [...newItems, ...oldItems].filter(it => {
@@ -748,9 +788,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
    เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในครั้งแรก ── */
 window.onload = () => {
   loadAll();
-  setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 3000);
-  setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 6000);
-  setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 10000);
   setInterval(loadAll, 5 * 60 * 1000);
 };
 </script>
