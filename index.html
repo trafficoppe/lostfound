@@ -427,14 +427,21 @@ async function loadAll() {
   document.getElementById('gallery').innerHTML =
     '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
 
-  const [r1, r2] = await Promise.allSettled([
-    fetch(OLD_SHEET_URL + '&t=' + Date.now()).then(r => r.text()),
-    fetch(GAS_URL + '?action=getData&t=' + Date.now()).then(r => r.json())
-  ]);
+  // ✅ fetch ทีละตัว ไม่ parallel เพื่อหลีกเลี่ยง gviz truncation
+  let oldItems = [];
+  let newItems = [];
 
-  const oldItems = r1.status === 'fulfilled' ? parseOldSheet(r1.value) : [];
-  const newItems = (r2.status === 'fulfilled' && r2.value?.data)
-    ? parseNewSheet(r2.value.data) : [];
+  try {
+    const r1 = await fetch(OLD_SHEET_URL + '&t=' + Date.now());
+    const text = await r1.text();
+    oldItems = parseOldSheet(text);
+  } catch(e) { console.error('gviz error:', e); }
+
+  try {
+    const r2 = await fetch(GAS_URL + '?action=getData&t=' + Date.now());
+    const json = await r2.json();
+    if (json?.data) newItems = parseNewSheet(json.data);
+  } catch(e) { console.error('GAS error:', e); }
 
   const today = new Date();
   allItems = [...newItems, ...oldItems].filter(it => {
@@ -741,6 +748,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
    เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในครั้งแรก ── */
 window.onload = () => {
   loadAll();
+  setInterval(loadAll, 5 * 60 * 1000);
+};
   // retry 3 ครั้ง ห่างกัน 3, 6, 10 วินาที เผื่อ gviz ยังไม่พร้อม
   setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 3000);
   setTimeout(() => { if (allItems.filter(i=>i.source==='old').length < 200) loadAll(); }, 6000);
