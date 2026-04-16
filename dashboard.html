@@ -391,40 +391,40 @@ async function manualRefresh() {
 // LOAD DATA
 // ============================================
 async function loadDashboard() {
-  const results = await Promise.allSettled([
-    fetch(OLD_SHEET_URL).then(r => r.text()),
-    fetch(GAS_URL + '?action=getData&t=' + Date.now()).then(r => r.json())
-  ]);
-
   let oldItems = [];
   let newItems = [];
 
-  if (results[0].status === 'fulfilled') oldItems = parseOldSheet(results[0].value);
-  if (results[1].status === 'fulfilled' && results[1].value?.data) {
-    newItems = results[1].value.data.map(r => ({
-      source: 'new',
-      refCode: r['RefCode'] || '',
-      type: r['ประเภท'] || '',
-      title: r['รายละเอียด'] || '',
-      location: r['สถานที่'] || '',
-      date: r['Timestamp'] || '',
-      dateObj: parseAnyDate(r['Timestamp']),
-      name: r['ชื่อ-นามสกุล'] || '',
-      personType: r['ประเภทบุคคล'] || '',
-      dept: r['คณะ/หน่วยงาน'] || '',
-      phone: r['เบอร์โทร'] || '',
-      status: r['สถานะ'] || '',
-      actionText: r['การดำเนินการ'] || '',
-      imgUrl: r['URL รูปภาพ'] || ''
-    }));
-  }
+  try {
+    const r = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+    const json = await r.json();
+    if (json?.newData) {
+      newItems = json.newData.map(r => ({
+        source: 'new',
+        refCode: r['RefCode'] || '',
+        type: r['ประเภท'] || '',
+        title: r['รายละเอียด'] || '',
+        location: r['สถานที่'] || '',
+        date: r['Timestamp'] || '',
+        dateObj: parseAnyDate(r['Timestamp']),
+        name: r['ชื่อ-นามสกุล'] || '',
+        personType: r['ประเภทบุคคล'] || '',
+        dept: r['คณะ/หน่วยงาน'] || '',
+        phone: r['เบอร์โทร'] || '',
+        status: r['สถานะ'] || '',
+        actionText: r['การดำเนินการ'] || '',
+        imgUrl: r['URL รูปภาพ'] || ''
+      }));
+    }
+    if (json?.oldData) {
+      oldItems = parseOldSheetRaw(json.oldData);
+    }
+  } catch(e) { console.error('getAllData error:', e); }
 
   const today2 = new Date();
   allData = [...newItems, ...oldItems].filter(it => !it.dateObj || it.dateObj <= today2);
   buildYearFilter();
   applyDashFilter();
 }
-
 function parseOldSheet(text) {
   try {
   const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+?)\);?\s*$/);
@@ -662,7 +662,44 @@ function drawItemChart() {
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
   });
 }
+function parseOldSheetRaw(rows) {
+  if (!rows || rows.length < 2) return [];
+  return rows.slice(1).map(row => {
+    const g = i => String(row[i] || '').trim();
+    const ts = g(0);
+    if (!ts) return null;
+    const tsObj = parseAnyDate(ts);
+    if (!tsObj || tsObj.getFullYear() < 2020) return null;
 
+    const colG = g(6), colH = g(7), colK = g(10), colN = g(13);
+    let type = '';
+    if (colG.includes('สูญหาย') || colG.includes('หาย')) type = 'สิ่งของสูญหาย';
+    else if (colG.includes('พบ') || colG.includes('เก็บ')) type = 'พบสิ่งของ';
+    else if (colG.includes('คืน')) type = 'รับของคืน';
+    if (!type) {
+      if (colH && colH.length > 2) type = 'สิ่งของสูญหาย';
+      else if (colK && colK.length > 2) type = 'พบสิ่งของ';
+      else if (colN && colN.length > 2) type = 'รับของคืน';
+    }
+    if (!type) return null;
+
+    let title = '', loc = '';
+    if (type === 'สิ่งของสูญหาย') { title = g(7); loc = g(8); }
+    else if (type === 'พบสิ่งของ') { title = g(10); loc = g(11); }
+    else { title = g(13); loc = '-'; }
+
+    if (!title || /^[\d\s\-\+]{7,15}$/.test(title.trim())) title = g(2) || 'ไม่ระบุ';
+
+    return {
+      source: 'old', refCode: '', type,
+      title: title || 'ไม่ระบุ',
+      location: loc || '-',
+      date: g(0), dateObj: tsObj,
+      name: g(2), personType: g(3), dept: g(4), phone: g(5),
+      status: g(18) || '', actionText: g(17) || ''
+    };
+  }).filter(Boolean);
+}
 // ============================================
 // รายการทั้งหมดอยู่ที่หน้า lostfound_list.html
 </script>
