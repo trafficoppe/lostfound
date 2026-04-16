@@ -475,14 +475,13 @@ function parseOldSheet(text) {
                 type === 'พบสิ่งของ'     ? `[ของที่พบ] ${name}` : `[รับคืน] ${name}`;
       }
 
-      const lostDateObj = normalizeLostDate(g(1), tsObj);
-      return {
-        source     : 'old',
-        type,
-        title      : title || 'ไม่ระบุ',
-        location   : loc   || 'ไม่ระบุสถานที่',
-        date       : g(0),
-        dateObj    : lostDateObj || tsObj,
+return {
+  source     : 'old',
+  type,
+  title      : title || 'ไม่ระบุ',
+  location   : loc   || 'ไม่ระบุสถานที่',
+  date       : g(0),
+  dateObj    : tsObj,
         imgUrl     : driveThumb(imgRaw),
         status     : g(18) || '',
         actionText : g(17) || '',
