@@ -345,7 +345,8 @@ window.onload = () => {
   if (sessionStorage.getItem('lf_auth') === '1') {
     document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-    loadDashboard();
+   loadDashboard();
+    setTimeout(loadDashboard, 5000);
     startAutoRefresh();
   }
 };
@@ -426,7 +427,7 @@ async function loadDashboard() {
 
 function parseOldSheet(text) {
   try {
-    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);/);
+  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+?)\);?\s*$/);
     if (!match) return [];
     const json = JSON.parse(match[1]);
     return (json.table.rows || []).map(row => {
