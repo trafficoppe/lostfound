@@ -15,8 +15,6 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
-
-/* ─── HEADER ─── */
 .header{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-mid) 100%);padding:0;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
 .header-inner{max-width:1400px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;gap:16px;}
 .header-left{display:flex;align-items:center;gap:12px;}
@@ -28,11 +26,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .btn-dash:hover{background:rgba(255,255,255,0.25);}
 .btn-add{background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 3px 10px rgba(232,160,32,0.35);white-space:nowrap;}
 .btn-add:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(232,160,32,0.45);}
-
-/* ─── CONTENT ─── */
 .content{max-width:1400px;margin:0 auto;padding:24px 20px;flex:1;}
-
-/* ─── STATS BAR ─── */
 .stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;align-items:flex-start;}
 .chip-group{display:flex;flex-direction:column;gap:5px;align-items:flex-start;}
 .stat-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:2px solid transparent;user-select:none;}
@@ -43,7 +37,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .chip-found{background:#edf7f1;color:var(--found);border-color:#b7e4c7;}
 .chip-pickup{background:#eaf1fb;color:var(--pickup);border-color:#b6d0ef;}
 .stat-chip:hover,.stat-chip.active{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15);}
-/* pending sub-button — ซ่อนก่อน โชว์เมื่อ chip active */
 .btn-pending{display:none;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed #e0a800;background:#fffbea;color:#b07d00;transition:all 0.2s;font-family:'Sarabun',sans-serif;}
 .btn-pending.visible{display:inline-flex;animation:fadeSlideIn 0.25s ease;}
 @keyframes fadeSlideIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
@@ -52,8 +45,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .btn-refresh{background:white;border:1.5px solid var(--border);padding:8px 14px;border-radius:10px;font-size:13.5px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;font-family:'Sarabun',sans-serif;}
 .btn-refresh:hover{border-color:var(--primary-mid);color:var(--primary);}
 .info-text{margin-left:auto;font-size:12.5px;color:var(--muted);}
-
-/* ─── PENDING PANEL ─── */
 .pending-panel{display:none;background:white;border-radius:var(--radius);box-shadow:0 4px 24px rgba(26,58,92,0.13);margin-bottom:20px;overflow:hidden;border:2px solid #f5c842;animation:slideDown 0.28s ease;}
 .pending-panel.show{display:block;}
 @keyframes slideDown{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
@@ -61,7 +52,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .pending-panel-title{color:white;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;}
 .pending-panel-close{background:rgba(255,255,255,0.2);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;}
 .pending-panel-close:hover{background:rgba(255,255,255,0.35);}
-/* filter bar inside panel */
 .pending-filter{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fffdf5;}
 .pending-filter label{font-size:13px;font-weight:600;color:var(--muted);}
 .pf-btn{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:white;font-family:'Sarabun',sans-serif;transition:all 0.18s;color:var(--text);}
@@ -71,7 +61,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .pf-custom input[type=date]{padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;outline:none;}
 .pf-custom input[type=date]:focus{border-color:var(--accent);}
 .pf-apply{padding:6px 14px;border-radius:8px;background:var(--accent);color:white;border:none;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
-/* pending list */
 .pending-list{max-height:420px;overflow-y:auto;}
 .pending-item{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;}
 .pending-item:hover{background:#fffdf5;}
@@ -86,16 +75,12 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .pending-empty{text-align:center;padding:30px;color:var(--muted);font-size:14px;}
 .pending-summary{padding:10px 18px;background:#fff8e6;border-top:1px solid #f5c842;font-size:13px;color:#7a5a00;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
 .pending-summary strong{color:#d35400;}
-
-/* ─── SEARCH ─── */
 .search-row{display:flex;gap:10px;margin-bottom:20px;}
 .search-box{flex:1;position:relative;}
 .search-box input{width:100%;padding:10px 14px 10px 40px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14.5px;background:white;outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
 .search-box input:focus{border-color:var(--primary-mid);box-shadow:0 0 0 3px rgba(45,95,143,0.08);}
 .search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
 .sort-select{padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;background:white;outline:none;cursor:pointer;color:var(--text);}
-
-/* ─── GALLERY ─── */
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
 .card{background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:2px solid transparent;transition:transform 0.22s,box-shadow 0.22s;cursor:pointer;display:flex;flex-direction:column;}
 .card:hover{transform:translateY(-4px);box-shadow:0 8px 28px rgba(26,58,92,0.14);}
@@ -117,14 +102,10 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .card-date{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
 .card-status{font-size:13px;font-weight:600;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);}
 .status-wait{color:var(--muted);}.status-done{color:var(--found);}.status-notfound{color:#d35400;}.status-unclaimed{color:#8e44ad;}
-
-/* ─── EMPTY / LOADING ─── */
 .empty,.loading{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--muted);}
 .empty-icon{font-size:48px;margin-bottom:12px;opacity:0.4;display:block;}
 .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-
-/* ─── MODAL ─── */
 .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(5px);z-index:500;align-items:center;justify-content:center;padding:20px;}
 .modal-backdrop.show{display:flex;}
 .modal{background:white;border-radius:18px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,0.35);animation:popIn 0.28s cubic-bezier(0.34,1.56,0.64,1);}
@@ -143,22 +124,16 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .ms-notfound{background:#fff3e0;color:#d35400;}.ms-unclaimed{background:#f3e5f5;color:#8e44ad;}
 .modal-action{margin-top:10px;padding:10px 14px;background:#f8f9fa;border-radius:8px;font-size:13px;color:var(--muted);line-height:1.5;}
 .modal-action strong{color:var(--text);}
-
-/* ─── PAGINATION ─── */
 .pagination{display:flex;justify-content:center;gap:8px;margin-top:28px;flex-wrap:wrap;padding-bottom:10px;}
 .page-btn{padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;transition:all 0.18s;min-width:42px;}
 .page-btn:hover:not(:disabled){border-color:var(--primary-mid);color:var(--primary);transform:translateY(-1px);}
 .page-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
 .page-btn:disabled{opacity:0.38;cursor:not-allowed;}
-
-/* ─── FOOTER ─── */
 footer{background:var(--primary);color:rgba(255,255,255,0.75);font-size:12px;padding:18px 24px;text-align:center;line-height:1.8;margin-top:auto;}
 footer .footer-ver{font-weight:700;color:var(--accent);letter-spacing:0.5px;}
 footer .footer-copy{font-size:11.5px;margin-top:3px;}
 footer a{color:rgba(255,255,255,0.6);text-decoration:none;}
 footer a:hover{color:white;}
-
-/* ─── RESPONSIVE ─── */
 @media(max-width:768px){
   .header-inner{padding:12px 16px;}
   .header-sub{display:none;}
@@ -183,7 +158,6 @@ footer a:hover{color:white;}
 </head>
 <body>
 
-<!-- HEADER -->
 <div class="header">
   <div class="header-inner">
     <div class="header-left">
@@ -200,10 +174,7 @@ footer a:hover{color:white;}
   </div>
 </div>
 
-<!-- CONTENT -->
 <div class="content">
-
-  <!-- STATS BAR -->
   <div class="stats-bar">
     <div class="chip-group">
       <div class="stat-chip chip-all active" id="chip-all" onclick="filterType('all')">
@@ -235,7 +206,6 @@ footer a:hover{color:white;}
     <div class="info-text" id="update-time"></div>
   </div>
 
-  <!-- PENDING PANEL -->
   <div class="pending-panel" id="pending-panel">
     <div class="pending-panel-head">
       <div class="pending-panel-title">
@@ -244,8 +214,6 @@ footer a:hover{color:white;}
       </div>
       <button class="pending-panel-close" onclick="closePending()">✕</button>
     </div>
-
-    <!-- FILTER BAR -->
     <div class="pending-filter">
       <label>ดูตาม:</label>
       <button class="pf-btn pf-active" id="pf-today"   onclick="setPfMode('today')">วันนี้</button>
@@ -262,18 +230,13 @@ footer a:hover{color:white;}
         <button class="pf-apply" onclick="applyCustomRange()">ค้นหา</button>
       </div>
     </div>
-
-    <!-- LIST -->
     <div class="pending-list" id="pending-list"></div>
-
-    <!-- SUMMARY -->
     <div class="pending-summary" id="pending-summary">
       <span>พบ <strong id="pending-count">0</strong> รายการรอดำเนินการ</span>
       <span id="pending-range-label" style="color:var(--muted)"></span>
     </div>
   </div>
 
-  <!-- SEARCH -->
   <div class="search-row">
     <div class="search-box">
       <span class="search-icon">🔎</span>
@@ -286,15 +249,12 @@ footer a:hover{color:white;}
     </select>
   </div>
 
-  <!-- GALLERY -->
   <div class="gallery" id="gallery">
     <div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>
   </div>
   <div class="pagination" id="pagination"></div>
-
 </div>
 
-<!-- MODAL -->
 <div class="modal-backdrop" id="modal-bg" onclick="bgClose(event)">
   <div class="modal" id="modal-box">
     <div class="modal-banner" id="modal-banner">
@@ -312,10 +272,8 @@ footer a:hover{color:white;}
   </div>
 </div>
 
-<!-- FOOTER -->
-<!-- FOOTER -->
 <footer>
-  <div><span class="footer-ver">Lost &amp; Found Web App — San v1.1.1</span></div>
+  <div><span class="footer-ver">Lost &amp; Found Web App — San v1.1.2</span></div>
   <div class="footer-copy">
     © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
@@ -325,9 +283,7 @@ footer a:hover{color:white;}
 <script>
 /* =====================================================
  * Lost & Found — index.html
- * Version : 1.1.1
- * Author  : Traffic Control and Premises Security Unit,
- *           Mahidol University
+ * Version : 1.1.2
  * © 2025–2026 Traffic Control and Premises Security Unit,
  *   Mahidol University. All rights reserved.
  * ===================================================== */
@@ -354,55 +310,15 @@ function fmtDate(d) {
   } catch(e) { return '-'; }
 }
 
-
-// ── normalize วันที่จาก Col B ของ Sheet เดิม ──
-// รองรับ: ค.ศ., พ.ศ.(2500+), ปี 2 หลัก(67/68), ปีผิด, D/M สลับ
-function normalizeLostDate(colBStr, tsObj) {
-  if (!colBStr || !tsObj || isNaN(tsObj)) return tsObj;
-  const s = String(colBStr).trim();
-  const parts = s.split('/');
-  if (parts.length !== 3) return tsObj;
-  let p1=parseInt(parts[0]), p2=parseInt(parts[1]), p3=parseInt(parts[2]);
-  if (isNaN(p1)||isNaN(p2)||isNaN(p3)) return tsObj;
-
-  const tsYear = tsObj.getFullYear();
-
-  // แก้ปี
-  if (p3 >= 2500 && p3 <= 2600) { p3 -= 543; }            // พ.ศ. → ค.ศ.
-  else if (p3 >= 60 && p3 <= 75) { p3 = (p3+2500)-543; }  // 67 → 2567 → 2024
-  else if (p3 < 2000 || Math.abs(p3-tsYear) > 5) { return tsObj; } // ผิดปกติ
-
-  // D/M vs M/D
-  let month, day;
-  if (p1 > 12) { day=p1; month=p2; }
-  else { month=p1; day=p2; }
-  if (month<1||month>12||day<1||day>31) return tsObj;
-
-  try {
-    const result = new Date(p3, month-1, day,
-      tsObj.getHours(), tsObj.getMinutes(), tsObj.getSeconds());
-    if (isNaN(result)) return tsObj;
-    // วันหายอยู่ในอนาคตกว่า timestamp → ใช้ timestamp
-    if (result > tsObj && (result-tsObj) > 86400000) return tsObj;
-    // ห่างเกิน 60 วัน → ผิดปกติ → ใช้ timestamp
-    if ((tsObj-result)/86400000 > 60) return tsObj;
-    return result;
-  } catch(e) { return tsObj; }
-}
-
 function parseDate(str) {
   if (!str) return null;
   const s = String(str).trim();
-
-  // Format: dd/MM/yyyy HH:mm:ss (จาก GAS ใหม่)
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (m) {
     const d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]),
                        parseInt(m[4]||0), parseInt(m[5]||0), parseInt(m[6]||0));
     if (!isNaN(d)) return d;
   }
-
-  // ISO / M/D/YYYY format
   try {
     const d = new Date(s);
     if (!isNaN(d) && d.getFullYear() > 2000) return d;
@@ -410,7 +326,9 @@ function parseDate(str) {
   return null;
 }
 
-/* ── Parse Sheet เดิม (gviz) ── */
+/* ── Parse Sheet เดิม (gviz) ──
+   ใช้ Timestamp (Col A) เป็น dateObj เสมอ
+   เพื่อหลีกเลี่ยงปัญหาวันที่ใน Col B ที่ผู้ใช้กรอกผิด ── */
 function parseOldSheet(text) {
   try {
     const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+?)\);?\s*$/);
@@ -422,52 +340,35 @@ function parseOldSheet(text) {
       if (!row?.c) return null;
       const g = i => row.c[i] ? String(row.c[i].f || row.c[i].v || '').trim() : '';
 
-      // ⛔ ข้ามแถวที่ไม่มี Timestamp (แถวกิจกรรม/ว่าง)
+      // ข้ามแถวที่ไม่มี Timestamp
       const ts = g(0);
-      if (!ts || !ts.includes('/') && !ts.includes('-')) return null;
+      if (!ts || (!ts.includes('/') && !ts.includes('-'))) return null;
       const tsObj = parseDate(ts);
       if (!tsObj || tsObj.getFullYear() < 2020) return null;
 
-      // ── ตรวจสอบ Col G, H, K เพื่อหา type ──
-      const colG = g(6);   // ประเภท (สูญหาย/พบของ/คืน)
-      const colH = g(7);   // รายละเอียดของสูญหาย
-      const colK = g(10);  // รายละเอียดของที่พบ
-      const colN = g(13);  // รายละเอียดของที่รับคืน
+      // หา type จาก Col G ก่อน ถ้าว่าง fallback Col H/K/N
+      const colG = g(6);
+      const colH = g(7);
+      const colK = g(10);
+      const colN = g(13);
 
       let type = '';
-
-      // 1. ดู Col G ก่อน
       if (colG.includes('สูญหาย') || colG.includes('หาย')) type = 'สิ่งของสูญหาย';
       else if (colG.includes('พบ') || colG.includes('เก็บ')) type = 'พบสิ่งของ';
       else if (colG.includes('คืน')) type = 'รับของคืน';
 
-      // 2. ถ้า Col G ว่าง → fallback ดูว่ามีข้อมูลใน Col H หรือ K
       if (!type) {
         if (colH && colH.length > 2) type = 'สิ่งของสูญหาย';
         else if (colK && colK.length > 2) type = 'พบสิ่งของ';
         else if (colN && colN.length > 2) type = 'รับของคืน';
       }
-
-      // ยังไม่ได้ type → ข้ามแถวนี้
       if (!type) return null;
 
-      // ── ดึง title/location/image ตามประเภท ──
       let title = '', loc = '', imgRaw = '';
-      if (type === 'สิ่งของสูญหาย') {
-        title  = g(7);   // Col H
-        loc    = g(8);   // Col I
-        imgRaw = g(9);   // Col J
-      } else if (type === 'พบสิ่งของ') {
-        title  = g(10);  // Col K
-        loc    = g(11);  // Col L
-        imgRaw = g(12);  // Col M
-      } else {
-        title  = g(13);  // Col N
-        imgRaw = g(14);  // Col O
-        loc    = '-';
-      }
+      if (type === 'สิ่งของสูญหาย') { title=g(7); loc=g(8); imgRaw=g(9); }
+      else if (type === 'พบสิ่งของ') { title=g(10); loc=g(11); imgRaw=g(12); }
+      else { title=g(13); imgRaw=g(14); loc='-'; }
 
-      // Fallback title
       const isPhone = /^[\d\s\-\+]{7,15}$/.test((title||'').trim());
       if (!title || isPhone) {
         const name = g(2);
@@ -475,21 +376,21 @@ function parseOldSheet(text) {
                 type === 'พบสิ่งของ'     ? `[ของที่พบ] ${name}` : `[รับคืน] ${name}`;
       }
 
-return {
-  source     : 'old',
-  type,
-  title      : title || 'ไม่ระบุ',
-  location   : loc   || 'ไม่ระบุสถานที่',
-  date       : g(0),
-  dateObj    : tsObj,
-        imgUrl     : driveThumb(imgRaw),
-        status     : g(18) || '',
-        actionText : g(17) || '',
-        name       : g(2),
-        personType : g(3),
-        dept       : g(4),
-        phone      : g(5),
-        time       : g(15)
+      return {
+        source    : 'old',
+        type,
+        title     : title || 'ไม่ระบุ',
+        location  : loc   || 'ไม่ระบุสถานที่',
+        date      : g(0),
+        dateObj   : tsObj,   // ✅ ใช้ Timestamp โดยตรง ไม่แปลงจาก Col B
+        imgUrl    : driveThumb(imgRaw),
+        status    : g(18) || '',
+        actionText: g(17) || '',
+        name      : g(2),
+        personType: g(3),
+        dept      : g(4),
+        phone     : g(5),
+        time      : g(15)
       };
     }).filter(Boolean);
   } catch(e) {
@@ -501,26 +402,27 @@ return {
 /* ── Parse Sheet ใหม่ (GAS JSON) ── */
 function parseNewSheet(data) {
   return (data || []).map(r => ({
-    source     : 'new',
-    refCode    : r['RefCode']       || '',
-    type       : r['ประเภท']        || '',
-    title      : r['รายละเอียด']    || 'ไม่ระบุ',
-    location   : r['สถานที่']       || 'ไม่ระบุสถานที่',
-    date       : r['Timestamp']     || '',
-    dateObj    : parseDate(r['Timestamp']),
-    imgUrl     : driveThumb(r['URL รูปภาพ']),
-    status     : r['สถานะ']         || 'รอดำเนินการ',
-    actionText : r['การดำเนินการ']  || '',
-    name       : r['ชื่อ-นามสกุล'] || '',
-    personType : r['ประเภทบุคคล']  || '',
-    dept       : r['คณะ/หน่วยงาน'] || '',
-    phone      : r['เบอร์โทร']      || '',
-    time       : r['เวลา']          || ''
+    source    : 'new',
+    refCode   : r['RefCode']       || '',
+    type      : r['ประเภท']        || '',
+    title     : r['รายละเอียด']    || 'ไม่ระบุ',
+    location  : r['สถานที่']       || 'ไม่ระบุสถานที่',
+    date      : r['Timestamp']     || '',
+    dateObj   : parseDate(r['Timestamp']),
+    imgUrl    : driveThumb(r['URL รูปภาพ']),
+    status    : r['สถานะ']         || 'รอดำเนินการ',
+    actionText: r['การดำเนินการ']  || '',
+    name      : r['ชื่อ-นามสกุล'] || '',
+    personType: r['ประเภทบุคคล']  || '',
+    dept      : r['คณะ/หน่วยงาน'] || '',
+    phone     : r['เบอร์โทร']      || '',
+    time      : r['เวลา']          || ''
   })).filter(r => r.type);
 }
 
-/* ── Load all ── */
-/* ── Load all ── */
+/* ── Load all ──
+   โหลด 2 ครั้ง: ครั้งแรกทันที ครั้งสองหลัง 5 วินาที
+   เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในการโหลดครั้งแรก ── */
 async function loadAll() {
   document.getElementById('gallery').innerHTML =
     '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
@@ -540,7 +442,6 @@ async function loadAll() {
     return it.dateObj <= today;
   });
 
-  // แสดงทั้งหมด ไม่กรองปี
   window._displayItems = allItems;
   updateCounts();
   applyFilters();
@@ -548,12 +449,6 @@ async function loadAll() {
     'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
 }
 
-/* ── Year Filter (คงไว้เพื่อ backward compat แต่แสดงทั้งหมด) ── */
-function applyYearFilter() {
-  window._displayItems = allItems;
-  updateCounts();
-  applyFilters();
-}
 /* ── Counts ── */
 function updateCounts() {
   const items = window._displayItems || allItems;
@@ -561,7 +456,6 @@ function updateCounts() {
   document.getElementById('cnt-lost').textContent   = items.filter(i => i.type === 'สิ่งของสูญหาย').length;
   document.getElementById('cnt-found').textContent  = items.filter(i => i.type === 'พบสิ่งของ').length;
   document.getElementById('cnt-pickup').textContent = items.filter(i => i.type === 'รับของคืน').length;
-
   const isPending = s => !s || s.trim() === 'รอดำเนินการ' || s.trim() === '';
   document.getElementById('pcnt-lost').textContent  =
     items.filter(i => i.type==='สิ่งของสูญหาย' && isPending(i.status)).length;
@@ -580,26 +474,18 @@ let pfTo        = null;
 function openPending(type) {
   pendingType = type;
   pfMode      = 'today';
-
-  // reset UI
   document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('pf-active'));
   document.getElementById('pf-today').classList.add('pf-active');
   document.getElementById('pf-custom-range').classList.remove('show');
-
-  // set title
   const isLost = type === 'สิ่งของสูญหาย';
   document.getElementById('pending-panel-icon').textContent   = isLost ? '😟' : '📦';
   document.getElementById('pending-panel-title-text').textContent =
     (isLost ? 'สิ่งของสูญหาย' : 'พบสิ่งของ') + ' — รายการรอดำเนินการ';
-
   document.getElementById('pending-panel').classList.add('show');
   document.getElementById('pending-panel').scrollIntoView({ behavior:'smooth', block:'start' });
-
-  // default dates for custom picker
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('pf-date-from').value = today;
   document.getElementById('pf-date-to').value   = today;
-
   renderPendingList();
 }
 
@@ -636,7 +522,7 @@ function getPendingDateRange() {
   } else if (pfMode === 'custom' && pfFrom && pfTo) {
     return { from: new Date(pfFrom), to: new Date(pfTo + 'T23:59:59') };
   }
-  return null; // 'all'
+  return null;
 }
 
 function fmtRangeLabel(range) {
@@ -651,35 +537,27 @@ function fmtRangeLabel(range) {
 function renderPendingList() {
   const isPending = s => !s || s.trim() === 'รอดำเนินการ' || s.trim() === '';
   const range     = getPendingDateRange();
-
   let items = allItems.filter(it => {
     if (it.type !== pendingType) return false;
     if (!isPending(it.status))   return false;
     if (range && it.dateObj) {
       return it.dateObj >= range.from && it.dateObj <= range.to;
     }
-    return !range; // 'all' mode
+    return !range;
   });
-
-  // sort newest first
   items.sort((a,b) => (b.dateObj||0) - (a.dateObj||0));
-
   document.getElementById('pending-count').textContent = items.length;
   document.getElementById('pending-range-label').textContent = fmtRangeLabel(range);
-
   const listEl = document.getElementById('pending-list');
   if (!items.length) {
     listEl.innerHTML = `<div class="pending-empty">✅ ไม่มีรายการรอดำเนินการในช่วงเวลานี้</div>`;
     return;
   }
-
   const badgeColor = pendingType === 'สิ่งของสูญหาย' ? '#c0392b' : '#1e7e44';
-
   listEl.innerHTML = items.map(it => {
     const imgHtml = it.imgUrl
       ? `<img class="pi-img" src="${it.imgUrl}" loading="lazy" onerror="this.style.display='none'">`
       : `<div class="pi-img-ph">🖼️</div>`;
-    // find index in filtered for modal open
     const idx = filtered.indexOf(it);
     const clickAttr = idx >= 0 ? `onclick="openModal(${idx})"` : '';
     return `
@@ -699,40 +577,30 @@ function renderPendingList() {
 /* ── Filter & sort ── */
 function filterType(t) {
   currentFilter = t; currentPage = 1;
-
-  // อัปเดต chip active
   document.querySelectorAll('.stat-chip').forEach(c => c.classList.remove('active'));
   const map = { all:'chip-all', 'สิ่งของสูญหาย':'chip-lost', 'พบสิ่งของ':'chip-found', 'รับของคืน':'chip-pickup' };
   if (map[t]) document.getElementById(map[t]).classList.add('active');
-
-  // แสดง/ซ่อนปุ่ม ⏳ รอดำเนินการ เฉพาะเมื่อ chip สูญหาย/พบของ ถูก active
   const btnLost  = document.getElementById('btn-pending-lost');
   const btnFound = document.getElementById('btn-pending-found');
   btnLost.classList.toggle('visible',  t === 'สิ่งของสูญหาย');
   btnFound.classList.toggle('visible', t === 'พบสิ่งของ');
-
-  // ถ้าเปลี่ยน chip → ปิด pending panel ถ้าไม่ตรงกับประเภทใหม่
   if (pendingType && pendingType !== t) closePending();
-
   applyFilters();
 }
 
 function applyFilters() {
   const q    = document.getElementById('searchInput').value.toLowerCase().trim();
   const sort = document.getElementById('sortSelect').value;
-
   const baseItems = window._displayItems || allItems;
   filtered = baseItems.filter(it => {
     const matchT = currentFilter === 'all' || it.type === currentFilter;
     const txt = `${it.title} ${it.location} ${it.name} ${it.dept} ${it.phone}`.toLowerCase();
     return matchT && (!q || txt.includes(q));
   });
-
   const statusOrder = { 'รับของคืนแล้ว':0,'รับของคืน':0,'ช่วยหาแล้วยังไม่พบ':1,'เจ้าของยังไม่มารับคืน':2,'รอดำเนินการ':3,'':4 };
   if      (sort === 'newest') filtered.sort((a,b)=>(b.dateObj||0)-(a.dateObj||0));
   else if (sort === 'oldest') filtered.sort((a,b)=>(a.dateObj||0)-(b.dateObj||0));
   else if (sort === 'status') filtered.sort((a,b)=>(statusOrder[a.status]??5)-(statusOrder[b.status]??5));
-
   currentPage = 1;
   renderPage();
 }
@@ -744,13 +612,11 @@ function renderPage() {
   const pages    = Math.ceil(total / ITEMS_PER_PAGE);
   const start    = (currentPage - 1) * ITEMS_PER_PAGE;
   const items    = filtered.slice(start, start + ITEMS_PER_PAGE);
-
   if (!items.length) {
     gallery.innerHTML = `<div class="empty"><span class="empty-icon">🔍</span>ไม่พบข้อมูลที่ตรงกับการค้นหา</div>`;
     document.getElementById('pagination').innerHTML = '';
     return;
   }
-
   gallery.innerHTML = items.map((it, i) => renderCard(it, start + i)).join('');
   renderPagination(pages);
 }
@@ -759,14 +625,12 @@ function renderCard(it, idx) {
   const tc  = it.type === 'สิ่งของสูญหาย' ? 'border-lost' : it.type === 'พบสิ่งของ' ? 'border-found' : 'border-pickup';
   const bc  = it.type === 'สิ่งของสูญหาย' ? 'badge-lost'  : it.type === 'พบสิ่งของ' ? 'badge-found'  : 'badge-pickup';
   const src = it.source === 'new' ? '<span class="source-badge">✨ ใหม่</span>' : '';
-
   const imgHtml = it.imgUrl
     ? `<img class="card-img" src="${it.imgUrl}" loading="lazy"
          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
          alt="รูปภาพสิ่งของ">
        <div class="card-img-placeholder" style="display:none"><span class="ph-icon">🖼️</span>ไม่มีภาพ</div>`
     : `<div class="card-img-placeholder"><span class="ph-icon">🖼️</span>ไม่มีภาพประกอบ</div>`;
-
   const s = (it.status || '').trim();
   let stHtml = '<div class="card-status status-wait">⏳ รอดำเนินการ</div>';
   if (s.includes('รับของคืนแล้ว') || s.includes('รับของคืน'))
@@ -775,7 +639,6 @@ function renderCard(it, idx) {
     stHtml = '<div class="card-status status-notfound">🔎 ช่วยหาแล้วยังไม่พบ</div>';
   else if (s.includes('เจ้าของยังไม่มารับคืน'))
     stHtml = '<div class="card-status status-unclaimed">⏳ เจ้าของยังไม่มารับคืน</div>';
-
   return `
     <div class="card ${tc}" onclick="openModal(${idx})">
       <div class="card-img-wrap">
@@ -796,7 +659,6 @@ function renderCard(it, idx) {
 function renderPagination(pages) {
   const pg = document.getElementById('pagination');
   if (pages <= 1) { pg.innerHTML = ''; return; }
-
   let h = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← ก่อนหน้า</button>`;
   for (let i = 1; i <= pages; i++) {
     if (i === 1 || i === pages || Math.abs(i - currentPage) <= 2)
@@ -819,13 +681,10 @@ function goPage(p) {
 /* ── Modal ── */
 function openModal(idx) {
   const it = filtered[idx]; if (!it) return;
-
   const color = it.type==='สิ่งของสูญหาย' ? '#c0392b' : it.type==='พบสิ่งของ' ? '#1e7e44' : '#1a5276';
   const emoji = it.type==='สิ่งของสูญหาย' ? '😟' : it.type==='พบสิ่งของ' ? '📦' : '🤝';
   document.getElementById('modal-banner').style.background = color;
   document.getElementById('modal-type-text').textContent = `${emoji} ${it.type}`;
-
-  // Image
   const imgWrap = document.getElementById('modal-img-wrap');
   const img     = document.getElementById('modal-img');
   if (it.imgUrl) {
@@ -835,8 +694,6 @@ function openModal(idx) {
   } else {
     imgWrap.style.display = 'none';
   }
-
-  // Rows
   const rows = [
     it.refCode    ? ['🔖 เลขอ้างอิง', it.refCode]                           : null,
     it.title      ? ['📝 รายละเอียด', it.title]                             : null,
@@ -848,12 +705,9 @@ function openModal(idx) {
     it.dept       ? ['🏢 คณะ/หน่วยงาน',it.dept]                             : null,
     it.phone      ? ['📞 เบอร์ติดต่อ', it.phone]                            : null,
   ].filter(Boolean);
-
   document.getElementById('modal-rows').innerHTML = rows.map(r =>
     `<div class="modal-row"><span class="modal-key">${r[0]}</span><span class="modal-val">${r[1]||'-'}</span></div>`
   ).join('');
-
-  // Status
   const s  = (it.status || '').trim();
   const sb = document.getElementById('modal-status-box');
   if (s.includes('รับของคืนแล้ว') || s.includes('รับของคืน'))
@@ -864,8 +718,6 @@ function openModal(idx) {
     { sb.className='modal-status-box ms-unclaimed';sb.textContent='⏳ เจ้าของยังไม่มารับคืน'; }
   else
     { sb.className='modal-status-box ms-wait';    sb.textContent='⏳ รอดำเนินการ'; }
-
-  // Action text
   const actEl = document.getElementById('modal-action');
   if (it.actionText) {
     actEl.innerHTML = `<strong>📋 การดำเนินการ:</strong> ${it.actionText}`;
@@ -873,7 +725,6 @@ function openModal(idx) {
   } else {
     actEl.style.display = 'none';
   }
-
   document.getElementById('modal-bg').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
@@ -885,10 +736,13 @@ function closeModal() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-/* ── Init ── */
+/* ── Init ──
+   โหลดครั้งแรกทันที แล้วโหลดซ้ำหลัง 5 วินาที
+   เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในครั้งแรก ── */
 window.onload = () => {
   loadAll();
-  setInterval(loadAll, 5 * 60 * 1000); // auto-refresh ทุก 5 นาที
+  setTimeout(loadAll, 5000);                    // ✅ retry หลัง 5 วินาที
+  setInterval(loadAll, 5 * 60 * 1000);          // auto-refresh ทุก 5 นาที
 };
 </script>
 </body>
