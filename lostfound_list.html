@@ -557,7 +557,9 @@ async function manualRefresh() {
 window.onload = () => {
   checkAuth();
   loadData();
-  setTimeout(loadData, 5000);         // ✅ retry หลัง 5 วินาที
+  setTimeout(() => { if (allData.length < 200) loadData(); }, 3000);
+  setTimeout(() => { if (allData.length < 200) loadData(); }, 6000);
+  setTimeout(() => { if (allData.length < 200) loadData(); }, 10000);
   startAutoRefresh();
 };
 </script>
