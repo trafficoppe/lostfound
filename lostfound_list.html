@@ -86,6 +86,39 @@ tr.row-overdue td:first-child{border-left:3px solid #c0392b;}
 .page-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
 .page-btn:disabled{opacity:0.38;cursor:not-allowed;}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+  /* ─── STAFF AUTOCOMPLETE ─── */
+.staff-ac-wrap{position:relative;margin-bottom:12px;}
+.staff-ac-wrap label{font-size:13px;font-weight:600;display:block;margin-bottom:6px;}
+.staff-ac-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14px;outline:none;}
+.staff-ac-input:focus{border-color:var(--primary-mid);}
+.staff-ac-list{position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--primary-mid);border-top:none;border-radius:0 0 9px 9px;max-height:180px;overflow-y:auto;z-index:700;box-shadow:0 8px 20px rgba(0,0,0,0.12);display:none;}
+.staff-ac-list.show{display:block;}
+.staff-ac-item{padding:9px 14px;font-size:13.5px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border);}
+.staff-ac-item:last-child{border-bottom:none;}
+.staff-ac-item:hover{background:#eef3fb;color:var(--primary);}
+.staff-ac-item .staff-email{font-size:11px;color:var(--muted);}
+.modal-timestamp{background:#f0f5ff;border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--primary);margin-bottom:12px;display:flex;align-items:center;gap:6px;border:1px solid #b6d0ef;}
+/* ─── DETAIL MODAL ─── */
+.detail-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(5px);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.detail-modal-bg.show{display:flex;}
+.detail-modal{background:white;border-radius:18px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,0.35);animation:popIn 0.28s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes popIn{from{opacity:0;transform:scale(0.88);}to{opacity:1;transform:scale(1);}}
+.detail-banner{padding:14px 20px;color:white;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;border-radius:18px 18px 0 0;}
+.detail-close{background:rgba(255,255,255,0.2);border:none;font-size:20px;color:white;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.detail-close:hover{background:rgba(255,255,255,0.35);}
+.detail-img-wrap{background:#f0f3f8;max-height:320px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.detail-img{width:100%;max-height:320px;object-fit:contain;}
+.detail-body{padding:22px;}
+.detail-row{display:flex;margin-bottom:11px;font-size:14px;gap:10px;}
+.detail-key{color:var(--muted);min-width:120px;flex-shrink:0;font-weight:600;}
+.detail-val{flex:1;color:var(--text);line-height:1.5;word-break:break-word;}
+.detail-status-box{margin-top:16px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;text-align:center;}
+.ds-wait{background:#f8f9fa;color:var(--muted);}
+.ds-done{background:#edf7f1;color:var(--found);}
+.ds-notfound{background:#fff3e0;color:#d35400;}
+.ds-unclaimed{background:#f3e5f5;color:#8e44ad;}
+.title-link{cursor:pointer;color:var(--primary);font-weight:600;}
+.title-link:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -193,25 +226,39 @@ tr.row-overdue td:first-child{border-left:3px solid #c0392b;}
 </div>
 
 <div class="status-modal" id="status-modal">
-  <div class="status-modal-box">
-    <h3>✏️ อัปเดตสถานะ</h3>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">
-      รายการ: <strong id="modal-ref" style="color:var(--primary)"></strong>
-    </div>
-    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">สถานะ</label>
-    <select id="modal-status-select">
-      <option value="รอดำเนินการ">⏳ รอดำเนินการ</option>
-      <option value="ช่วยหาแล้วยังไม่พบ">🔎 ช่วยหาแล้วยังไม่พบ</option>
-      <option value="รับของคืนแล้ว">✅ รับของคืนแล้ว</option>
-      <option value="เจ้าของยังไม่มารับคืน">⏳ เจ้าของยังไม่มารับคืน</option>
-    </select>
-    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">บันทึกการดำเนินการ (ถ้ามี)</label>
-    <textarea id="modal-action-text" placeholder="เช่น: โทรแจ้งเจ้าของแล้ว, ส่งมอบของคืนเรียบร้อย..."></textarea>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeStatusModal()">ยกเลิก</button>
-      <button class="btn-save" id="btn-save-modal" onclick="saveStatus()">💾 บันทึก</button>
-    </div>
+ <div class="status-modal-box">
+  <h3>✏️ อัปเดตสถานะ</h3>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+    รายการ: <strong id="modal-ref" style="color:var(--primary)"></strong>
   </div>
+  <!-- Staff Autocomplete -->
+  <div class="staff-ac-wrap">
+    <label>👤 ผู้บันทึกข้อมูล</label>
+    <input type="text" id="staff-input" class="staff-ac-input"
+      placeholder="พิมพ์ชื่อเพื่อค้นหา..."
+      oninput="staffAcSearch(this.value)" autocomplete="off">
+    <div class="staff-ac-list" id="staff-ac-list"></div>
+    <input type="hidden" id="staff-selected-name">
+    <input type="hidden" id="staff-selected-email">
+  </div>
+  <!-- Timestamp -->
+  <div class="modal-timestamp" id="modal-timestamp">
+    🕐 <span id="timestamp-display">—</span>
+  </div>
+  <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">สถานะ</label>
+  <select id="modal-status-select">
+    <option value="รอดำเนินการ">⏳ รอดำเนินการ</option>
+    <option value="ช่วยหาแล้วยังไม่พบ">🔎 ช่วยหาแล้วยังไม่พบ</option>
+    <option value="รับของคืนแล้ว">✅ รับของคืนแล้ว</option>
+    <option value="เจ้าของยังไม่มารับคืน">⏳ เจ้าของยังไม่มารับคืน</option>
+  </select>
+  <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">บันทึกการดำเนินการ</label>
+  <textarea id="modal-action-text" placeholder="เช่น: โทรแจ้งเจ้าของแล้ว..."></textarea>
+  <div class="modal-btns">
+    <button class="btn-cancel" onclick="closeStatusModal()">ยกเลิก</button>
+    <button class="btn-save" id="btn-save-modal" onclick="saveStatus()">💾 บันทึก</button>
+  </div>
+</div>
 </div>
 
 <script>
@@ -471,7 +518,7 @@ function renderTable() {
   const now = new Date();
   let overdueCount = 0;
 
-  tbody.innerHTML = items.map(d => {
+ tbody.innerHTML = items.map((d, i) => {
     const typeTag = d.type==='สิ่งของสูญหาย'?'tag-lost':d.type==='พบสิ่งของ'?'tag-found':'tag-pickup';
     const s = (d.status||'').trim();
     let statusTag='tag-wait', statusText='รอดำเนินการ';
@@ -498,7 +545,11 @@ function renderTable() {
     return `<tr class="${rowClass}">
       <td style="font-size:12px;color:var(--muted);white-space:nowrap">${refDisplay}</td>
       <td><span class="tag ${typeTag}">${d.type}</span></td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.title}">${d.title||'-'}</td>
+  <td style="max-width:200px;overflow:hidden;">
+        <span class="title-link" onclick="openDetailModal(${start + i})" title="${d.title}">
+          ${(d.title||'-').substring(0,35)}${(d.title||'').length>35?'...':''}
+        </span>
+      </td>
       <td style="white-space:nowrap">${d.name||'-'}</td>
       <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.dept}">${d.dept||'-'}</td>
       <td style="white-space:nowrap">${fmtDate(d.dateObj)}${overdueHtml}</td>
@@ -546,9 +597,16 @@ function openStatusModal(refCode, currentStatus, currentNote) {
   document.getElementById('modal-ref').textContent = refCode;
   document.getElementById('modal-status-select').value = currentStatus||'รอดำเนินการ';
   document.getElementById('modal-action-text').value = currentNote||'';
+  document.getElementById('staff-input').value = '';
+  document.getElementById('staff-selected-name').value = '';
+  document.getElementById('staff-selected-email').value = '';
   document.getElementById('status-modal').classList.add('show');
+  startTimestamp(); // ← เพิ่มบรรทัดนี้
 }
-function closeStatusModal() { document.getElementById('status-modal').classList.remove('show'); }
+function closeStatusModal() {
+  document.getElementById('status-modal').classList.remove('show');
+  clearInterval(timestampInterval); // ← เพิ่มบรรทัดนี้
+}
 
 async function saveStatus() {
   const status = document.getElementById('modal-status-select').value;
@@ -562,7 +620,11 @@ async function saveStatus() {
     params.append('refCode',editingRef);
     params.append('status',status);
     params.append('actionText',actionText);
-    params.append('updatedBy','admin01');
+   const staffName = document.getElementById('staff-selected-name').value
+  || document.getElementById('staff-input').value || 'admin01';
+const now = new Date();
+const updatedAt = now.toLocaleString('th-TH');
+params.append('updatedBy', `${staffName} (${updatedAt})`);
     await fetch(GAS_URL, {method:'POST', body:params, mode:'no-cors'});
     const item = allData.find(d => d.refCode===editingRef);
     if (item) { item.status=status; item.actionText=actionText; item.updatedAt=new Date().toLocaleDateString('th-TH'); }
@@ -606,7 +668,100 @@ async function manualRefresh() {
   btn.classList.remove('spinning'); btn.disabled=false;
   showToast('🔄 โหลดข้อมูลใหม่แล้ว');
 }
+// ── STAFF LIST ──
+const STAFF_LIST = [
+  {name:'นายไกรสอน คชมิตร',email:'kaison.noum@gmail.com'},
+  {name:'นายชนสรณ์ เนียมสุภาพ',email:'chanasorn.nem@mahidol.ac.th'},
+  {name:'นายชัยเทพ เจียมวีระบรรยง',email:'chaiyathep.jia@mahidol.ac.th'},
+  {name:'นายตะวัน ทรัพย์อบรมย์',email:'tawan.sap@mahidol.ac.th'},
+  {name:'นายทรงกลด สุดตา',email:'songklod.sud@mahidol.ac.th'},
+  {name:'นายนพกร เมืองแก้ว',email:'noppakorn.mua@mahidol.ac.th'},
+  {name:'นายนฤเดช เวชบุญ',email:'wetbun1063@gmail.com'},
+  {name:'นายบัญชา ฟักเฟื่อง',email:'bancha.fak@mahidol.ac.th'},
+  {name:'นายบุญฤทธิ์ สายลือนาม',email:'klaoklao195@gmail.com'},
+  {name:'นายปิยนันท์ ศรีชุมพวง',email:'piyanan.sri@mahidol.ac.th'},
+  {name:'นางสาวปิยะพร มาลัย',email:'traffic.oppe@gmail.com'},
+  {name:'นายพชร สาธร',email:'pup2441@gmail.com'},
+  {name:'นายพรชัย โพธิ์ไซย์',email:'phrchayphothichi@gmail.com'},
+  {name:'นางสาวพิชญา ดลมินทร์',email:'pichaya.don@mahidol.ac.th'},
+  {name:'นายยุทธภูมิ ญานเพิ่ม',email:'yuthapoom.yan@mahidol.ac.th'},
+  {name:'นายรวี จำเนียร',email:'rawee.jum@mahidol.ac.th'},
+  {name:'นายวิฑูรย์ สุวรรณกิจ',email:'withun.suw@mahidol.ac.th'},
+  {name:'นายศักดิ์นรินทร์ คัญทัพ',email:'saknarin.kha@mahidol.ac.th'},
+  {name:'นายศุภชัย เรืองเพชร',email:'suphachai.rue@mahidol.ac.th'},
+  {name:'นายสถาพร แจ่มใจ',email:'sathaphon1051@gmail.com'},
+  {name:'นายสุรชัย สุวรรณราฐ',email:'suwannarat1472@gmail.com'},
+  {name:'นางสาวโสภาณา จันทร์ทวีนุช',email:'sopanachanthawinut52@gmail.com'},
+  {name:'นายอนิน นาควัชระ',email:'anin.nak@mahidol.ac.th'},
+  {name:'นายอำนาจ แม้นพรม',email:'amnartmaen90@gmail.com'}
+];
 
+let timestampInterval = null;
+
+function staffAcSearch(q) {
+  const list = document.getElementById('staff-ac-list');
+  if (!q.trim()) { list.classList.remove('show'); return; }
+  const matches = STAFF_LIST.filter(s => s.name.includes(q));
+  if (!matches.length) { list.classList.remove('show'); return; }
+  list.innerHTML = matches.slice(0,8).map(s =>
+    `<div class="staff-ac-item" onclick="pickStaff('${s.name.replace(/'/g,"\\'")}','${s.email}')">
+      ${s.name}<div class="staff-email">${s.email}</div>
+    </div>`).join('');
+  list.classList.add('show');
+}
+function pickStaff(name, email) {
+  document.getElementById('staff-input').value = name;
+  document.getElementById('staff-selected-name').value = name;
+  document.getElementById('staff-selected-email').value = email;
+  document.getElementById('staff-ac-list').classList.remove('show');
+}
+function startTimestamp() {
+  clearInterval(timestampInterval);
+  updateTimestamp();
+  timestampInterval = setInterval(updateTimestamp, 1000);
+}
+function updateTimestamp() {
+  const now = new Date();
+  const fmt = now.toLocaleString('th-TH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const el = document.getElementById('timestamp-display');
+  if (el) el.textContent = fmt;
+}
+function openDetailModal(idx) {
+  const it = filtered[idx]; if (!it) return;
+  const color = it.type==='สิ่งของสูญหาย'?'#c0392b':it.type==='พบสิ่งของ'?'#1e7e44':'#1a5276';
+  const emoji = it.type==='สิ่งของสูญหาย'?'😟':it.type==='พบสิ่งของ'?'📦':'🤝';
+  document.getElementById('detail-banner').style.background = color;
+  document.getElementById('detail-type-text').textContent = `${emoji} ${it.type}`;
+  const imgWrap = document.getElementById('detail-img-wrap');
+  const img = document.getElementById('detail-img');
+  if (it.imgUrl) { img.src=it.imgUrl; img.onerror=()=>{imgWrap.style.display='none';}; imgWrap.style.display='flex'; }
+  else imgWrap.style.display = 'none';
+  const rows = [
+    it.refCode ? ['🔖 เลขอ้างอิง', it.refCode] : null,
+    it.title   ? ['📝 รายละเอียด', it.title]    : null,
+    it.location&&it.location!=='-' ? ['📍 สถานที่', it.location] : null,
+    ['📅 วันที่', fmtDate(it.dateObj)],
+    it.name    ? ['👤 ผู้แจ้ง',    it.name]     : null,
+    it.personType ? ['🏷️ ประเภทบุคคล', (it.personType||'').split(' ')[0]] : null,
+    it.dept    ? ['🏢 คณะ/หน่วยงาน', it.dept]   : null,
+    it.phone   ? ['📞 เบอร์ติดต่อ', it.phone]   : null,
+  ].filter(Boolean);
+  document.getElementById('detail-rows').innerHTML = rows.map(r =>
+    `<div class="detail-row"><span class="detail-key">${r[0]}</span><span class="detail-val">${r[1]||'-'}</span></div>`).join('');
+  const s = (it.status||'').trim();
+  const sb = document.getElementById('detail-status-box');
+  if(s.includes('รับของคืนแล้ว')){sb.className='detail-status-box ds-done';sb.textContent='✅ รับของคืนแล้ว';}
+  else if(s.includes('ช่วยหาแล้วยังไม่พบ')){sb.className='detail-status-box ds-notfound';sb.textContent='🔎 ช่วยหาแล้วยังไม่พบ';}
+  else if(s.includes('เจ้าของยังไม่มารับคืน')){sb.className='detail-status-box ds-unclaimed';sb.textContent='⏳ เจ้าของยังไม่มารับคืน';}
+  else{sb.className='detail-status-box ds-wait';sb.textContent='⏳ รอดำเนินการ';}
+  const actEl = document.getElementById('detail-action');
+  if(it.actionText){actEl.innerHTML=`<strong>📋 การดำเนินการ:</strong> ${it.actionText}`;actEl.style.display='block';}
+  else actEl.style.display='none';
+  document.getElementById('detail-modal-bg').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function bgCloseDetail(e){if(e.target===document.getElementById('detail-modal-bg'))closeDetailModal();}
+function closeDetailModal(){document.getElementById('detail-modal-bg').classList.remove('show');document.body.style.overflow='';}
 /* ── Init ──
    โหลดครั้งแรกทันที แล้วโหลดซ้ำหลัง 5 วินาที
    เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในครั้งแรก ── */
@@ -617,12 +772,31 @@ window.onload = () => {
 };
 </script>
 
+ <!-- DETAIL MODAL -->
+  <div class="detail-modal-bg" id="detail-modal-bg" onclick="bgCloseDetail(event)">
+    <div class="detail-modal">
+      <div class="detail-banner" id="detail-banner">
+        <span id="detail-type-text"></span>
+        <button class="detail-close" onclick="closeDetailModal()">✕</button>
+      </div>
+      <div class="detail-img-wrap" id="detail-img-wrap" style="display:none">
+        <img id="detail-img" class="detail-img" src="" alt="รูปภาพ">
+      </div>
+      <div class="detail-body">
+        <div id="detail-rows"></div>
+        <div class="detail-status-box" id="detail-status-box"></div>
+        <div id="detail-action" style="display:none;margin-top:10px;padding:10px 14px;background:#f8f9fa;border-radius:8px;font-size:13px;color:var(--muted);"></div>
+      </div>
+    </div>
+  </div>
+
 <footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
-  <div><span style="font-weight:700;color:#e8a020;">Lost &amp; Found Web App — San v1.2.2</span></div>
+  <div><span style="font-weight:700;color:#e8a020;">Lost &amp; Found Web App — San v1.3.0</span></div>
   <div style="font-size:11.5px;margin-top:3px;">
     © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
-    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit, Mahidol University</span>
   </div>
 </footer>
+
 </body>
 </html>
