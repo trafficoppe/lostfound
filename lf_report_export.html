@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ออกรายงาน PDF | Lost & Found มหาวิทยาลัยมหิดล</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
+<!-- jsPDF + AutoTable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --primary:#1a3a5c; --primary-mid:#2d5f8f; --accent:#e8a020;
+  --lost:#c0392b; --found:#1e7e44; --pickup:#1a5276;
+  --bg:#f0f3f8; --white:#fff; --border:#d5dce8; --muted:#6c7a89; --text:#1c2833;
+  --shadow:0 2px 16px rgba(26,58,92,0.10); --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* TOP BAR */
+.top-bar{background:linear-gradient(135deg,var(--primary),var(--primary-mid));padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
+.top-bar-left{display:flex;align-items:center;gap:12px;color:white;}
+.top-bar-left h1{font-size:16px;font-weight:700;}
+.top-bar-right a{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13.5px;padding:7px 14px;border:1px solid rgba(255,255,255,0.3);border-radius:8px;}
+.top-bar-right a:hover{background:rgba(255,255,255,0.15);}
+
+/* MAIN */
+.main{max-width:900px;margin:0 auto;padding:28px 20px 60px;}
+
+/* CARD */
+.card{background:white;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden;}
+.card-head{padding:14px 20px;font-size:14px;font-weight:700;color:white;background:var(--primary);display:flex;align-items:center;gap:8px;}
+.card-body{padding:22px;}
+
+/* FORM ELEMENTS */
+.field{margin-bottom:18px;}
+.field:last-child{margin-bottom:0;}
+.field label{font-size:13.5px;font-weight:600;display:block;margin-bottom:7px;color:var(--text);}
+.field .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;}
+select,input[type=date],input[type=text]{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14.5px;background:#fafbfd;outline:none;transition:border-color 0.2s;}
+select:focus,input:focus{border-color:var(--primary-mid);background:white;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+/* REPORT TYPE TABS */
+.rtype-tabs{display:flex;gap:10px;margin-bottom:20px;}
+.rtype-tab{flex:1;padding:13px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:white;color:var(--muted);text-align:center;transition:all 0.2s;}
+.rtype-tab:hover{border-color:var(--primary-mid);color:var(--primary);}
+.rtype-tab.active{background:var(--primary);color:white;border-color:var(--primary);}
+
+/* NOTICE BOX */
+.notice{background:#fffbeb;border:1.5px solid #f5c442;border-radius:9px;padding:12px 16px;font-size:13px;color:#6b4c00;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start;line-height:1.6;}
+
+/* PREVIEW CARD */
+.preview-card{background:#f8fafd;border:2px dashed var(--border);border-radius:12px;padding:22px;margin-top:16px;}
+.preview-title{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.preview-doc{background:white;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:0;overflow:hidden;font-size:13px;}
+
+/* GENERATE BTN */
+.btn-generate{width:100%;padding:15px;background:linear-gradient(135deg,var(--accent),#c47a10);color:white;border:none;border-radius:12px;font-family:'Sarabun',sans-serif;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 16px rgba(232,160,32,0.35);transition:all 0.2s;}
+.btn-generate:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(232,160,32,0.45);}
+.btn-generate:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+
+/* LOADING */
+.gen-loading{display:none;text-align:center;padding:30px;color:var(--muted);}
+.gen-loading.show{display:block;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* KPI PREVIEW */
+.kpi-preview{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;}
+.kpi-box{background:white;border-radius:8px;padding:12px;text-align:center;border-left:4px solid var(--primary);}
+.kpi-box.lost{border-left-color:var(--lost);}
+.kpi-box.found{border-left-color:var(--found);}
+.kpi-box.pickup{border-left-color:var(--pickup);}
+.kpi-num{font-size:24px;font-weight:800;color:var(--primary);}
+.kpi-box.lost .kpi-num{color:var(--lost);}
+.kpi-box.found .kpi-num{color:var(--found);}
+.kpi-box.pickup .kpi-num{color:var(--pickup);}
+.kpi-lbl{font-size:11px;color:var(--muted);font-weight:600;margin-top:3px;}
+
+/* DOC CODE */
+.doc-code-box{background:#eaf1fb;border-radius:8px;padding:10px 16px;font-family:monospace;font-size:14px;font-weight:700;color:var(--primary);display:inline-block;letter-spacing:1px;}
+
+@media(max-width:600px){
+  .row2,.row3{grid-template-columns:1fr;}
+  .rtype-tabs{flex-direction:column;}
+  .kpi-preview{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-bar-left">
+    <span style="font-size:20px;">📄</span>
+    <h1>ออกรายงาน PDF <span style="font-size:11px;background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:10px;font-weight:400;margin-left:6px;">v1.0.0</span></h1>
+  </div>
+  <div class="top-bar-right">
+    <a href="dashboard.html">← กลับ Dashboard</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- STEP 1: รูปแบบรายงาน -->
+  <div class="card">
+    <div class="card-head">📋 เลือกรูปแบบรายงาน</div>
+    <div class="card-body">
+      <div class="rtype-tabs">
+        <button class="rtype-tab active" id="tab-daily" onclick="setReportType('daily')">
+          📅 รายวัน<br><span style="font-size:11px;font-weight:400;opacity:0.8;">รายละเอียดทุกรายการ</span>
+        </button>
+        <button class="rtype-tab" id="tab-monthly" onclick="setReportType('monthly')">
+          🗓️ รายเดือน<br><span style="font-size:11px;font-weight:400;opacity:0.8;">ภาพรวม + ตารางสรุป</span>
+        </button>
+        <button class="rtype-tab" id="tab-yearly" onclick="setReportType('yearly')">
+          📊 รายปี<br><span style="font-size:11px;font-weight:400;opacity:0.8;">สรุปภาพรวมทั้งปี</span>
+        </button>
+        <button class="rtype-tab" id="tab-custom" onclick="setReportType('custom')">
+          📆 กำหนดเอง<br><span style="font-size:11px;font-weight:400;opacity:0.8;">ระบุช่วงวันที่</span>
+        </button>
+      </div>
+
+      <!-- daily -->
+      <div id="form-daily">
+        <div class="field">
+          <label>เลือกวันที่</label>
+          <input type="date" id="daily-date">
+        </div>
+      </div>
+
+      <!-- monthly -->
+      <div id="form-monthly" style="display:none">
+        <div class="row2">
+          <div class="field">
+            <label>ปี (ค.ศ.)</label>
+            <select id="monthly-year"></select>
+          </div>
+          <div class="field">
+            <label>เดือน</label>
+            <select id="monthly-month">
+              <option value="1">มกราคม (January)</option>
+              <option value="2">กุมภาพันธ์ (February)</option>
+              <option value="3">มีนาคม (March)</option>
+              <option value="4">เมษายน (April)</option>
+              <option value="5">พฤษภาคม (May)</option>
+              <option value="6">มิถุนายน (June)</option>
+              <option value="7">กรกฎาคม (July)</option>
+              <option value="8">สิงหาคม (August)</option>
+              <option value="9">กันยายน (September)</option>
+              <option value="10">ตุลาคม (October)</option>
+              <option value="11">พฤศจิกายน (November)</option>
+              <option value="12">ธันวาคม (December)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- yearly -->
+      <div id="form-yearly" style="display:none">
+        <div class="field">
+          <label>ปี (ค.ศ.)</label>
+          <select id="yearly-year"></select>
+        </div>
+      </div>
+
+      <!-- custom -->
+      <div id="form-custom" style="display:none">
+        <div class="row2">
+          <div class="field">
+            <label>วันที่เริ่มต้น</label>
+            <input type="date" id="custom-from">
+          </div>
+          <div class="field">
+            <label>วันที่สิ้นสุด</label>
+            <input type="date" id="custom-to">
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STEP 2: ตั้งค่าเอกสาร -->
+  <div class="card">
+    <div class="card-head">⚙️ ตั้งค่าเอกสาร</div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field">
+          <label>รหัสเอกสาร (Document Code)</label>
+          <input type="text" id="doc-code" placeholder="สร้างอัตโนมัติ หรือระบุเอง">
+          <div class="hint">รูปแบบ: LF-YYYYMMDD-XXXX | ในอนาคตสามารถกำหนดรหัสฟอร์มถาวรได้</div>
+        </div>
+        <div class="field">
+          <label>ผู้จัดทำรายงาน</label>
+          <input type="text" id="doc-preparer" placeholder="ชื่อ-นามสกุล">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>ตำแหน่ง</label>
+          <input type="text" id="doc-position" placeholder="เช่น เจ้าหน้าที่งานจราจรฯ">
+        </div>
+        <div class="field">
+          <label>วัตถุประสงค์การจัดทำ</label>
+          <select id="doc-purpose">
+            <option value="iso">ประกอบการประเมิน ISO</option>
+            <option value="internal">รายงานภายในหน่วยงาน</option>
+            <option value="management">รายงานต่อผู้บริหาร</option>
+            <option value="audit">ตรวจสอบภายใน</option>
+            <option value="other">อื่นๆ</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVIEW AREA -->
+  <div class="card">
+    <div class="card-head">👁️ ตัวอย่างรายงาน (Preview)</div>
+    <div class="card-body">
+      <div class="notice">💡 <span>ระบบจะดึงข้อมูลจาก GAS เมื่อกดสร้าง PDF — ตัวอย่างนี้แสดงโครงสร้างที่จะออก</span></div>
+      <div id="preview-area">
+        <div style="text-align:center;padding:30px;color:var(--muted);">เลือกรูปแบบและกรอกข้อมูลด้านบน แล้วกดปุ่ม "สร้าง PDF"</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERATE -->
+  <button class="btn-generate" id="btn-gen" onclick="generatePDF()">
+    <span id="btn-gen-text">📄 สร้าง PDF และดาวน์โหลด</span>
+  </button>
+
+  <div class="gen-loading" id="gen-loading">
+    <div class="spinner"></div>
+    <div style="font-size:14px;font-weight:600;">กำลังโหลดข้อมูลและสร้าง PDF...</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px;" id="gen-status">กำลังเชื่อมต่อ GAS...</div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
+  <div><span style="font-weight:700;color:#e8a020;">Lost &amp; Found Report Export — v1.0.0</span></div>
+  <div style="font-size:11.5px;margin-top:3px;">
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit, Mahidol University</span>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+ * Lost & Found — lf_report_export.html
+ * Version : 1.0.0
+ * PDF Export for ISO Documentation
+ * © 2025–2026 Traffic Control and Premises Security Unit,
+ *   Mahidol University. All rights reserved.
+ * ============================================================ */
+
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
+
+const THAI_MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+let reportType = 'daily';
+
+// ── Init ──
+window.onload = () => {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  document.getElementById('daily-date').value = today;
+  document.getElementById('custom-from').value = today;
+  document.getElementById('custom-to').value = today;
+
+  // fill year dropdowns
+  const yr = now.getFullYear();
+  ['monthly-year','yearly-year'].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let y = yr; y >= yr-5; y--) {
+      sel.innerHTML += `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`;
+    }
+  });
+  document.getElementById('monthly-month').value = now.getMonth() + 1;
+  autoDocCode();
+};
+
+function setReportType(t) {
+  reportType = t;
+  ['daily','monthly','yearly','custom'].forEach(r => {
+    document.getElementById('tab-'+r).classList.toggle('active', r===t);
+    document.getElementById('form-'+r).style.display = r===t ? '' : 'none';
+  });
+  autoDocCode();
+  updatePreview();
+}
+
+function autoDocCode() {
+  const now = new Date();
+  const yy = now.getFullYear();
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd = String(now.getDate()).padStart(2,'0');
+  const rnd = String(Math.floor(Math.random()*900)+100);
+  const prefix = { daily:'LF-DAY', monthly:'LF-MON', yearly:'LF-YR', custom:'LF-CUS' }[reportType];
+  document.getElementById('doc-code').value = `${prefix}-${yy}${mm}${dd}-${rnd}`;
+}
+
+function updatePreview() {
+  // Simple structural preview
+  const type = reportType;
+  const now = new Date();
+  const yr = now.getFullYear();
+  const mo = now.getMonth();
+  let periodTH = '', periodEN = '';
+  if (type === 'daily') {
+    const d = document.getElementById('daily-date').value;
+    if (d) {
+      const dObj = new Date(d);
+      periodTH = `วันที่ ${dObj.getDate()} ${THAI_MONTHS_FULL[dObj.getMonth()]} พ.ศ. ${dObj.getFullYear()+543}`;
+      periodEN = `${dObj.getDate()} ${EN_MONTHS[dObj.getMonth()]} ${dObj.getFullYear()}`;
+    }
+  } else if (type === 'monthly') {
+    const y = document.getElementById('monthly-year').value || yr;
+    const m = parseInt(document.getElementById('monthly-month').value||mo+1) - 1;
+    periodTH = `เดือน${THAI_MONTHS_FULL[m]} พ.ศ. ${parseInt(y)+543}`;
+    periodEN = `${EN_MONTHS[m]} ${y}`;
+  } else if (type === 'yearly') {
+    const y = document.getElementById('yearly-year').value || yr;
+    periodTH = `ประจำปี พ.ศ. ${parseInt(y)+543}`;
+    periodEN = `Year ${y}`;
+  } else {
+    const f = document.getElementById('custom-from').value;
+    const t = document.getElementById('custom-to').value;
+    periodTH = `ช่วงวันที่ ${f} ถึง ${t}`;
+    periodEN = `${f} to ${t}`;
+  }
+
+  const docCode = document.getElementById('doc-code').value || 'LF-XXXXXXXX-XXX';
+
+  document.getElementById('preview-area').innerHTML = `
+    <div class="preview-doc">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#1a3a5c,#2d5f8f);padding:18px 22px;color:white;">
+        <div style="font-size:11px;opacity:0.7;margin-bottom:2px;">งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล</div>
+        <div style="font-size:11px;opacity:0.6;">Traffic Control and Safety Unit, Division of Physical and Environmental, Mahidol University</div>
+        <div style="font-size:16px;font-weight:700;margin-top:8px;">รายงานสรุประบบแจ้งของหาย/พบของ</div>
+        <div style="font-size:13px;opacity:0.85;">Lost & Found Management System Report</div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;opacity:0.75;">
+          <span>ช่วงเวลา: ${periodTH}</span>
+          <span>รหัสเอกสาร: ${docCode}</span>
+        </div>
+      </div>
+      <!-- KPI preview -->
+      <div style="padding:16px 22px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">สรุปภาพรวม (ข้อมูลจริงจะแสดงเมื่อสร้าง PDF)</div>
+        <div class="kpi-preview">
+          <div class="kpi-box"><div class="kpi-num">—</div><div class="kpi-lbl">รายการทั้งหมด</div></div>
+          <div class="kpi-box lost"><div class="kpi-num">—</div><div class="kpi-lbl">สิ่งของสูญหาย</div></div>
+          <div class="kpi-box found"><div class="kpi-num">—</div><div class="kpi-lbl">พบสิ่งของ</div></div>
+          <div class="kpi-box pickup"><div class="kpi-num">—</div><div class="kpi-lbl">รับของคืนแล้ว</div></div>
+        </div>
+        ${type === 'daily' ? `
+        <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">ตารางรายการ (รายวัน — แสดงรายละเอียดทุกรายการ)</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+          <thead><tr style="background:#f0f3f8;">
+            <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #d5dce8;">RefCode</th>
+            <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #d5dce8;">ประเภท</th>
+            <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #d5dce8;">รายละเอียด</th>
+            <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #d5dce8;">ผู้แจ้ง</th>
+            <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #d5dce8;">สถานะ</th>
+          </tr></thead>
+          <tbody><tr><td colspan="5" style="padding:10px 8px;text-align:center;color:#aaa;font-size:11px;">ข้อมูลจริงจะแสดงเมื่อสร้าง PDF</td></tr></tbody>
+        </table>` : `
+        <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">ตารางสรุปรายเดือน / กราฟแนวโน้ม (จะแสดงในไฟล์ PDF จริง)</div>
+        <div style="background:#f8fafd;border-radius:8px;padding:14px;font-size:12px;color:var(--muted);text-align:center;">
+          📊 ตารางสรุปสถิติ + รายละเอียดย่อยจะแสดงใน PDF จริง
+        </div>`}
+      </div>
+      <!-- Footer preview -->
+      <div style="background:#f0f3f8;padding:10px 22px;font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;">
+        <span>จัดทำโดย: ${document.getElementById('doc-preparer').value || '—'}</span>
+        <span>วัตถุประสงค์: ${document.getElementById('doc-purpose').selectedOptions[0]?.text || '—'}</span>
+        <span>วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}</span>
+      </div>
+    </div>`;
+}
+
+// ── Parse helpers ──
+function parseAnyDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    const d = new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0));
+    if (!isNaN(d)) return d;
+  }
+  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e) {}
+  return null;
+}
+
+function fmtDateTH(d) {
+  if (!d) return '-';
+  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()+543} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function fmtDateShortTH(d) {
+  if (!d) return '-';
+  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()+543}`;
+}
+
+// ── Load GAS data ──
+async function loadAllData() {
+  const r = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+  const json = await r.json();
+  let items = [];
+
+  if (json?.newData) {
+    json.newData.forEach(row => {
+      const d = parseAnyDate(row['Timestamp']);
+      if (d) items.push({
+        source:'new',
+        refCode: row['RefCode'] || '',
+        type: row['ประเภท'] || '',
+        title: row['รายละเอียด'] || '',
+        location: row['สถานที่'] || '',
+        dateObj: d,
+        name: row['ชื่อ-นามสกุล'] || '',
+        personType: (row['ประเภทบุคคล']||'').split(' ')[0],
+        dept: row['คณะ/หน่วยงาน'] || '',
+        phone: row['เบอร์โทร'] || '',
+        status: row['สถานะ'] || 'รอดำเนินการ',
+        actionText: row['การดำเนินการ'] || '',
+        updatedAt: row['วันที่อัปเดต'] || '',
+        updatedBy: row['อัปเดตโดย'] || ''
+      });
+    });
+  }
+
+  if (json?.oldData && json.oldData.length > 1) {
+    json.oldData.slice(1).forEach(row => {
+      const g = i => String(row[i]||'').trim();
+      const d = parseAnyDate(g(0));
+      if (!d || d.getFullYear() < 2020) return;
+      const colG=g(6),colH=g(7),colK=g(10),colN=g(13);
+      let type='';
+      if(colG.includes('สูญหาย')||colG.includes('หาย')) type='สิ่งของสูญหาย';
+      else if(colG.includes('พบ')||colG.includes('เก็บ')) type='พบสิ่งของ';
+      else if(colG.includes('คืน')) type='รับของคืน';
+      if(!type){
+        if(colH.length>2)type='สิ่งของสูญหาย';
+        else if(colK.length>2)type='พบสิ่งของ';
+        else if(colN.length>2)type='รับของคืน';
+      }
+      if(!type) return;
+      let title='',loc='';
+      if(type==='สิ่งของสูญหาย'){title=g(7);loc=g(8);}
+      else if(type==='พบสิ่งของ'){title=g(10);loc=g(11);}
+      else{title=g(13);}
+      if(/^[\d\s\-\+]{7,15}$/.test(title)||!title) title=g(2)||'ไม่ระบุ';
+      items.push({
+        source:'old', refCode:'', type,
+        title:title||'ไม่ระบุ', location:loc||'-',
+        dateObj:d, name:g(2),
+        personType:(g(3)||'').split(' ')[0],
+        dept:g(4), phone:g(5),
+        status:g(18)||'', actionText:g(17)||'',
+        updatedAt:'', updatedBy:''
+      });
+    });
+  }
+  return items;
+}
+
+// ── Filter by date range ──
+function filterData(items, from, to) {
+  return items.filter(it => {
+    if (!it.dateObj) return false;
+    const d = new Date(it.dateObj.getFullYear(), it.dateObj.getMonth(), it.dateObj.getDate());
+    return d >= from && d <= to;
+  });
+}
+
+// ── Generate PDF (jsPDF) ──
+async function generatePDF() {
+  const btn = document.getElementById('btn-gen');
+  const loading = document.getElementById('gen-loading');
+  btn.disabled = true;
+  loading.classList.add('show');
+
+  try {
+    // ── Determine date range ──
+    let fromDate, toDate, periodLabel, periodEN, reportLabel;
+
+    if (reportType === 'daily') {
+      const d = new Date(document.getElementById('daily-date').value);
+      fromDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      toDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+      periodLabel = `วันที่ ${d.getDate()} ${THAI_MONTHS_FULL[d.getMonth()]} พ.ศ. ${d.getFullYear()+543}`;
+      periodEN = `${d.getDate()} ${EN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      reportLabel = 'รายวัน (Daily Report)';
+    } else if (reportType === 'monthly') {
+      const y = parseInt(document.getElementById('monthly-year').value);
+      const m = parseInt(document.getElementById('monthly-month').value) - 1;
+      fromDate = new Date(y, m, 1);
+      toDate = new Date(y, m+1, 0, 23, 59, 59);
+      periodLabel = `เดือน${THAI_MONTHS_FULL[m]} พ.ศ. ${y+543}`;
+      periodEN = `${EN_MONTHS[m]} ${y}`;
+      reportLabel = 'รายเดือน (Monthly Report)';
+    } else if (reportType === 'yearly') {
+      const y = parseInt(document.getElementById('yearly-year').value);
+      fromDate = new Date(y, 0, 1);
+      toDate = new Date(y, 11, 31, 23, 59, 59);
+      periodLabel = `ประจำปี พ.ศ. ${y+543}`;
+      periodEN = `Year ${y}`;
+      reportLabel = 'รายปี (Annual Report)';
+    } else {
+      fromDate = new Date(document.getElementById('custom-from').value);
+      toDate = new Date(document.getElementById('custom-to').value + 'T23:59:59');
+      periodLabel = `${fmtDateShortTH(fromDate)} ถึง ${fmtDateShortTH(toDate)}`;
+      periodEN = `${document.getElementById('custom-from').value} to ${document.getElementById('custom-to').value}`;
+      reportLabel = 'กำหนดเอง (Custom Period)';
+    }
+
+    document.getElementById('gen-status').textContent = 'กำลังดึงข้อมูลจากระบบ...';
+
+    const allItems = await loadAllData();
+    const items = filterData(allItems, fromDate, toDate);
+
+    document.getElementById('gen-status').textContent = `พบ ${items.length} รายการ กำลังสร้าง PDF...`;
+
+    const docCode = document.getElementById('doc-code').value;
+    const preparer = document.getElementById('doc-preparer').value || '—';
+    const position = document.getElementById('doc-position').value || '—';
+    const purposeEl = document.getElementById('doc-purpose');
+    const purpose = purposeEl.selectedOptions[0].text;
+
+    const printDate = new Date();
+    const printDateTH = fmtDateTH(printDate);
+
+    // ── Calc stats ──
+    const total = items.length;
+    const lost = items.filter(i => i.type==='สิ่งของสูญหาย').length;
+    const found = items.filter(i => i.type==='พบสิ่งของ').length;
+    const pickup = items.filter(i => i.type==='รับของคืน').length;
+    const returned = items.filter(i => (i.status||'').includes('รับของคืนแล้ว')||i.type==='รับของคืน').length;
+    const rate = total > 0 ? ((returned/total)*100).toFixed(1)+'%' : '0%';
+    const pending = items.filter(i => !i.status || i.status==='รอดำเนินการ').length;
+
+    // ── Create PDF ──
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const PW = 210, PH = 297;
+    const ML = 15, MR = 15, MT = 15;
+    let curY = MT;
+
+    // ─── Load Sarabun font (base64) via canvas trick — use built-in helvetica for Latin, Thai via encoded font
+    // Note: jsPDF supports Thai via custom font — for production add THSarabunNew font
+    // For now: use built-in fonts with UTF-8 encoding
+    doc.setFont('helvetica');
+
+    const addPageHeader = (pageNum) => {
+      // Header bar
+      doc.setFillColor(26, 58, 92);
+      doc.rect(0, 0, PW, 28, 'F');
+      doc.setFillColor(45, 95, 143);
+      doc.rect(0, 25, PW, 3, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.text('Traffic Control and Safety Unit, Division of Physical and Environmental, Mahidol University', ML, 7);
+      doc.setFontSize(13);
+      doc.setFont('helvetica','bold');
+      doc.text('Lost & Found Management System Report', ML, 15);
+      doc.setFontSize(9);
+      doc.setFont('helvetica','normal');
+      doc.text(`Period: ${periodEN}   |   Doc Code: ${docCode}`, ML, 21);
+
+      // Page number top right
+      doc.setFontSize(8);
+      doc.text(`Page ${pageNum}`, PW - MR - 10, 21, {align:'right'});
+
+      doc.setTextColor(28, 40, 51);
+    };
+
+    const addPageFooter = () => {
+      doc.setDrawColor(213, 220, 232);
+      doc.line(ML, PH-14, PW-MR, PH-14);
+      doc.setFontSize(7.5);
+      doc.setTextColor(108, 122, 137);
+      doc.setFont('helvetica','normal');
+      doc.text(`Prepared by: ${preparer} (${position})`, ML, PH-10);
+      doc.text(`Purpose: ${purpose}`, ML, PH-6);
+      doc.text(`Printed: ${printDateTH}`, PW-MR, PH-10, {align:'right'});
+      doc.text('© Traffic Control and Safety Unit, Mahidol University', PW-MR, PH-6, {align:'right'});
+      doc.setTextColor(28,40,51);
+    };
+
+    // ═══ PAGE 1 ═══
+    let pageNum = 1;
+    addPageHeader(pageNum);
+    addPageFooter();
+    curY = 34;
+
+    // ── Thai period label (Unicode) ──
+    doc.setFontSize(11);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(26,58,92);
+    doc.text(`Report Period: ${periodLabel}  (${reportLabel})`, ML, curY);
+    curY += 6;
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(108,122,137);
+    doc.text(`Document Code: ${docCode}   |   Generated: ${printDateTH}`, ML, curY);
+    curY += 8;
+
+    // ── Divider ──
+    doc.setDrawColor(232, 160, 32);
+    doc.setLineWidth(1);
+    doc.line(ML, curY, PW-MR, curY);
+    curY += 5;
+    doc.setLineWidth(0.3);
+
+    // ── KPI Boxes ──
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(26,58,92);
+    doc.text('Summary / สรุปภาพรวม', ML, curY);
+    curY += 5;
+
+    const kpiData = [
+      { label:'Total\nรวมทั้งหมด',  val:total,   color:[26,58,92],   bg:[240,243,248] },
+      { label:'Lost\nสิ่งของสูญหาย', val:lost,    color:[192,57,43],  bg:[253,238,234] },
+      { label:'Found\nพบสิ่งของ',    val:found,   color:[30,126,68],  bg:[237,247,241] },
+      { label:'Claimed\nรับของคืน',  val:pickup,  color:[26,82,118],  bg:[234,241,251] },
+      { label:'Returned\nสำเร็จแล้ว',val:returned,color:[30,126,68],  bg:[237,247,241] },
+      { label:'Rate\nอัตราสำเร็จ',  val:rate,    color:[232,160,32], bg:[255,251,235] },
+    ];
+    const kpiW = (PW - ML - MR - 5*3) / 6;
+    kpiData.forEach((k, i) => {
+      const x = ML + i*(kpiW+3);
+      doc.setFillColor(...k.bg);
+      doc.roundedRect(x, curY, kpiW, 22, 2, 2, 'F');
+      doc.setDrawColor(...k.color);
+      doc.setLineWidth(0.5);
+      doc.line(x, curY, x, curY+22);
+      doc.setLineWidth(0.3);
+      doc.setFontSize(14);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...k.color);
+      doc.text(String(k.val), x + kpiW/2, curY+11, {align:'center'});
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(108,122,137);
+      const lines = k.label.split('\n');
+      lines.forEach((l,li) => doc.text(l, x+kpiW/2, curY+16+li*3.5, {align:'center'}));
+    });
+    curY += 26;
+
+    // ── Pending/Overdue note ──
+    if (pending > 0) {
+      doc.setFillColor(255, 245, 245);
+      doc.roundedRect(ML, curY, PW-ML-MR, 8, 2, 2, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(192,57,43);
+      doc.setFont('helvetica','bold');
+      doc.text(`! Pending Items / รายการรอดำเนินการ: ${pending} รายการ`, ML+3, curY+5);
+      doc.setFont('helvetica','normal');
+      curY += 11;
+    }
+
+    doc.setTextColor(28,40,51);
+    doc.setFont('helvetica','normal');
+
+    // ═══ DAILY REPORT — Detail Table ═══
+    if (reportType === 'daily' || (reportType === 'custom' && items.length <= 50)) {
+      curY += 3;
+      doc.setFontSize(9);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(26,58,92);
+      doc.text('Detail / รายการทั้งหมด', ML, curY);
+      curY += 4;
+
+      if (items.length === 0) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(108,122,137);
+        doc.text('No records found for this period. / ไม่พบรายการในช่วงเวลานี้', ML, curY+5);
+      } else {
+        doc.autoTable({
+          startY: curY,
+          margin: { left: ML, right: MR },
+          styles: { fontSize: 7.5, cellPadding: 2.5, overflow: 'linebreak', font: 'helvetica' },
+          headStyles: { fillColor: [26,58,92], textColor:255, fontStyle:'bold', fontSize:7.5 },
+          alternateRowStyles: { fillColor: [248,250,253] },
+          columnStyles: {
+            0: { cellWidth: 24 },  // RefCode
+            1: { cellWidth: 22 },  // Type
+            2: { cellWidth: 40 },  // Title
+            3: { cellWidth: 25 },  // Name
+            4: { cellWidth: 22 },  // Dept
+            5: { cellWidth: 18 },  // Time
+            6: { cellWidth: 22 },  // Status
+          },
+          head: [['RefCode', 'Type / ประเภท', 'Description / รายละเอียด', 'Reporter / ผู้แจ้ง', 'Dept / หน่วยงาน', 'Time / เวลา', 'Status / สถานะ']],
+          body: items.map(it => [
+            it.refCode || '(เดิม)',
+            it.type,
+            (it.title||'').substring(0,50) + (it.title&&it.title.length>50?'...':''),
+            it.name || '-',
+            (it.dept||'-').substring(0,18),
+            fmtDateTH(it.dateObj),
+            it.status || 'รอดำเนินการ'
+          ]),
+          didDrawPage: (d) => {
+            pageNum++;
+            addPageHeader(pageNum);
+            addPageFooter();
+          }
+        });
+        curY = doc.lastAutoTable.finalY + 8;
+      }
+    }
+
+    // ═══ MONTHLY / YEARLY / CUSTOM — Summary breakdown ═══
+    if (reportType === 'monthly' || reportType === 'yearly' || (reportType==='custom' && items.length > 50)) {
+      // ─── Monthly breakdown table ───
+      if (reportType === 'yearly') {
+        // by month
+        const byMonth = {};
+        for (let m=0; m<12; m++) byMonth[m] = { lost:0, found:0, pickup:0, returned:0 };
+        items.forEach(it => {
+          const m = it.dateObj.getMonth();
+          if(it.type==='สิ่งของสูญหาย') byMonth[m].lost++;
+          else if(it.type==='พบสิ่งของ') byMonth[m].found++;
+          else byMonth[m].pickup++;
+          if((it.status||'').includes('รับของคืนแล้ว')) byMonth[m].returned++;
+        });
+        curY += 3;
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(26,58,92);
+        doc.text('Monthly Breakdown / สรุปรายเดือน', ML, curY);
+        curY += 4;
+        doc.autoTable({
+          startY: curY,
+          margin: { left: ML, right: MR },
+          styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica' },
+          headStyles: { fillColor: [26,58,92], textColor:255, fontStyle:'bold' },
+          alternateRowStyles: { fillColor: [248,250,253] },
+          head: [['Month / เดือน', 'Lost / สูญหาย', 'Found / พบของ', 'Claimed / รับคืน', 'Total', 'Returned / สำเร็จ', 'Rate %']],
+          body: Array.from({length:12}, (_,m) => {
+            const r = byMonth[m];
+            const t = r.lost + r.found + r.pickup;
+            const rate = t>0 ? ((r.returned/t)*100).toFixed(1)+'%' : '0%';
+            return [
+              `${THAI_MONTHS_FULL[m]} / ${EN_MONTHS[m]}`,
+              r.lost, r.found, r.pickup, t, r.returned, rate
+            ];
+          }),
+          foot: [['รวม / Total', lost, found, pickup, total, returned, rate]],
+          footStyles: { fillColor:[232,160,32], textColor:255, fontStyle:'bold' },
+          didDrawPage: () => { pageNum++; addPageHeader(pageNum); addPageFooter(); }
+        });
+        curY = doc.lastAutoTable.finalY + 8;
+      }
+
+      if (reportType === 'monthly') {
+        // by day of month
+        const byDay = {};
+        items.forEach(it => {
+          const d = it.dateObj.getDate();
+          if (!byDay[d]) byDay[d] = { lost:0, found:0, pickup:0, returned:0 };
+          if(it.type==='สิ่งของสูญหาย') byDay[d].lost++;
+          else if(it.type==='พบสิ่งของ') byDay[d].found++;
+          else byDay[d].pickup++;
+          if((it.status||'').includes('รับของคืนแล้ว')) byDay[d].returned++;
+        });
+        curY += 3;
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(26,58,92);
+        doc.text('Daily Breakdown / สรุปรายวัน', ML, curY);
+        curY += 4;
+        const sortedDays = Object.keys(byDay).map(Number).sort((a,b)=>a-b);
+        doc.autoTable({
+          startY: curY,
+          margin: { left: ML, right: MR },
+          styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica' },
+          headStyles: { fillColor: [26,58,92], textColor:255, fontStyle:'bold' },
+          alternateRowStyles: { fillColor: [248,250,253] },
+          head: [['Date / วันที่', 'Lost / สูญหาย', 'Found / พบของ', 'Claimed / รับคืน', 'Total']],
+          body: sortedDays.map(d => {
+            const r = byDay[d];
+            return [d, r.lost, r.found, r.pickup, r.lost+r.found+r.pickup];
+          }),
+          foot: [['รวม / Total', lost, found, pickup, total]],
+          footStyles: { fillColor:[232,160,32], textColor:255, fontStyle:'bold' },
+          didDrawPage: () => { pageNum++; addPageHeader(pageNum); addPageFooter(); }
+        });
+        curY = doc.lastAutoTable.finalY + 8;
+
+        // Sub-table: items in this month (condensed)
+        if (curY > PH - 50) { doc.addPage(); pageNum++; addPageHeader(pageNum); addPageFooter(); curY = 34; }
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(26,58,92);
+        doc.text('Item List (Condensed) / รายการ (ย่อ)', ML, curY);
+        curY += 4;
+        doc.autoTable({
+          startY: curY,
+          margin: { left: ML, right: MR },
+          styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
+          headStyles: { fillColor: [45,95,143], textColor:255, fontStyle:'bold' },
+          alternateRowStyles: { fillColor: [248,250,253] },
+          columnStyles: {
+            0: { cellWidth: 22 }, 1: { cellWidth: 22 }, 2: { cellWidth: 45 },
+            3: { cellWidth: 28 }, 4: { cellWidth: 20 }, 5: { cellWidth: 25 }
+          },
+          head: [['Date', 'Type', 'Description', 'Reporter', 'Dept', 'Status']],
+          body: items.map(it => [
+            fmtDateShortTH(it.dateObj),
+            it.type,
+            (it.title||'').substring(0,45),
+            (it.name||'-').substring(0,20),
+            (it.dept||'-').substring(0,16),
+            it.status||'รอดำเนินการ'
+          ]),
+          didDrawPage: () => { pageNum++; addPageHeader(pageNum); addPageFooter(); }
+        });
+        curY = doc.lastAutoTable.finalY + 8;
+      }
+
+      // ─── Top locations ───
+      if (curY > PH - 70) { doc.addPage(); pageNum++; addPageHeader(pageNum); addPageFooter(); curY = 34; }
+      const locMap = {};
+      items.forEach(it => { if(it.location&&it.location!=='-') locMap[it.location] = (locMap[it.location]||0)+1; });
+      const topLocs = Object.entries(locMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(26,58,92);
+      doc.text('Top Locations / สถานที่เกิดเหตุบ่อย', ML, curY);
+      curY += 4;
+      doc.autoTable({
+        startY: curY,
+        margin: { left: ML, right: MR },
+        styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica' },
+        headStyles: { fillColor: [26,82,118], textColor:255, fontStyle:'bold' },
+        alternateRowStyles: { fillColor: [248,250,253] },
+        head: [['#', 'Location / สถานที่', 'Cases / จำนวน']],
+        body: topLocs.map((l,i) => [i+1, l[0], l[1]]),
+        tableWidth: 100,
+        didDrawPage: () => { pageNum++; addPageHeader(pageNum); addPageFooter(); }
+      });
+      curY = doc.lastAutoTable.finalY + 8;
+
+      // ─── Person type breakdown ───
+      if (curY > PH - 60) { doc.addPage(); pageNum++; addPageHeader(pageNum); addPageFooter(); curY = 34; }
+      const ptMap = {};
+      items.forEach(it => {
+        const pt = (it.personType||'ไม่ระบุ').split(' ')[0];
+        ptMap[pt] = (ptMap[pt]||0)+1;
+      });
+      const ptRows = Object.entries(ptMap).sort((a,b)=>b[1]-a[1]);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(26,58,92);
+      doc.text('Person Type / ประเภทบุคคล', ML, curY);
+      curY += 4;
+      doc.autoTable({
+        startY: curY,
+        margin: { left: ML, right: MR },
+        styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica' },
+        headStyles: { fillColor: [30,126,68], textColor:255, fontStyle:'bold' },
+        alternateRowStyles: { fillColor: [248,250,253] },
+        head: [['Person Type / ประเภท', 'Count / จำนวน', '% of Total']],
+        body: ptRows.map(p => [p[0], p[1], total>0 ? ((p[1]/total)*100).toFixed(1)+'%' : '0%']),
+        tableWidth: 100,
+        didDrawPage: () => { pageNum++; addPageHeader(pageNum); addPageFooter(); }
+      });
+      curY = doc.lastAutoTable.finalY + 8;
+    }
+
+    // ═══ SIGNATURE BLOCK (last page) ═══
+    if (curY > PH - 55) { doc.addPage(); pageNum++; addPageHeader(pageNum); addPageFooter(); curY = 34; }
+    curY += 5;
+    doc.setDrawColor(213,220,232);
+    doc.setLineWidth(0.5);
+    doc.line(ML, curY, PW-MR, curY);
+    curY += 8;
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(26,58,92);
+    doc.text('Certification / การรับรองเอกสาร', ML, curY);
+    curY += 6;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(28,40,51);
+    doc.text('This report is generated from the Lost & Found Management System of the Traffic Control and Safety Unit,', ML, curY);
+    curY += 4.5;
+    doc.text('Division of Physical and Environmental, Mahidol University, Salaya Campus.', ML, curY);
+    curY += 8;
+
+    // Signature lines
+    const sigBoxW = (PW - ML - MR - 20) / 3;
+    [['Preparer / ผู้จัดทำ', preparer, position],
+     ['Checker / ผู้ตรวจสอบ', '……………………………', '……………………'],
+     ['Approver / ผู้อนุมัติ', '……………………………', '……………………']
+    ].forEach((sig, i) => {
+      const x = ML + i*(sigBoxW + 10);
+      doc.setDrawColor(213,220,232);
+      doc.roundedRect(x, curY, sigBoxW, 28, 2, 2, 'S');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(108,122,137);
+      doc.text(sig[0], x + sigBoxW/2, curY+5, {align:'center'});
+      doc.setDrawColor(180,190,210);
+      doc.line(x+5, curY+16, x+sigBoxW-5, curY+16);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(28,40,51);
+      doc.text(sig[1].substring(0,22), x+sigBoxW/2, curY+20, {align:'center'});
+      doc.setTextColor(108,122,137);
+      doc.text(sig[2].substring(0,22), x+sigBoxW/2, curY+24, {align:'center'});
+    });
+
+    // ─── Save ───
+    const fromStr = fromDate.toISOString().split('T')[0].replace(/-/g,'');
+    const toStr = toDate.toISOString().split('T')[0].replace(/-/g,'');
+    const fname = reportType === 'daily'
+      ? `LF_Report_${fromStr}_${docCode}.pdf`
+      : `LF_Report_${fromStr}_${toStr}_${docCode}.pdf`;
+
+    doc.save(fname);
+    document.getElementById('gen-status').textContent = `✅ สร้าง PDF สำเร็จ — ${items.length} รายการ`;
+
+    // update preview with real counts
+    updatePreviewWithData(items, periodLabel);
+
+  } catch(err) {
+    console.error(err);
+    alert('❌ เกิดข้อผิดพลาด: ' + err.message);
+    document.getElementById('gen-status').textContent = 'เกิดข้อผิดพลาด';
+  } finally {
+    btn.disabled = false;
+    loading.classList.remove('show');
+  }
+}
+
+function updatePreviewWithData(items, periodLabel) {
+  const total = items.length;
+  const lost = items.filter(i=>i.type==='สิ่งของสูญหาย').length;
+  const found = items.filter(i=>i.type==='พบสิ่งของ').length;
+  const pickup = items.filter(i=>i.type==='รับของคืน').length;
+  const returned = items.filter(i=>(i.status||'').includes('รับของคืนแล้ว')||i.type==='รับของคืน').length;
+
+  document.querySelectorAll('.kpi-preview .kpi-num').forEach((el, i) => {
+    el.textContent = [total, lost, found, pickup][i];
+  });
+}
+
+// Event listeners for live preview update
+document.addEventListener('input', updatePreview);
+document.addEventListener('change', updatePreview);
+
+// Init preview
+setTimeout(updatePreview, 100);
+</script>
+</body>
+</html>
