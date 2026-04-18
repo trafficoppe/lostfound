@@ -273,19 +273,21 @@ footer a:hover{color:white;}
 </div>
 
 <footer>
-  <div><span class="footer-ver">Lost &amp; Found Web App — San v1.1.2</span></div>
+  <div><span class="footer-ver">Lost &amp; Found Web App — v1.1.3</span></div>
   <div class="footer-copy">
     © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
-    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit · Buildings, Facilities and Environment Department</span>
+    <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit, Mahidol University</span>
   </div>
 </footer>
 
 <script>
 /* =====================================================
  * Lost & Found — index.html
- * Version : 1.1.2
+ * Version : 1.1.3
  * © 2025–2026 Traffic Control and Premises Security Unit,
  *   Mahidol University. All rights reserved.
+ * Changelog v1.1.3:
+ *   - แก้ footer เป็น "Mahidol University"
  * ===================================================== */
 
 const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
@@ -294,7 +296,6 @@ const ITEMS_PER_PAGE = 20;
 
 let allItems = [], filtered = [], currentPage = 1, currentFilter = 'all';
 
-/* ── helpers ── */
 function driveThumb(raw, size='w400') {
   if (!raw) return '';
   const first = raw.split(',')[0].trim();
@@ -319,84 +320,8 @@ function parseDate(str) {
                        parseInt(m[4]||0), parseInt(m[5]||0), parseInt(m[6]||0));
     if (!isNaN(d)) return d;
   }
-  try {
-    const d = new Date(s);
-    if (!isNaN(d) && d.getFullYear() > 2000) return d;
-  } catch(e) {}
+  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e) {}
   return null;
-}
-
-/* ── Parse Sheet เดิม (gviz) ──
-   ใช้ Timestamp (Col A) เป็น dateObj เสมอ
-   เพื่อหลีกเลี่ยงปัญหาวันที่ใน Col B ที่ผู้ใช้กรอกผิด ── */
-function parseOldSheet(text) {
-  try {
-    const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]+?)\);?\s*$/);
-    if (!m) return [];
-    const json = JSON.parse(m[1]);
-    const rows = json?.table?.rows || [];
-
-    return rows.map(row => {
-      if (!row?.c) return null;
-      const g = i => row.c[i] ? String(row.c[i].f || row.c[i].v || '').trim() : '';
-
-      // ข้ามแถวที่ไม่มี Timestamp
-      const ts = g(0);
-      if (!ts || (!ts.includes('/') && !ts.includes('-'))) return null;
-      const tsObj = parseDate(ts);
-      if (!tsObj || tsObj.getFullYear() < 2020) return null;
-
-      // หา type จาก Col G ก่อน ถ้าว่าง fallback Col H/K/N
-      const colG = g(6);
-      const colH = g(7);
-      const colK = g(10);
-      const colN = g(13);
-
-      let type = '';
-      if (colG.includes('สูญหาย') || colG.includes('หาย')) type = 'สิ่งของสูญหาย';
-      else if (colG.includes('พบ') || colG.includes('เก็บ')) type = 'พบสิ่งของ';
-      else if (colG.includes('คืน')) type = 'รับของคืน';
-
-      if (!type) {
-        if (colH && colH.length > 2) type = 'สิ่งของสูญหาย';
-        else if (colK && colK.length > 2) type = 'พบสิ่งของ';
-        else if (colN && colN.length > 2) type = 'รับของคืน';
-      }
-      if (!type) return null;
-
-      let title = '', loc = '', imgRaw = '';
-      if (type === 'สิ่งของสูญหาย') { title=g(7); loc=g(8); imgRaw=g(9); }
-      else if (type === 'พบสิ่งของ') { title=g(10); loc=g(11); imgRaw=g(12); }
-      else { title=g(13); imgRaw=g(14); loc='-'; }
-
-      const isPhone = /^[\d\s\-\+]{7,15}$/.test((title||'').trim());
-      if (!title || isPhone) {
-        const name = g(2);
-        title = type === 'สิ่งของสูญหาย' ? `[ของหาย] ${name}` :
-                type === 'พบสิ่งของ'     ? `[ของที่พบ] ${name}` : `[รับคืน] ${name}`;
-      }
-
-      return {
-        source    : 'old',
-        type,
-        title     : title || 'ไม่ระบุ',
-        location  : loc   || 'ไม่ระบุสถานที่',
-        date      : g(0),
-        dateObj   : tsObj,   // ✅ ใช้ Timestamp โดยตรง ไม่แปลงจาก Col B
-        imgUrl    : driveThumb(imgRaw),
-        status    : g(18) || '',
-        actionText: g(17) || '',
-        name      : g(2),
-        personType: g(3),
-        dept      : g(4),
-        phone     : g(5),
-        time      : g(15)
-      };
-    }).filter(Boolean);
-  } catch(e) {
-    console.error('parseOldSheet error:', e);
-    return [];
-  }
 }
 
 function parseOldSheetRaw(rows) {
@@ -444,8 +369,7 @@ function parseOldSheetRaw(rows) {
     };
   }).filter(Boolean);
 }
-  
-/* ── Parse Sheet ใหม่ (GAS JSON) ── */
+
 function parseNewSheet(data) {
   return (data || []).map(r => ({
     source    : 'new',
@@ -466,9 +390,6 @@ function parseNewSheet(data) {
   })).filter(r => r.type);
 }
 
-/* ── Load all ──
-   โหลด 2 ครั้ง: ครั้งแรกทันที ครั้งสองหลัง 5 วินาที
-   เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในการโหลดครั้งแรก ── */
 async function loadAll() {
   document.getElementById('gallery').innerHTML =
     '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
@@ -496,7 +417,6 @@ async function loadAll() {
     'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
 }
 
-/* ── Counts ── */
 function updateCounts() {
   const items = window._displayItems || allItems;
   document.getElementById('cnt-all').textContent    = items.length;
@@ -510,9 +430,6 @@ function updateCounts() {
     items.filter(i => i.type==='พบสิ่งของ'     && isPending(i.status)).length;
 }
 
-/* ══════════════════════════════════════════
-   PENDING PANEL
-══════════════════════════════════════════ */
 let pendingType = '';
 let pfMode      = 'today';
 let pfFrom      = null;
@@ -621,7 +538,6 @@ function renderPendingList() {
   }).join('');
 }
 
-/* ── Filter & sort ── */
 function filterType(t) {
   currentFilter = t; currentPage = 1;
   document.querySelectorAll('.stat-chip').forEach(c => c.classList.remove('active'));
@@ -652,7 +568,6 @@ function applyFilters() {
   renderPage();
 }
 
-/* ── Render gallery ── */
 function renderPage() {
   const gallery  = document.getElementById('gallery');
   const total    = filtered.length;
@@ -702,7 +617,6 @@ function renderCard(it, idx) {
     </div>`;
 }
 
-/* ── Pagination ── */
 function renderPagination(pages) {
   const pg = document.getElementById('pagination');
   if (pages <= 1) { pg.innerHTML = ''; return; }
@@ -725,7 +639,6 @@ function goPage(p) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* ── Modal ── */
 function openModal(idx) {
   const it = filtered[idx]; if (!it) return;
   const color = it.type==='สิ่งของสูญหาย' ? '#c0392b' : it.type==='พบสิ่งของ' ? '#1e7e44' : '#1a5276';
@@ -783,9 +696,6 @@ function closeModal() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-/* ── Init ──
-   โหลดครั้งแรกทันที แล้วโหลดซ้ำหลัง 5 วินาที
-   เพื่อแก้ปัญหา gviz ส่งข้อมูลไม่ครบในครั้งแรก ── */
 window.onload = () => {
   loadAll();
   setInterval(loadAll, 5 * 60 * 1000);
