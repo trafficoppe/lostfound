@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<!-- jsPDF + AutoTable for PDF export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -19,8 +18,6 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
-
-/* LOGIN */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--primary-mid));padding:20px;}
 .login-box{background:white;border-radius:20px;padding:40px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
 .login-logo{text-align:center;margin-bottom:28px;}
@@ -34,8 +31,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .login-btn{width:100%;padding:13px;background:var(--primary);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
 .login-btn:hover{background:var(--primary-mid);}
 .login-err{color:var(--lost);font-size:13px;text-align:center;margin-top:10px;display:none;}
-
-/* DASHBOARD */
 .dashboard{display:none;}
 .top-bar{background:linear-gradient(135deg,var(--primary),var(--primary-mid));padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
 .top-bar-left{display:flex;align-items:center;gap:12px;color:white;}
@@ -47,10 +42,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .btn-logout:hover{background:rgba(255,255,255,0.22);}
 .ver-badge{font-size:11px;background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:10px;font-weight:400;letter-spacing:0.5px;cursor:pointer;border:none;color:white;margin-left:6px;}
 .ver-badge:hover{background:rgba(255,255,255,0.25);}
-
 .dash-content{max-width:1200px;margin:0 auto;padding:24px 20px 60px;}
-
-/* FILTER BAR */
 .filter-bar{background:white;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 20px;margin-bottom:20px;}
 .filter-bar-title{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
 .filter-row-1{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
@@ -58,16 +50,10 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .filter-bar select,.filter-bar input[type=date]{padding:9px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;background:white;outline:none;cursor:pointer;}
 .filter-bar select:focus,.filter-bar input[type=date]:focus{border-color:var(--primary-mid);}
 .filter-label{font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap;}
-.filter-sep{height:1px;background:var(--border);margin:10px 0;}
-.btn-apply-filter{padding:9px 18px;background:var(--primary);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;cursor:pointer;}
-.btn-apply-filter:hover{background:var(--primary-mid);}
 .btn-clear-filter{padding:9px 14px;background:#f8f9fa;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;}
 .btn-clear-filter:hover{border-color:var(--primary-mid);color:var(--primary);}
 .btn-refresh-dash{padding:9px 16px;background:var(--accent);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;}
 .btn-refresh-dash:hover{opacity:0.9;}
-.filter-active-tag{display:inline-flex;align-items:center;gap:5px;background:#eaf1fb;color:var(--pickup);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;}
-
-/* KPI */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:28px;}
 .kpi{background:white;border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border-left:5px solid var(--primary);text-align:center;transition:transform 0.2s;}
 .kpi:hover{transform:translateY(-3px);}
@@ -81,16 +67,14 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .kpi.kpi-pickup .kpi-num{color:var(--pickup);}
 .kpi.kpi-rate .kpi-num{color:var(--accent);font-size:28px;}
 .kpi-label{font-size:13px;color:var(--muted);font-weight:600;}
-
-/* CHARTS */
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px;}
 .chart-card{background:white;border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);}
 .chart-card.full{grid-column:1/-1;}
 .chart-title{font-size:15px;font-weight:700;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
 .chart-wrap{position:relative;height:260px;}
-
-/* STAFF CHART */
 .staff-chart-card{background:white;border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);margin-bottom:20px;}
+.staff-toggle-head{cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;}
+.staff-toggle-head:hover{opacity:0.8;}
 .staff-list{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
 .staff-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:#f8fafd;}
 .staff-rank{width:24px;height:24px;border-radius:50%;background:var(--primary);color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -101,8 +85,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .staff-count-bar{flex:2;height:8px;background:#e9ecef;border-radius:4px;overflow:hidden;}
 .staff-count-fill{height:100%;background:var(--primary-mid);border-radius:4px;transition:width 0.5s;}
 .staff-count{font-size:13px;font-weight:700;color:var(--primary);min-width:30px;text-align:right;}
-
-/* QUICK ACCESS CARDS */
 .quick-cards{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;}
 .quick-card{flex:1;min-width:240px;border-radius:14px;padding:18px 22px;text-decoration:none;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(26,58,92,0.2);transition:all 0.2s;color:white;}
 .quick-card:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(26,58,92,0.3);}
@@ -111,26 +93,18 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .quick-card-icon{font-size:28px;}
 .quick-card-text .qc-title{font-size:15px;font-weight:700;margin-bottom:3px;}
 .quick-card-text .qc-sub{font-size:12px;opacity:0.75;}
-
-/* SPINNER */
 .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.dash-loading{text-align:center;padding:40px;color:var(--muted);}
-@keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
-
-/* VERSION MODAL */
 .ver-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:600;align-items:center;justify-content:center;padding:20px;}
 .ver-modal.show{display:flex;}
 .ver-modal-box{background:white;border-radius:16px;padding:28px;max-width:520px;width:100%;box-shadow:0 16px 50px rgba(0,0,0,0.25);max-height:80vh;overflow-y:auto;}
-.ver-modal-box h3{font-size:17px;font-weight:700;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.ver-modal-box h3{font-size:17px;font-weight:700;color:var(--primary);margin-bottom:16px;}
 .ver-item{border-left:3px solid var(--primary-mid);padding:10px 14px;margin-bottom:10px;background:#f8fafd;border-radius:0 8px 8px 0;}
 .ver-item .ver-num{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:4px;}
 .ver-item .ver-date{font-size:11px;color:var(--muted);margin-bottom:6px;}
 .ver-item ul{padding-left:16px;}
 .ver-item ul li{font-size:13px;color:var(--text);margin-bottom:2px;}
 .ver-close{width:100%;padding:11px;background:var(--primary);color:white;border:none;border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px;}
-
-/* PDF MODAL */
 .pdf-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:600;align-items:center;justify-content:center;padding:20px;}
 .pdf-modal.show{display:flex;}
 .pdf-modal-box{background:white;border-radius:16px;padding:28px;max-width:560px;width:100%;box-shadow:0 16px 50px rgba(0,0,0,0.25);max-height:90vh;overflow-y:auto;}
@@ -140,13 +114,12 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 .pdf-type-tab.active{background:var(--primary);color:white;border-color:var(--primary);}
 .pdf-field{margin-bottom:14px;}
 .pdf-field label{font-size:13px;font-weight:600;display:block;margin-bottom:6px;}
-.pdf-field input,.pdf-field select{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14px;outline:none;}
+.pdf-field input,.pdf-field select,.pdf-field textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14px;outline:none;}
 .pdf-field input:focus,.pdf-field select:focus{border-color:var(--primary-mid);}
 .pdf-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .pdf-btn-gen{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),#c47a10);color:white;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;}
 .pdf-btn-gen:disabled{opacity:0.6;cursor:not-allowed;}
 .btn-cancel-modal{width:100%;padding:11px;background:#f8f9fa;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;cursor:pointer;margin-top:8px;}
-
 @media(max-width:768px){
   .charts-grid{grid-template-columns:1fr;}
   .kpi-grid{grid-template-columns:repeat(2,1fr);}
@@ -163,7 +136,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
       <div class="icon">📊</div>
       <h2>Dashboard ของหาย/พบของ</h2>
       <p>งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล</p>
-      <p style="font-size:11px;color:#aaa;margin-top:4px;">v1.3.0</p>
+      <p style="font-size:11px;color:#aaa;margin-top:4px;">v1.3.1</p>
     </div>
     <div class="login-field">
       <label>ชื่อผู้ใช้</label>
@@ -184,7 +157,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
     <div class="top-bar-left">
       <span style="font-size:22px;">📊</span>
       <h1>Dashboard ของหาย/พบของ
-        <button class="ver-badge" onclick="openVerModal()">v1.3.0 · ประวัติเวอร์ชั่น</button>
+        <button class="ver-badge" onclick="openVerModal()">v1.3.1 · ประวัติเวอร์ชั่น</button>
       </h1>
     </div>
     <div class="top-bar-right">
@@ -200,12 +173,9 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
       <div class="filter-bar-title">🗓️ กรองข้อมูลตามช่วงเวลา
         <span id="filter-active-label" style="font-size:12px;color:var(--accent);font-weight:600;margin-left:8px;"></span>
       </div>
-      <!-- แถว 1: ปี / ไตรมาส / เดือน -->
       <div class="filter-row-1">
         <span class="filter-label">ปี:</span>
-        <select id="filter-year" onchange="onYearChange()">
-          <option value="all">ทุกปี</option>
-        </select>
+        <select id="filter-year" onchange="onYearChange()"><option value="all">ทุกปี</option></select>
         <span class="filter-label">ไตรมาส:</span>
         <select id="filter-quarter" onchange="onQuarterChange()">
           <option value="all">ทุกไตรมาส</option>
@@ -226,36 +196,27 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
         </select>
         <button class="btn-refresh-dash" onclick="manualRefresh()">🔄 รีเฟรช</button>
       </div>
-      <!-- แถว 2: กำหนดช่วงเองแบบกว้าง -->
       <div class="filter-row-2">
         <span class="filter-label">📅 กำหนดเอง:</span>
         <span class="filter-label">ปีจาก</span>
-        <select id="filter-year-from" onchange="applyCustomRange()">
-          <option value="">—</option>
-        </select>
+        <select id="filter-year-from" onchange="applyCustomRange()"><option value="">—</option></select>
         <span class="filter-label">ถึงปี</span>
-        <select id="filter-year-to" onchange="applyCustomRange()">
-          <option value="">—</option>
-        </select>
+        <select id="filter-year-to" onchange="applyCustomRange()"><option value="">—</option></select>
         <span class="filter-label">เดือนจาก</span>
         <select id="filter-month-from" onchange="applyCustomRange()">
           <option value="">—</option>
-          <option value="1">ม.ค.</option><option value="2">ก.พ.</option>
-          <option value="3">มี.ค.</option><option value="4">เม.ย.</option>
-          <option value="5">พ.ค.</option><option value="6">มิ.ย.</option>
-          <option value="7">ก.ค.</option><option value="8">ส.ค.</option>
-          <option value="9">ก.ย.</option><option value="10">ต.ค.</option>
-          <option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
+          <option value="1">ม.ค.</option><option value="2">ก.พ.</option><option value="3">มี.ค.</option>
+          <option value="4">เม.ย.</option><option value="5">พ.ค.</option><option value="6">มิ.ย.</option>
+          <option value="7">ก.ค.</option><option value="8">ส.ค.</option><option value="9">ก.ย.</option>
+          <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
         </select>
         <span class="filter-label">ถึงเดือน</span>
         <select id="filter-month-to" onchange="applyCustomRange()">
           <option value="">—</option>
-          <option value="1">ม.ค.</option><option value="2">ก.พ.</option>
-          <option value="3">มี.ค.</option><option value="4">เม.ย.</option>
-          <option value="5">พ.ค.</option><option value="6">มิ.ย.</option>
-          <option value="7">ก.ค.</option><option value="8">ส.ค.</option>
-          <option value="9">ก.ย.</option><option value="10">ต.ค.</option>
-          <option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
+          <option value="1">ม.ค.</option><option value="2">ก.พ.</option><option value="3">มี.ค.</option>
+          <option value="4">เม.ย.</option><option value="5">พ.ค.</option><option value="6">มิ.ย.</option>
+          <option value="7">ก.ค.</option><option value="8">ส.ค.</option><option value="9">ก.ย.</option>
+          <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
         </select>
         <button class="btn-clear-filter" onclick="clearCustomRange()">✕ ล้าง</button>
       </div>
@@ -272,41 +233,26 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 
     <!-- CHARTS -->
     <div class="charts-grid">
-      <div class="chart-card full">
-        <div class="chart-title">📅 แนวโน้มรายเดือน</div>
-        <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">🥧 สัดส่วนประเภท</div>
-        <div class="chart-wrap"><canvas id="chart-type"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">👥 ประเภทบุคคล</div>
-        <div class="chart-wrap"><canvas id="chart-person"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">🚻 เพศ/คำนำหน้า</div>
-        <div class="chart-wrap"><canvas id="chart-prefix"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">📍 Top สถานที่</div>
-        <div class="chart-wrap"><canvas id="chart-location"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">📦 ประเภทสิ่งของบ่อย</div>
-        <div class="chart-wrap"><canvas id="chart-items"></canvas></div>
-      </div>
+      <div class="chart-card full"><div class="chart-title">📅 แนวโน้มรายเดือน</div><div class="chart-wrap"><canvas id="chart-monthly"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">🥧 สัดส่วนประเภท</div><div class="chart-wrap"><canvas id="chart-type"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">👥 ประเภทบุคคล</div><div class="chart-wrap"><canvas id="chart-person"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">🚻 เพศ/คำนำหน้า</div><div class="chart-wrap"><canvas id="chart-prefix"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">📍 Top สถานที่</div><div class="chart-wrap"><canvas id="chart-location"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">📦 ประเภทสิ่งของบ่อย</div><div class="chart-wrap"><canvas id="chart-items"></canvas></div></div>
     </div>
 
-    <!-- STAFF STATS -->
+    <!-- STAFF STATS — v1.3.1: คลิกถึงจะแสดง -->
     <div class="staff-chart-card">
-      <div class="chart-title">👤 สถิติผู้บันทึกข้อมูล (จากหน้า List)</div>
-      <div id="staff-stats-list" class="staff-list">
+      <div class="chart-title staff-toggle-head" onclick="toggleStaffStats()">
+        <span>👤 สถิติผู้บันทึกข้อมูล (จากหน้า List)</span>
+        <span id="staff-toggle-icon" style="font-size:13px;color:var(--muted);font-weight:400;">▼ แสดง</span>
+      </div>
+      <div id="staff-stats-list" class="staff-list" style="display:none;">
         <div style="text-align:center;padding:20px;color:var(--muted);">กำลังโหลด...</div>
       </div>
     </div>
 
-    <!-- QUICK ACCESS -->
+    <!-- QUICK ACCESS — v1.3.1: เปลี่ยนชื่อปุ่ม Export PDF -->
     <div class="quick-cards">
       <a href="lostfound_list.html" class="quick-card card-list">
         <div class="quick-card-text">
@@ -317,7 +263,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
       </a>
       <button onclick="openPdfModal()" class="quick-card card-pdf" style="border:none;cursor:pointer;text-align:left;">
         <div class="quick-card-text">
-          <div class="qc-title">📄 Export PDF รายงาน ISO</div>
+          <div class="qc-title">📄 Export PDF</div>
           <div class="qc-sub">รายวัน · รายเดือน · รายปี · กำหนดเอง</div>
         </div>
         <div class="quick-card-icon">⬇</div>
@@ -332,56 +278,44 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
   <div class="ver-modal-box">
     <h3>📋 ประวัติเวอร์ชั่น — Lost & Found Web App</h3>
     <div class="ver-item">
-      <div class="ver-num">v1.3.0 <span style="background:#e8a020;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">ล่าสุด</span></div>
+      <div class="ver-num">v1.3.1 <span style="background:#e8a020;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">ล่าสุด</span></div>
+      <div class="ver-date">18 เมษายน 2569 (2026)</div>
+      <ul>
+        <li>dashboard.html: เปลี่ยนชื่อปุ่มเป็น "Export PDF"</li>
+        <li>dashboard.html: เพิ่มช่อง "อื่นๆ" ในวัตถุประสงค์ PDF</li>
+        <li>dashboard.html: สถิติผู้บันทึก คลิกถึงจะแสดง (toggle)</li>
+        <li>dashboard.html: PDF ใช้ English ล้วน (Thai font fix)</li>
+        <li>dashboard.html: updatedBy แยกชื่อออกจาก (วัน/เวลา)</li>
+        <li>lostfound_list.html: เพิ่ม date range filter + v1.3.1</li>
+        <li>index.html: แก้ footer เป็น Mahidol University</li>
+        <li>lf_gas.js: รวม Web App + Notification + Overdue Alert</li>
+      </ul>
+    </div>
+    <div class="ver-item">
+      <div class="ver-num">v1.3.0</div>
       <div class="ver-date">17 เมษายน 2569 (2026)</div>
       <ul>
-        <li>dashboard.html: เพิ่มกรองช่วงปี-เดือนแบบกำหนดเอง</li>
-        <li>dashboard.html: เพิ่มสถิติผู้บันทึกข้อมูล</li>
-        <li>dashboard.html: เพิ่มประวัติเวอร์ชั่น (modal)</li>
+        <li>dashboard.html: กรองช่วงปี-เดือนแบบกำหนดเอง</li>
+        <li>dashboard.html: สถิติผู้บันทึกข้อมูล + ประวัติเวอร์ชั่น</li>
         <li>dashboard.html: รวม PDF Export เข้าใน Dashboard</li>
-        <li>dashboard.html: ปรับปุ่มเป็น "อัปเดตสถานะ - ค้นหา - กรองข้อมูล"</li>
-        <li>lostfound_list.html: เพิ่ม staff autocomplete + timestamp ใน modal</li>
-        <li>lostfound_list.html: คลิกรายละเอียดแสดง popup เหมือน index.html</li>
-        <li>lostfound_list.html: sort ล่าสุดก่อนเมื่อ filter ทุกประเภท</li>
-        <li>index.html: ซ่อน chip filter เป็นไอคอน ☰ คลิกเพื่อเปิด</li>
-        <li>Footer ทุกหน้า: เปลี่ยนเป็น "Mahidol University"</li>
-        <li>lf_report_export.html: รวมเข้าใน Dashboard</li>
+        <li>lostfound_list.html: staff autocomplete + timestamp modal</li>
+        <li>lostfound_list.html: popup รายละเอียด + sort ล่าสุดก่อน</li>
       </ul>
     </div>
     <div class="ver-item">
       <div class="ver-num">v1.2.2</div>
       <div class="ver-date">16 เมษายน 2569 (2026)</div>
       <ul>
-        <li>lostfound_list.html: แก้ปัญหา gviz truncation → ใช้ getAllData</li>
-        <li>dashboard.html: ตัวเลขตรงกันทุกหน้า</li>
-        <li>lostfound_form.html: สร้างฟอร์มอังกฤษ v1.0.0</li>
-        <li>validation รูปบัตรประจำตัว (pickup) ทำงานถูกต้อง</li>
+        <li>lostfound_list.html: แก้ gviz truncation → ใช้ getAllData</li>
+        <li>lostfound_form_en.html: ฟอร์มภาษาอังกฤษ v1.0.0</li>
       </ul>
     </div>
     <div class="ver-item">
-      <div class="ver-num">v1.2.1</div>
-      <div class="ver-date">เมษายน 2569</div>
-      <ul>
-        <li>dashboard.html: เพิ่ม auto-refresh 5 นาที + countdown</li>
-        <li>เพิ่ม parseOldSheetRaw() ใช้ getAllData GAS endpoint</li>
-      </ul>
-    </div>
-    <div class="ver-item">
-      <div class="ver-num">v1.2.0</div>
-      <div class="ver-date">มีนาคม–เมษายน 2569</div>
-      <ul>
-        <li>สร้าง GAS endpoint getAllData ดึงทั้ง 2 sheets</li>
-        <li>dashboard.html: KPI + 6 charts</li>
-        <li>lostfound_list.html: ตาราง + อัปเดตสถานะ</li>
-      </ul>
-    </div>
-    <div class="ver-item">
-      <div class="ver-num">v1.0.0 – v1.1.2</div>
+      <div class="ver-num">v1.0.0 – v1.2.1</div>
       <div class="ver-date">2025–2026</div>
       <ul>
         <li>สร้างระบบ Lost & Found Web App พื้นฐาน</li>
         <li>index.html: gallery + modal + pending panel</li>
-        <li>lostfound_form.html: multi-step form</li>
         <li>Firebase LINE + Email notification</li>
       </ul>
     </div>
@@ -389,21 +323,19 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
   </div>
 </div>
 
-<!-- PDF EXPORT MODAL -->
+<!-- PDF EXPORT MODAL — v1.3.1: ชื่อ "Export PDF" + option อื่นๆ -->
 <div class="pdf-modal" id="pdf-modal">
   <div class="pdf-modal-box">
-    <h3>📄 Export PDF รายงาน ISO</h3>
+    <h3>📄 Export PDF</h3>
     <div class="pdf-type-tabs">
-      <button class="pdf-type-tab active" id="ptab-daily" onclick="setPdfType('daily')">📅 รายวัน</button>
-      <button class="pdf-type-tab" id="ptab-monthly" onclick="setPdfType('monthly')">🗓️ รายเดือน</button>
-      <button class="pdf-type-tab" id="ptab-yearly" onclick="setPdfType('yearly')">📊 รายปี</button>
-      <button class="pdf-type-tab" id="ptab-custom" onclick="setPdfType('custom')">📆 กำหนดเอง</button>
+      <button class="pdf-type-tab active" id="ptab-daily"   onclick="setPdfType('daily')">📅 รายวัน</button>
+      <button class="pdf-type-tab"         id="ptab-monthly" onclick="setPdfType('monthly')">🗓️ รายเดือน</button>
+      <button class="pdf-type-tab"         id="ptab-yearly"  onclick="setPdfType('yearly')">📊 รายปี</button>
+      <button class="pdf-type-tab"         id="ptab-custom"  onclick="setPdfType('custom')">📆 กำหนดเอง</button>
     </div>
-    <!-- daily -->
     <div id="pform-daily">
       <div class="pdf-field"><label>วันที่</label><input type="date" id="p-daily-date"></div>
     </div>
-    <!-- monthly -->
     <div id="pform-monthly" style="display:none">
       <div class="pdf-row2">
         <div class="pdf-field"><label>ปี (ค.ศ.)</label><select id="p-monthly-year"></select></div>
@@ -419,11 +351,9 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
         </div>
       </div>
     </div>
-    <!-- yearly -->
     <div id="pform-yearly" style="display:none">
       <div class="pdf-field"><label>ปี (ค.ศ.)</label><select id="p-yearly-year"></select></div>
     </div>
-    <!-- custom -->
     <div id="pform-custom" style="display:none">
       <div class="pdf-row2">
         <div class="pdf-field"><label>วันที่เริ่มต้น</label><input type="date" id="p-custom-from"></div>
@@ -436,12 +366,19 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
     </div>
     <div class="pdf-field">
       <label>วัตถุประสงค์</label>
-      <select id="p-purpose">
+      <select id="p-purpose" onchange="onPurposeChange()">
         <option value="iso">ประกอบการประเมิน ISO</option>
         <option value="internal">รายงานภายใน</option>
         <option value="management">รายงานต่อผู้บริหาร</option>
         <option value="audit">ตรวจสอบภายใน</option>
+        <option value="other">อื่นๆ (ระบุ)</option>
       </select>
+    </div>
+    <div id="p-purpose-other-wrap" style="display:none;">
+      <div class="pdf-field">
+        <label>ระบุวัตถุประสงค์</label>
+        <input type="text" id="p-purpose-other" placeholder="กรอกวัตถุประสงค์...">
+      </div>
     </div>
     <button class="pdf-btn-gen" id="pdf-btn-gen" onclick="runPdfExport()">📄 สร้าง PDF และดาวน์โหลด</button>
     <button class="btn-cancel-modal" onclick="closePdfModal()">ยกเลิก</button>
@@ -450,20 +387,15 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
 
 <script>
 /* =====================================================
- * Lost & Found Web App — dashboard.html
- * Version : 1.3.0
+ * Lost & Found Web App — dashboard.html  v1.3.1
  * © 2025–2026 Traffic Control and Premises Security Unit,
  *   Mahidol University. All rights reserved.
- * Changelog:
- *   1.3.0 - Custom date range filter, staff stats chart,
- *           version history modal, PDF export embedded,
- *           quick access cards updated
  * ===================================================== */
 const CREDENTIALS = { user:'admin01', pass:'024414400' };
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
-const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const THAI_MONTHS      = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const THAI_MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const EN_MONTHS        = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function parseAnyDate(str) {
   if (!str) return null;
@@ -477,11 +409,8 @@ function parseAnyDate(str) {
   return null;
 }
 
-let allData = [], filteredData = [], charts = {};
-// custom range mode
-let customRangeActive = false;
+let allData = [], filteredData = [], charts = {}, customRangeActive = false;
 
-// ── LOGIN ──
 function doLogin() {
   const u = document.getElementById('login-user').value.trim();
   const p = document.getElementById('login-pass').value.trim();
@@ -489,8 +418,7 @@ function doLogin() {
     sessionStorage.setItem('lf_auth','1');
     document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-    loadDashboard();
-    startAutoRefresh();
+    loadDashboard(); startAutoRefresh();
   } else {
     document.getElementById('login-err').style.display = 'block';
   }
@@ -501,35 +429,45 @@ window.onload = () => {
   if (sessionStorage.getItem('lf_auth') === '1') {
     document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-    loadDashboard();
-    startAutoRefresh();
+    loadDashboard(); startAutoRefresh();
   }
-  // init PDF modal year dropdowns
   const yr = new Date().getFullYear();
   ['p-monthly-year','p-yearly-year'].forEach(id => {
     const sel = document.getElementById(id);
-    for (let y = yr; y >= yr-5; y--) {
-      sel.innerHTML += `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`;
-    }
+    for (let y = yr; y >= yr-5; y--) sel.innerHTML += `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`;
   });
-  document.getElementById('p-daily-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('p-daily-date').value  = new Date().toISOString().split('T')[0];
   document.getElementById('p-custom-from').value = new Date().toISOString().split('T')[0];
-  document.getElementById('p-custom-to').value = new Date().toISOString().split('T')[0];
+  document.getElementById('p-custom-to').value   = new Date().toISOString().split('T')[0];
   document.getElementById('p-monthly-month').value = new Date().getMonth()+1;
 };
 
-// ── AUTO REFRESH ──
-let refreshInterval = null;
-function startAutoRefresh() {
-  clearInterval(refreshInterval);
-  refreshInterval = setInterval(loadDashboard, 300000); // 5 min
+// v1.3.1: วัตถุประสงค์ อื่นๆ
+function onPurposeChange() {
+  const val = document.getElementById('p-purpose').value;
+  document.getElementById('p-purpose-other-wrap').style.display = val === 'other' ? 'block' : 'none';
 }
+
+// v1.3.1: Staff stats toggle
+function toggleStaffStats() {
+  const el   = document.getElementById('staff-stats-list');
+  const icon = document.getElementById('staff-toggle-icon');
+  const isHidden = el.style.display === 'none';
+  if (isHidden) {
+    el.style.display = 'flex'; el.style.flexDirection = 'column';
+    icon.textContent = '▲ ซ่อน'; renderStaffStats();
+  } else {
+    el.style.display = 'none'; icon.textContent = '▼ แสดง';
+  }
+}
+
+let refreshInterval = null;
+function startAutoRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(loadDashboard, 300000); }
 async function manualRefresh() { await loadDashboard(); }
 
-// ── LOAD DATA ──
 async function loadDashboard() {
   try {
-    const r = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+    const r    = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
     const json = await r.json();
     let newItems = [], oldItems = [];
     if (json?.newData) {
@@ -540,16 +478,14 @@ async function loadDashboard() {
         name:r['ชื่อ-นามสกุล']||'', personType:r['ประเภทบุคคล']||'',
         dept:r['คณะ/หน่วยงาน']||'', phone:r['เบอร์โทร']||'',
         status:r['สถานะ']||'', actionText:r['การดำเนินการ']||'',
-        imgUrl:r['URL รูปภาพ']||'',
-        updatedBy:r['อัปเดตโดย']||''
+        imgUrl:r['URL รูปภาพ']||'', updatedBy:r['อัปเดตโดย']||''
       }));
     }
     if (json?.oldData) oldItems = parseOldSheetRaw(json.oldData);
     const today = new Date();
     allData = [...newItems, ...oldItems].filter(it => !it.dateObj || it.dateObj <= today);
-    buildYearFilter();
-    applyDashFilter();
-    renderStaffStats();
+    buildYearFilter(); applyDashFilter();
+    if (document.getElementById('staff-stats-list').style.display !== 'none') renderStaffStats();
   } catch(e) { console.error(e); }
 }
 
@@ -577,144 +513,119 @@ function parseOldSheetRaw(rows) {
   }).filter(Boolean);
 }
 
-// ── BUILD YEAR FILTER ──
 function buildYearFilter() {
   const years = [...new Set(allData.map(d=>d.dateObj?.getFullYear()).filter(Boolean))].sort((a,b)=>b-a);
   const sel = document.getElementById('filter-year');
   const cur = sel.value;
   sel.innerHTML = '<option value="all">ทุกปี</option>' + years.map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
   if (cur) sel.value = cur;
-
-  // custom range dropdowns
   ['filter-year-from','filter-year-to'].forEach(id => {
-    const s = document.getElementById(id);
-    const cv = s.value;
-    s.innerHTML = '<option value="">—</option>' + years.map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
-    if (cv) s.value = cv;
+    const s=document.getElementById(id); const cv=s.value;
+    s.innerHTML='<option value="">—</option>'+years.map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
+    if(cv)s.value=cv;
   });
 }
 
 function onYearChange() {
-  customRangeActive = false;
-  clearCustomRangeUI();
-  document.getElementById('filter-quarter').value = 'all';
-  document.getElementById('filter-month').value = 'all';
+  customRangeActive=false; clearCustomRangeUI();
+  document.getElementById('filter-quarter').value='all';
+  document.getElementById('filter-month').value='all';
   applyDashFilter();
 }
 function onQuarterChange() {
-  customRangeActive = false;
-  clearCustomRangeUI();
-  document.getElementById('filter-month').value = 'all';
+  customRangeActive=false; clearCustomRangeUI();
+  document.getElementById('filter-month').value='all';
   applyDashFilter();
 }
-
 function applyCustomRange() {
-  const yf = document.getElementById('filter-year-from').value;
-  const yt = document.getElementById('filter-year-to').value;
-  const mf = document.getElementById('filter-month-from').value;
-  const mt = document.getElementById('filter-month-to').value;
-  if (!yf && !yt && !mf && !mt) { customRangeActive = false; applyDashFilter(); return; }
-  customRangeActive = true;
-  // reset top filters
-  document.getElementById('filter-year').value = 'all';
-  document.getElementById('filter-quarter').value = 'all';
-  document.getElementById('filter-month').value = 'all';
+  const yf=document.getElementById('filter-year-from').value;
+  const yt=document.getElementById('filter-year-to').value;
+  const mf=document.getElementById('filter-month-from').value;
+  const mt=document.getElementById('filter-month-to').value;
+  if(!yf&&!yt&&!mf&&!mt){customRangeActive=false;applyDashFilter();return;}
+  customRangeActive=true;
+  document.getElementById('filter-year').value='all';
+  document.getElementById('filter-quarter').value='all';
+  document.getElementById('filter-month').value='all';
   applyDashFilter();
 }
-function clearCustomRange() {
-  customRangeActive = false;
-  clearCustomRangeUI();
-  applyDashFilter();
-}
-function clearCustomRangeUI() {
-  ['filter-year-from','filter-year-to','filter-month-from','filter-month-to'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
+function clearCustomRange(){customRangeActive=false;clearCustomRangeUI();applyDashFilter();}
+function clearCustomRangeUI(){
+  ['filter-year-from','filter-year-to','filter-month-from','filter-month-to'].forEach(id=>document.getElementById(id).value='');
 }
 
-// ── APPLY FILTER ──
 function applyDashFilter() {
-  const yr  = document.getElementById('filter-year').value;
-  const mo  = document.getElementById('filter-month').value;
-  const q   = document.getElementById('filter-quarter').value;
-  const qm  = {q1:[1,2,3],q2:[4,5,6],q3:[7,8,9],q4:[10,11,12]};
-
-  if (customRangeActive) {
-    const yf = parseInt(document.getElementById('filter-year-from').value)||0;
-    const yt = parseInt(document.getElementById('filter-year-to').value)||9999;
-    const mf = parseInt(document.getElementById('filter-month-from').value)||1;
-    const mt = parseInt(document.getElementById('filter-month-to').value)||12;
-    filteredData = allData.filter(d => {
-      if (!d.dateObj) return false;
-      const y = d.dateObj.getFullYear();
-      const m = d.dateObj.getMonth()+1;
-      // same year range
-      if (yf && yt && yf === yt) return y === yf && m >= mf && m <= mt;
-      if (yf && yt) {
-        if (y < yf || y > yt) return false;
-        if (y === yf && m < mf) return false;
-        if (y === yt && m > mt) return false;
-        return true;
-      }
-      if (yf) return y >= yf;
-      if (yt) return y <= yt;
-      return m >= mf && m <= mt;
+  const yr=document.getElementById('filter-year').value;
+  const mo=document.getElementById('filter-month').value;
+  const q=document.getElementById('filter-quarter').value;
+  const qm={q1:[1,2,3],q2:[4,5,6],q3:[7,8,9],q4:[10,11,12]};
+  if(customRangeActive){
+    const yf=parseInt(document.getElementById('filter-year-from').value)||0;
+    const yt=parseInt(document.getElementById('filter-year-to').value)||9999;
+    const mf=parseInt(document.getElementById('filter-month-from').value)||1;
+    const mt=parseInt(document.getElementById('filter-month-to').value)||12;
+    filteredData=allData.filter(d=>{
+      if(!d.dateObj)return false;
+      const y=d.dateObj.getFullYear(); const m=d.dateObj.getMonth()+1;
+      if(yf&&yt&&yf===yt)return y===yf&&m>=mf&&m<=mt;
+      if(yf&&yt){if(y<yf||y>yt)return false;if(y===yf&&m<mf)return false;if(y===yt&&m>mt)return false;return true;}
+      if(yf)return y>=yf; if(yt)return y<=yt; return m>=mf&&m<=mt;
     });
-    const label = buildCustomLabel();
-    document.getElementById('filter-active-label').textContent = label ? `(${label})` : '';
+    const label=buildCustomLabel();
+    document.getElementById('filter-active-label').textContent=label?`(${label})`:'';
   } else {
-    filteredData = allData.filter(d => {
-      if (!d.dateObj) return yr==='all';
-      const y = d.dateObj.getFullYear().toString();
-      const m = d.dateObj.getMonth()+1;
-      return (yr==='all'||y===yr) && (mo==='all'||m===parseInt(mo)) && (q==='all'||(qm[q]||[]).includes(m));
+    filteredData=allData.filter(d=>{
+      if(!d.dateObj)return yr==='all';
+      const y=d.dateObj.getFullYear().toString(); const m=d.dateObj.getMonth()+1;
+      return(yr==='all'||y===yr)&&(mo==='all'||m===parseInt(mo))&&(q==='all'||(qm[q]||[]).includes(m));
     });
-    document.getElementById('filter-active-label').textContent = '';
+    document.getElementById('filter-active-label').textContent='';
   }
-  updateKPIs();
-  updateCharts();
+  updateKPIs(); updateCharts();
 }
 
 function buildCustomLabel() {
-  const yf = document.getElementById('filter-year-from').value;
-  const yt = document.getElementById('filter-year-to').value;
-  const mf = document.getElementById('filter-month-from').value;
-  const mt = document.getElementById('filter-month-to').value;
-  let parts = [];
-  if (yf && yt) parts.push(`พ.ศ.${parseInt(yf)+543}–${parseInt(yt)+543}`);
-  else if (yf) parts.push(`ตั้งแต่พ.ศ.${parseInt(yf)+543}`);
-  else if (yt) parts.push(`ถึงพ.ศ.${parseInt(yt)+543}`);
-  if (mf && mt) parts.push(`เดือน${THAI_MONTHS[parseInt(mf)-1]}–${THAI_MONTHS[parseInt(mt)-1]}`);
-  else if (mf) parts.push(`ตั้งแต่${THAI_MONTHS[parseInt(mf)-1]}`);
-  else if (mt) parts.push(`ถึง${THAI_MONTHS[parseInt(mt)-1]}`);
+  const yf=document.getElementById('filter-year-from').value;
+  const yt=document.getElementById('filter-year-to').value;
+  const mf=document.getElementById('filter-month-from').value;
+  const mt=document.getElementById('filter-month-to').value;
+  const TM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  let parts=[];
+  if(yf&&yt)parts.push(`พ.ศ.${parseInt(yf)+543}–${parseInt(yt)+543}`);
+  else if(yf)parts.push(`ตั้งแต่พ.ศ.${parseInt(yf)+543}`);
+  else if(yt)parts.push(`ถึงพ.ศ.${parseInt(yt)+543}`);
+  if(mf&&mt)parts.push(`เดือน${TM[parseInt(mf)-1]}–${TM[parseInt(mt)-1]}`);
+  else if(mf)parts.push(`ตั้งแต่${TM[parseInt(mf)-1]}`);
+  else if(mt)parts.push(`ถึง${TM[parseInt(mt)-1]}`);
   return parts.join(' ');
 }
 
-// ── KPIs ──
 function updateKPIs() {
-  const total = filteredData.length;
-  const lost = filteredData.filter(d=>d.type==='สิ่งของสูญหาย').length;
-  const found = filteredData.filter(d=>d.type==='พบสิ่งของ').length;
-  const returned = filteredData.filter(d=>(d.status||'').includes('รับของคืนแล้ว')).length;
-  document.getElementById('kpi-total').textContent = total;
-  document.getElementById('kpi-lost').textContent = lost;
-  document.getElementById('kpi-found').textContent = found;
-  document.getElementById('kpi-pickup').textContent = returned;
-  document.getElementById('kpi-rate').textContent = total > 0 ? Math.round((returned/total)*100)+'%' : '-';
+  const total=filteredData.length;
+  const lost=filteredData.filter(d=>d.type==='สิ่งของสูญหาย').length;
+  const found=filteredData.filter(d=>d.type==='พบสิ่งของ').length;
+  const returned=filteredData.filter(d=>(d.status||'').includes('รับของคืนแล้ว')).length;
+  document.getElementById('kpi-total').textContent=total;
+  document.getElementById('kpi-lost').textContent=lost;
+  document.getElementById('kpi-found').textContent=found;
+  document.getElementById('kpi-pickup').textContent=returned;
+  document.getElementById('kpi-rate').textContent=total>0?Math.round((returned/total)*100)+'%':'-';
 }
 
-// ── STAFF STATS ──
+// v1.3.1: แยกชื่อออกจากวงเล็บ
 function renderStaffStats() {
-  const staffMap = {};
-  allData.forEach(d => {
-    const by = (d.updatedBy||'').trim();
-    if (by) staffMap[by] = (staffMap[by]||0)+1;
+  const staffMap={};
+  allData.forEach(d=>{
+    const by=(d.updatedBy||'').trim();
+    if(!by)return;
+    const namePart=by.split('(')[0].trim();
+    if(namePart)staffMap[namePart]=(staffMap[namePart]||0)+1;
   });
-  const sorted = Object.entries(staffMap).sort((a,b)=>b[1]-a[1]);
-  const maxVal = sorted[0]?.[1] || 1;
-  const el = document.getElementById('staff-stats-list');
-  if (!sorted.length) { el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);">ยังไม่มีข้อมูลผู้บันทึก (เฉพาะรายการที่อัปเดตสถานะแล้ว)</div>'; return; }
-  el.innerHTML = sorted.map(([name,cnt],i) => `
+  const sorted=Object.entries(staffMap).sort((a,b)=>b[1]-a[1]);
+  const maxVal=sorted[0]?.[1]||1;
+  const el=document.getElementById('staff-stats-list');
+  if(!sorted.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);">ยังไม่มีข้อมูลผู้บันทึก</div>';return;}
+  el.innerHTML=sorted.map(([name,cnt],i)=>`
     <div class="staff-row">
       <div class="staff-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</div>
       <div class="staff-name">${name}</div>
@@ -723,28 +634,21 @@ function renderStaffStats() {
     </div>`).join('');
 }
 
-// ── CHARTS ──
-function updateCharts() {
-  drawMonthlyChart(); drawTypeChart(); drawPersonChart();
-  drawPrefixChart(); drawLocationChart(); drawItemChart();
-}
-function destroyChart(id) { if(charts[id]){charts[id].destroy();charts[id]=null;} }
+function updateCharts(){drawMonthlyChart();drawTypeChart();drawPersonChart();drawPrefixChart();drawLocationChart();drawItemChart();}
+function destroyChart(id){if(charts[id]){charts[id].destroy();charts[id]=null;}}
 
-function drawMonthlyChart() {
+function drawMonthlyChart(){
   destroyChart('monthly');
-  const mm = {};
-  filteredData.forEach(d => {
+  const mm={};
+  filteredData.forEach(d=>{
     if(!d.dateObj)return;
-    const k = `${d.dateObj.getFullYear()}-${String(d.dateObj.getMonth()+1).padStart(2,'0')}`;
+    const k=`${d.dateObj.getFullYear()}-${String(d.dateObj.getMonth()+1).padStart(2,'0')}`;
     if(!mm[k])mm[k]={lost:0,found:0,pickup:0};
-    if(d.type==='สิ่งของสูญหาย')mm[k].lost++;
-    else if(d.type==='พบสิ่งของ')mm[k].found++;
-    else mm[k].pickup++;
+    if(d.type==='สิ่งของสูญหาย')mm[k].lost++;else if(d.type==='พบสิ่งของ')mm[k].found++;else mm[k].pickup++;
   });
-  const sorted = Object.keys(mm).sort();
-  const labels = sorted.map(k=>{const[y,m]=k.split('-');return `${THAI_MONTHS[parseInt(m)-1]} ${parseInt(y)+543}`;});
-  charts.monthly = new Chart(document.getElementById('chart-monthly'),{
-    type:'bar',
+  const sorted=Object.keys(mm).sort();
+  const labels=sorted.map(k=>{const[y,m]=k.split('-');return `${THAI_MONTHS[parseInt(m)-1]} ${parseInt(y)+543}`;});
+  charts.monthly=new Chart(document.getElementById('chart-monthly'),{type:'bar',
     data:{labels,datasets:[
       {label:'สิ่งของสูญหาย',data:sorted.map(k=>mm[k].lost),backgroundColor:'#ef9a9a'},
       {label:'พบสิ่งของ',data:sorted.map(k=>mm[k].found),backgroundColor:'#a5d6a7'},
@@ -753,10 +657,9 @@ function drawMonthlyChart() {
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:false},y:{beginAtZero:true}}}
   });
 }
-function drawTypeChart() {
+function drawTypeChart(){
   destroyChart('type');
-  charts.type = new Chart(document.getElementById('chart-type'),{
-    type:'doughnut',
+  charts.type=new Chart(document.getElementById('chart-type'),{type:'doughnut',
     data:{labels:['สูญหาย','พบสิ่งของ','รับของคืน'],datasets:[{data:[
       filteredData.filter(d=>d.type==='สิ่งของสูญหาย').length,
       filteredData.filter(d=>d.type==='พบสิ่งของ').length,
@@ -765,197 +668,173 @@ function drawTypeChart() {
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}
   });
 }
-function drawPrefixChart() {
+function drawPrefixChart(){
   destroyChart('prefix');
   const gc={ชาย:0,หญิง:0,'ไม่ระบุ':0};
   const gm={'นาย':'ชาย','เด็กชาย':'ชาย','นาง':'หญิง','นางสาว':'หญิง','เด็กหญิง':'หญิง'};
   filteredData.forEach(d=>{
-    const name=d.name||'';
-    let prefix='';
+    const name=d.name||''; let prefix='';
     for(const p of ['นาย','นาง','นางสาว','เด็กชาย','เด็กหญิง']){if(name.startsWith(p)){prefix=p;break;}}
-    if(d.prefix)prefix=d.prefix;
     gc[gm[prefix]||'ไม่ระบุ']++;
   });
-  charts.prefix = new Chart(document.getElementById('chart-prefix'),{
-    type:'doughnut',
+  charts.prefix=new Chart(document.getElementById('chart-prefix'),{type:'doughnut',
     data:{labels:['ชาย','หญิง','ไม่ระบุ'],datasets:[{data:[gc.ชาย,gc.หญิง,gc['ไม่ระบุ']],backgroundColor:['#3b82f6','#ec4899','#94a3b8'],borderWidth:3,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}
   });
 }
-function drawPersonChart() {
+function drawPersonChart(){
   destroyChart('person');
   const map={};
   filteredData.forEach(d=>{const p=(d.personType||'').split(' ')[0]||'ไม่ระบุ';map[p]=(map[p]||0)+1;});
   const s=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  charts.person = new Chart(document.getElementById('chart-person'),{
-    type:'bar',
+  charts.person=new Chart(document.getElementById('chart-person'),{type:'bar',
     data:{labels:s.map(x=>x[0]),datasets:[{label:'จำนวน',data:s.map(x=>x[1]),backgroundColor:'#b39ddb'}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
   });
 }
-function drawLocationChart() {
+function drawLocationChart(){
   destroyChart('location');
   const map={};
   filteredData.forEach(d=>{const loc=(d.location||'ไม่ระบุ').trim().substring(0,20);if(loc&&loc!=='-')map[loc]=(map[loc]||0)+1;});
   const s=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  charts.location = new Chart(document.getElementById('chart-location'),{
-    type:'bar',
+  charts.location=new Chart(document.getElementById('chart-location'),{type:'bar',
     data:{labels:s.map(x=>x[0]),datasets:[{label:'จำนวน',data:s.map(x=>x[1]),backgroundColor:'#80deea'}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
   });
 }
-function drawItemChart() {
+function drawItemChart(){
   destroyChart('items');
   const keywords=['บัตร','กระเป๋า','โทรศัพท์','กุญแจ','เงิน','หูฟัง','แว่นตา','นาฬิกา','เสื้อ','ร่ม'];
   const map={};
   filteredData.forEach(d=>{const t=(d.title||'').toLowerCase();keywords.forEach(k=>{if(t.includes(k))map[k]=(map[k]||0)+1;});});
   const s=Object.entries(map).sort((a,b)=>b[1]-a[1]);
-  charts.items = new Chart(document.getElementById('chart-items'),{
-    type:'bar',
+  charts.items=new Chart(document.getElementById('chart-items'),{type:'bar',
     data:{labels:s.map(x=>x[0]),datasets:[{label:'จำนวน',data:s.map(x=>x[1]),backgroundColor:'#ffcc80'}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
   });
 }
 
-// ── VERSION MODAL ──
-function openVerModal() { document.getElementById('ver-modal').classList.add('show'); }
-function closeVerModal() { document.getElementById('ver-modal').classList.remove('show'); }
-document.addEventListener('keydown', e => { if(e.key==='Escape'){closeVerModal();closePdfModal();} });
+function openVerModal(){document.getElementById('ver-modal').classList.add('show');}
+function closeVerModal(){document.getElementById('ver-modal').classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeVerModal();closePdfModal();}});
 
-// ── PDF MODAL ──
-let pdfType = 'daily';
-function openPdfModal() { document.getElementById('pdf-modal').classList.add('show'); }
-function closePdfModal() { document.getElementById('pdf-modal').classList.remove('show'); }
-function setPdfType(t) {
-  pdfType = t;
-  ['daily','monthly','yearly','custom'].forEach(r => {
+let pdfType='daily';
+function openPdfModal(){document.getElementById('pdf-modal').classList.add('show');}
+function closePdfModal(){document.getElementById('pdf-modal').classList.remove('show');}
+function setPdfType(t){
+  pdfType=t;
+  ['daily','monthly','yearly','custom'].forEach(r=>{
     document.getElementById('ptab-'+r).classList.toggle('active',r===t);
-    document.getElementById('pform-'+r).style.display = r===t?'':'none';
+    document.getElementById('pform-'+r).style.display=r===t?'':'none';
   });
 }
 
-async function runPdfExport() {
-  const btn = document.getElementById('pdf-btn-gen');
-  btn.disabled = true; btn.textContent = '⏳ กำลังสร้าง...';
+// v1.3.1: PDF ใช้ English ล้วน
+async function runPdfExport(){
+  const btn=document.getElementById('pdf-btn-gen');
+  btn.disabled=true; btn.textContent='⏳ กำลังสร้าง...';
   try {
-    let fromDate, toDate, periodLabel, periodEN, reportLabel;
-    if (pdfType==='daily') {
-      const d = new Date(document.getElementById('p-daily-date').value);
-      fromDate = new Date(d.getFullYear(),d.getMonth(),d.getDate());
-      toDate = new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59);
-      periodLabel = `วันที่ ${d.getDate()} ${THAI_MONTHS_FULL[d.getMonth()]} พ.ศ. ${d.getFullYear()+543}`;
-      periodEN = `${d.getDate()} ${EN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-      reportLabel = 'รายวัน (Daily Report)';
-    } else if (pdfType==='monthly') {
-      const y = parseInt(document.getElementById('p-monthly-year').value);
-      const m = parseInt(document.getElementById('p-monthly-month').value)-1;
-      fromDate = new Date(y,m,1); toDate = new Date(y,m+1,0,23,59,59);
-      periodLabel = `เดือน${THAI_MONTHS_FULL[m]} พ.ศ. ${y+543}`;
-      periodEN = `${EN_MONTHS[m]} ${y}`; reportLabel = 'รายเดือน (Monthly Report)';
-    } else if (pdfType==='yearly') {
-      const y = parseInt(document.getElementById('p-yearly-year').value);
-      fromDate = new Date(y,0,1); toDate = new Date(y,11,31,23,59,59);
-      periodLabel = `ประจำปี พ.ศ. ${y+543}`; periodEN = `Year ${y}`; reportLabel = 'รายปี (Annual Report)';
+    let fromDate,toDate,periodEN,reportLabel;
+    if(pdfType==='daily'){
+      const d=new Date(document.getElementById('p-daily-date').value);
+      fromDate=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+      toDate=new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59);
+      periodEN=`${d.getDate()} ${EN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      reportLabel='Daily Report';
+    } else if(pdfType==='monthly'){
+      const y=parseInt(document.getElementById('p-monthly-year').value);
+      const m=parseInt(document.getElementById('p-monthly-month').value)-1;
+      fromDate=new Date(y,m,1); toDate=new Date(y,m+1,0,23,59,59);
+      periodEN=`${EN_MONTHS[m]} ${y}`; reportLabel='Monthly Report';
+    } else if(pdfType==='yearly'){
+      const y=parseInt(document.getElementById('p-yearly-year').value);
+      fromDate=new Date(y,0,1); toDate=new Date(y,11,31,23,59,59);
+      periodEN=`Year ${y}`; reportLabel='Annual Report';
     } else {
-      fromDate = new Date(document.getElementById('p-custom-from').value);
-      toDate = new Date(document.getElementById('p-custom-to').value+'T23:59:59');
-      periodLabel = `${fromDate.toLocaleDateString('th-TH')} ถึง ${toDate.toLocaleDateString('th-TH')}`;
-      periodEN = `${document.getElementById('p-custom-from').value} to ${document.getElementById('p-custom-to').value}`;
-      reportLabel = 'กำหนดเอง (Custom Period)';
+      fromDate=new Date(document.getElementById('p-custom-from').value);
+      toDate=new Date(document.getElementById('p-custom-to').value+'T23:59:59');
+      periodEN=`${document.getElementById('p-custom-from').value} to ${document.getElementById('p-custom-to').value}`;
+      reportLabel='Custom Period';
     }
-
-    const preparer = document.getElementById('p-preparer').value||'—';
-    const position = document.getElementById('p-position').value||'—';
-    const purpose = document.getElementById('p-purpose').selectedOptions[0].text;
-
-    // use already-loaded allData, filter by range
-    const items = allData.filter(it => {
-      if (!it.dateObj) return false;
-      const d = new Date(it.dateObj.getFullYear(),it.dateObj.getMonth(),it.dateObj.getDate());
-      return d >= fromDate && d <= toDate;
+    const preparer=document.getElementById('p-preparer').value||'—';
+    const position=document.getElementById('p-position').value||'—';
+    const purposeSel=document.getElementById('p-purpose').value;
+    const purpose=purposeSel==='other'?(document.getElementById('p-purpose-other').value||'Other'):document.getElementById('p-purpose').selectedOptions[0].text;
+    const items=allData.filter(it=>{
+      if(!it.dateObj)return false;
+      const d=new Date(it.dateObj.getFullYear(),it.dateObj.getMonth(),it.dateObj.getDate());
+      return d>=fromDate&&d<=toDate;
     });
-
-    const now = new Date();
-    const mm = String(now.getMonth()+1).padStart(2,'0');
-    const dd = String(now.getDate()).padStart(2,'0');
-    const rnd = String(Math.floor(Math.random()*900)+100);
-    const docCode = `LF-${pdfType.toUpperCase().substring(0,3)}-${now.getFullYear()}${mm}${dd}-${rnd}`;
-    const fmtDT = d => !d?'-':`${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()+543} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    const fmtDS = d => !d?'-':`${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()+543}`;
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const now=new Date();
+    const docCode=`LF-${pdfType.toUpperCase().substring(0,3)}-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*900)+100)}`;
+    const fmtDT=d=>!d?'-':`${d.getDate()} ${EN_MONTHS[d.getMonth()].substring(0,3)} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     const PW=210,PH=297,ML=15,MR=15;
-    let curY=15, pageNum=1;
-
-    const hdr = () => {
-      doc.setFillColor(26,58,92); doc.rect(0,0,PW,28,'F');
-      doc.setFillColor(45,95,143); doc.rect(0,25,PW,3,'F');
+    let curY=15,pageNum=1;
+    const hdr=()=>{
+      doc.setFillColor(26,58,92);doc.rect(0,0,PW,28,'F');
+      doc.setFillColor(45,95,143);doc.rect(0,25,PW,3,'F');
       doc.setTextColor(255,255,255);
-      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.setFontSize(7);doc.setFont('helvetica','normal');
       doc.text('Traffic Control and Safety Unit, Division of Physical and Environmental, Mahidol University',ML,7);
-      doc.setFontSize(13); doc.setFont('helvetica','bold');
+      doc.setFontSize(13);doc.setFont('helvetica','bold');
       doc.text('Lost & Found Management System Report',ML,15);
-      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.setFontSize(8);doc.setFont('helvetica','normal');
       doc.text(`Period: ${periodEN}   |   Doc: ${docCode}   |   Page ${pageNum}`,ML,22);
       doc.setTextColor(28,40,51);
     };
-    const ftr = () => {
-      doc.setDrawColor(213,220,232); doc.line(ML,PH-14,PW-MR,PH-14);
-      doc.setFontSize(7.5); doc.setTextColor(108,122,137); doc.setFont('helvetica','normal');
+    const ftr=()=>{
+      doc.setDrawColor(213,220,232);doc.line(ML,PH-14,PW-MR,PH-14);
+      doc.setFontSize(7.5);doc.setTextColor(108,122,137);doc.setFont('helvetica','normal');
       doc.text(`Prepared by: ${preparer} (${position})`,ML,PH-10);
       doc.text(`Purpose: ${purpose}`,ML,PH-6);
       doc.text(`Printed: ${fmtDT(now)}`,PW-MR,PH-10,{align:'right'});
-      doc.text('© Traffic Control and Safety Unit, Mahidol University',PW-MR,PH-6,{align:'right'});
+      doc.text('Traffic Control and Safety Unit, Mahidol University',PW-MR,PH-6,{align:'right'});
       doc.setTextColor(28,40,51);
     };
-
-    hdr(); ftr(); curY = 34;
-    const total=items.length, lost=items.filter(i=>i.type==='สิ่งของสูญหาย').length;
-    const found=items.filter(i=>i.type==='พบสิ่งของ').length, pickup=items.filter(i=>i.type==='รับของคืน').length;
+    hdr();ftr();curY=34;
+    const total=items.length,lost=items.filter(i=>i.type==='สิ่งของสูญหาย').length;
+    const found=items.filter(i=>i.type==='พบสิ่งของ').length,pickup=items.filter(i=>i.type==='รับของคืน').length;
     const returned=items.filter(i=>(i.status||'').includes('รับของคืนแล้ว')||i.type==='รับของคืน').length;
     const rate=total>0?((returned/total)*100).toFixed(1)+'%':'0%';
-
-    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(26,58,92);
-    doc.text(`${periodLabel}  (${reportLabel})`,ML,curY); curY+=6;
-    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(108,122,137);
-    doc.text(`Doc Code: ${docCode}   |   Generated: ${fmtDT(now)}`,ML,curY); curY+=8;
-    doc.setDrawColor(232,160,32); doc.setLineWidth(1); doc.line(ML,curY,PW-MR,curY); curY+=5; doc.setLineWidth(0.3);
-
-    // KPI boxes
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,58,92);
-    doc.text('Summary / สรุปภาพรวม',ML,curY); curY+=5;
-    const kpis=[{l:'Total\nรวม',v:total,c:[26,58,92],b:[240,243,248]},{l:'Lost\nสูญหาย',v:lost,c:[192,57,43],b:[253,238,234]},
-      {l:'Found\nพบของ',v:found,c:[30,126,68],b:[237,247,241]},{l:'Claimed\nรับคืน',v:pickup,c:[26,82,118],b:[234,241,251]},
-      {l:'Returned\nสำเร็จ',v:returned,c:[30,126,68],b:[237,247,241]},{l:'Rate\nอัตรา',v:rate,c:[232,160,32],b:[255,251,235]}];
+    doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(26,58,92);
+    doc.text(`${periodEN}  (${reportLabel})`,ML,curY);curY+=6;
+    doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(108,122,137);
+    doc.text(`Doc: ${docCode}   |   Generated: ${fmtDT(now)}`,ML,curY);curY+=8;
+    doc.setDrawColor(232,160,32);doc.setLineWidth(1);doc.line(ML,curY,PW-MR,curY);curY+=5;doc.setLineWidth(0.3);
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(26,58,92);
+    doc.text('Summary',ML,curY);curY+=5;
+    const kpis=[{l:'Total',v:total,c:[26,58,92],b:[240,243,248]},{l:'Lost',v:lost,c:[192,57,43],b:[253,238,234]},
+      {l:'Found',v:found,c:[30,126,68],b:[237,247,241]},{l:'Claimed',v:pickup,c:[26,82,118],b:[234,241,251]},
+      {l:'Returned',v:returned,c:[30,126,68],b:[237,247,241]},{l:'Rate',v:rate,c:[232,160,32],b:[255,251,235]}];
     const kw=(PW-ML-MR-15)/6;
     kpis.forEach((k,i)=>{
       const x=ML+i*(kw+3);
-      doc.setFillColor(...k.b); doc.roundedRect(x,curY,kw,22,2,2,'F');
-      doc.setDrawColor(...k.c); doc.setLineWidth(0.5); doc.line(x,curY,x,curY+22); doc.setLineWidth(0.3);
-      doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(...k.c);
+      doc.setFillColor(...k.b);doc.roundedRect(x,curY,kw,22,2,2,'F');
+      doc.setDrawColor(...k.c);doc.setLineWidth(0.5);doc.line(x,curY,x,curY+22);doc.setLineWidth(0.3);
+      doc.setFontSize(13);doc.setFont('helvetica','bold');doc.setTextColor(...k.c);
       doc.text(String(k.v),x+kw/2,curY+11,{align:'center'});
-      doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(108,122,137);
-      k.l.split('\n').forEach((l,li)=>doc.text(l,x+kw/2,curY+16+li*3.5,{align:'center'}));
+      doc.setFontSize(6.5);doc.setFont('helvetica','normal');doc.setTextColor(108,122,137);
+      doc.text(k.l,x+kw/2,curY+17,{align:'center'});
     });
     curY+=28;
-
-    if (pdfType==='daily'||pdfType==='custom') {
-      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,58,92);
-      doc.text('Detail / รายการทั้งหมด',ML,curY); curY+=4;
-      if (!items.length) { doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(108,122,137); doc.text('No records found for this period.',ML,curY+5); }
-      else {
+    if(pdfType==='daily'||pdfType==='custom'){
+      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(26,58,92);
+      doc.text('Detail — All Records',ML,curY);curY+=4;
+      if(!items.length){doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(108,122,137);doc.text('No records found for this period.',ML,curY+5);}
+      else{
         doc.autoTable({startY:curY,margin:{left:ML,right:MR},
           styles:{fontSize:7.5,cellPadding:2.5,font:'helvetica'},
           headStyles:{fillColor:[26,58,92],textColor:255,fontStyle:'bold'},
           alternateRowStyles:{fillColor:[248,250,253]},
           head:[['RefCode','Type','Description','Reporter','Dept','Time','Status']],
-          body:items.map(it=>[it.refCode||'(เดิม)',it.type,(it.title||'').substring(0,45),it.name||'-',(it.dept||'-').substring(0,18),fmtDT(it.dateObj),it.status||'รอดำเนินการ']),
+          body:items.map(it=>[it.refCode||'(old)',it.type,(it.title||'').substring(0,45),it.name||'-',(it.dept||'-').substring(0,18),fmtDT(it.dateObj),it.status||'Pending']),
           didDrawPage:()=>{pageNum++;hdr();ftr();}
         });
         curY=doc.lastAutoTable.finalY+8;
       }
-    } else if (pdfType==='monthly') {
+    } else if(pdfType==='monthly'){
       const byDay={};
       items.forEach(it=>{const d=it.dateObj.getDate();if(!byDay[d])byDay[d]={lost:0,found:0,pickup:0};
         if(it.type==='สิ่งของสูญหาย')byDay[d].lost++;else if(it.type==='พบสิ่งของ')byDay[d].found++;else byDay[d].pickup++;});
@@ -969,7 +848,7 @@ async function runPdfExport() {
         didDrawPage:()=>{pageNum++;hdr();ftr();}
       });
       curY=doc.lastAutoTable.finalY+8;
-    } else if (pdfType==='yearly') {
+    } else if(pdfType==='yearly'){
       const byMonth={};
       for(let m=0;m<12;m++)byMonth[m]={lost:0,found:0,pickup:0,returned:0};
       items.forEach(it=>{const m=it.dateObj.getMonth();
@@ -978,48 +857,40 @@ async function runPdfExport() {
       doc.autoTable({startY:curY,margin:{left:ML,right:MR},
         styles:{fontSize:8,cellPadding:2.5,font:'helvetica'},
         headStyles:{fillColor:[26,58,92],textColor:255,fontStyle:'bold'},
-        head:[['Month / เดือน','Lost','Found','Claimed','Total','Rate%']],
-        body:Array.from({length:12},(_,m)=>{const r=byMonth[m];const t=r.lost+r.found+r.pickup;return[`${THAI_MONTHS_FULL[m]} / ${EN_MONTHS[m]}`,r.lost,r.found,r.pickup,t,t>0?((r.returned/t)*100).toFixed(1)+'%':'0%'];}),
+        head:[['Month','Lost','Found','Claimed','Total','Rate%']],
+        body:Array.from({length:12},(_,m)=>{const r=byMonth[m];const t=r.lost+r.found+r.pickup;return[EN_MONTHS[m],r.lost,r.found,r.pickup,t,t>0?((r.returned/t)*100).toFixed(1)+'%':'0%'];}),
         foot:[['Total',lost,found,pickup,total,rate]],
         footStyles:{fillColor:[232,160,32],textColor:255,fontStyle:'bold'},
         didDrawPage:()=>{pageNum++;hdr();ftr();}
       });
       curY=doc.lastAutoTable.finalY+8;
     }
-
-    // Signature
     if(curY>PH-55){doc.addPage();pageNum++;hdr();ftr();curY=34;}
-    curY+=5; doc.setDrawColor(213,220,232); doc.setLineWidth(0.5); doc.line(ML,curY,PW-MR,curY); curY+=8;
-    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(26,58,92);
-    doc.text('Certification / การรับรองเอกสาร',ML,curY); curY+=6;
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(28,40,51);
-    doc.text('This report is generated from the Lost & Found Management System of Traffic Control and Safety Unit, Mahidol University.',ML,curY); curY+=8;
+    curY+=5;doc.setDrawColor(213,220,232);doc.setLineWidth(0.5);doc.line(ML,curY,PW-MR,curY);curY+=8;
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(26,58,92);
+    doc.text('Certification',ML,curY);curY+=6;
+    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(28,40,51);
+    doc.text('This report is generated from the Lost & Found Management System of Traffic Control and Safety Unit, Mahidol University.',ML,curY);curY+=8;
     const sw=(PW-ML-MR-20)/3;
-    [['Preparer / ผู้จัดทำ',preparer,position],['Checker / ผู้ตรวจสอบ','…………………………','……………'],['Approver / ผู้อนุมัติ','…………………………','……………']].forEach((s,i)=>{
-      const x=ML+i*(sw+10); doc.setDrawColor(213,220,232); doc.roundedRect(x,curY,sw,28,2,2,'S');
-      doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(108,122,137);
+    [['Preparer',preparer,position],['Checker','…………………………','……………'],['Approver','…………………………','……………']].forEach((s,i)=>{
+      const x=ML+i*(sw+10);doc.setDrawColor(213,220,232);doc.roundedRect(x,curY,sw,28,2,2,'S');
+      doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(108,122,137);
       doc.text(s[0],x+sw/2,curY+5,{align:'center'});
-      doc.setDrawColor(180,190,210); doc.line(x+5,curY+16,x+sw-5,curY+16);
-      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(28,40,51);
+      doc.setDrawColor(180,190,210);doc.line(x+5,curY+16,x+sw-5,curY+16);
+      doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(28,40,51);
       doc.text(s[1].substring(0,20),x+sw/2,curY+20,{align:'center'});
-      doc.setTextColor(108,122,137); doc.text(s[2].substring(0,20),x+sw/2,curY+25,{align:'center'});
+      doc.setTextColor(108,122,137);doc.text(s[2].substring(0,20),x+sw/2,curY+25,{align:'center'});
     });
-
-    const fname=`LF_Report_${docCode}.pdf`;
-    doc.save(fname);
+    doc.save(`LF_Report_${docCode}.pdf`);
     closePdfModal();
-    alert(`✅ สร้าง PDF สำเร็จ: ${fname}\n(${items.length} รายการ)`);
-  } catch(e) {
-    console.error(e); alert('❌ เกิดข้อผิดพลาด: '+e.message);
-  } finally {
-    btn.disabled=false; btn.textContent='📄 สร้าง PDF และดาวน์โหลด';
-  }
+    alert(`✅ สร้าง PDF สำเร็จ: LF_Report_${docCode}.pdf\n(${items.length} รายการ)`);
+  } catch(e){console.error(e);alert('❌ เกิดข้อผิดพลาด: '+e.message);}
+  finally{btn.disabled=false;btn.textContent='📄 สร้าง PDF และดาวน์โหลด';}
 }
 </script>
 
-<!-- FOOTER -->
 <footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
-  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Dashboard — San v1.3.0</span></div>
+  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Dashboard — v1.3.1</span></div>
   <div style="font-size:11.5px;margin-top:3px;">
     © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.<br>
     <span style="opacity:0.55;">Developed by Traffic Control and Premises Security Unit, Mahidol University</span>
