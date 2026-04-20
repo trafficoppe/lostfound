@@ -752,10 +752,10 @@ function fmtDateTimeTH_pdf(d) {
   if (!d) return "-";
   const M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
              "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-  return d.getDate() + " " + M[d.getMonth()] + " "
+    return d.getDate() + " " + M[d.getMonth()] + " "
        + (d.getFullYear()+543) + " "
        + String(d.getHours()).padStart(2,"0") + ":"
-       + String(d.getMinutes()).padStart(2,"0");
+       + String(d.getMinutes()).padStart(2,"0") + " น.";
 }
   
 
@@ -834,42 +834,52 @@ async function runPdfExport() {
     const MIDBLUE= [45,95,143];
     const MUTED  = [108,122,137];
 
-    // ── ฟังก์ชัน Header (เรียกทุกหน้า) ──
+   // ── ฟังก์ชัน Header (เรียกทุกหน้า) ──
     const hdr = () => {
-      // พื้นหลัง header navy
-      doc.setFillColor(...NAVY); doc.rect(0,0,PW,32,"F");
-      doc.setFillColor(...MIDBLUE); doc.rect(0,29,PW,3,"F");
-      
-      // ตราม.มหิดล — ซ้ายบน
-     if (_muLogoData) doc.addImage(_muLogoData, "PNG", ML, 2, 26, 26);
-
-      // ข้อความ header — ขวาจากโลโก้
-      const tx = ML + 30;
+      doc.setFillColor(...NAVY); doc.rect(0,0,PW,34,"F");
+      doc.setFillColor(...MIDBLUE); doc.rect(0,31,PW,3,"F");
+      if (_muLogoData) doc.addImage(_muLogoData, "PNG", ML, 2, 28, 28);
+      const tx = ML + 32;
       doc.setTextColor(...WHITE);
-      sf("bold", 13);
-      doc.text("รายงานสรุประบบแจ้งของหาย/พบของ", tx, 11);
-      sf("normal", 9);
-      doc.text("งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล", tx, 19);
-      sf("normal", 7.5);
-      const pageLabel = "หน้า " + pageNum;
-      doc.setFont(F,"bold"); doc.text(pageLabel, PW-MR, 26, {align:"right"}); doc.setFont(F,"normal");
-      doc.text("ช่วงเวลา: " + periodTH + "   |   รหัสเอกสาร: " + docCode, tx, 26);
-      
+      sf("bold", 15);
+      doc.text("รายงานสรุประบบแจ้งของหาย/พบของ", tx, 12);
+      sf("normal", 10);
+      doc.text("งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล", tx, 21);
+      sf("bold", 8);
+      doc.text("ช่วงเวลา: ", tx, 29);
+      sf("normal", 8);
+      doc.text(periodTH + "   |   ", tx + doc.getTextWidth("ช่วงเวลา: "), 29);
+      sf("bold", 8);
+      const afterPeriod = tx + doc.getTextWidth("ช่วงเวลา: " + periodTH + "   |   ");
+      doc.text("รหัสเอกสาร: ", afterPeriod, 29);
+      sf("normal", 8);
+      doc.text(docCode, afterPeriod + doc.getTextWidth("รหัสเอกสาร: "), 29);
+      sf("bold", 8);
+      doc.text("หน้า " + pageNum, PW-MR, 29, {align:"right"});
       doc.setTextColor(...BLACK);
     };
 
     // ── Footer ──
     const ftr = () => {
       doc.setDrawColor(...BLACK); doc.setLineWidth(0.3); doc.line(ML,PH-14,PW-MR,PH-14);
-      sf("normal",7.5); doc.setTextColor(...BLACK);
-      doc.text("ผู้จัดทำ: " + preparer + " (" + position + ")", ML, PH-10);
-      doc.text("วัตถุประสงค์: " + purpose, ML, PH-6);
-      doc.text("พิมพ์เมื่อ: " + fmtDateTimeTH_pdf(now), PW-MR, PH-10, {align:"right"});
-      doc.text("งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล", PW-MR, PH-6, {align:"right"});
+      doc.setTextColor(...BLACK);
+      // ซ้าย บรรทัด 1: ผู้จัดทำ (bold) + ชื่อ (normal)
+      sf("bold",7.5); doc.text("ผู้จัดทำ: ", ML, PH-10);
+      sf("normal",7.5); doc.text(preparer + " (" + position + ")", ML + doc.getTextWidth("ผู้จัดทำ: "), PH-10);
+      // ซ้าย บรรทัด 2: วัตถุประสงค์ (bold) + ค่า (normal)
+      sf("bold",7.5); doc.text("วัตถุประสงค์: ", ML, PH-6);
+      sf("normal",7.5); doc.text(purpose, ML + doc.getTextWidth("วัตถุประสงค์: "), PH-6);
+      // ขวา บรรทัด 1: พิมพ์เมื่อ (bold) + เวลา (normal)
+      const printTime = fmtDateTimeTH_pdf(now);
+      const timeWidth = doc.getTextWidth(printTime);
+      sf("normal",7.5); doc.text(printTime, PW-MR, PH-10, {align:"right"});
+      sf("bold",7.5); doc.text("พิมพ์เมื่อ: ", PW-MR - timeWidth, PH-10, {align:"right"});
+      // ขวา บรรทัด 2: งานจราจรฯ (normal)
+      sf("normal",7.5); doc.text("งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล", PW-MR, PH-6, {align:"right"});
     };
 
     // ── วาด PAGE 1 ──
-    hdr(); ftr(); curY = 36;
+    hdr(); ftr(); curY = 40;
 
     const total    = items.length;
     const lost     = items.filter(i=>i.type==="สิ่งของสูญหาย").length;
@@ -878,11 +888,11 @@ async function runPdfExport() {
     const returned = items.filter(i=>(i.status||"").includes("รับของคืนแล้ว")||i.type==="รับของคืน").length;
     const rate     = total > 0 ? Math.round((returned/total)*100)+"%" : "0%";
 
-    // ── ชื่อรายงาน + รหัส ──
-    sf("bold",12); doc.setTextColor(...NAVY);
-    doc.text(periodTH + "  (" + reportLabel + ")", ML, curY); curY+=7;
-    sf("normal",8); doc.setTextColor(...BLACK);
-    doc.text("รหัสเอกสาร: " + docCode + "   |   สร้างเมื่อ: " + fmtDateTimeTH_pdf(now), ML, curY); curY+=9;
+   // ── ชื่อรายงาน + รหัส ──
+    sf("bold",14); doc.setTextColor(...NAVY);
+    doc.text(periodTH + "  (" + reportLabel + ")", ML, curY); curY+=9;
+    sf("normal",10); doc.setTextColor(...BLACK);
+    doc.text("รหัสเอกสาร: " + docCode + "   |   สร้างเมื่อ: " + fmtDateTimeTH_pdf(now), ML, curY); curY+=12;
 
     // เส้นคั่นสีดำ
     doc.setDrawColor(...BLACK); doc.setLineWidth(1); doc.line(ML,curY,PW-MR,curY); curY+=5; doc.setLineWidth(0.3);
@@ -956,7 +966,7 @@ async function runPdfExport() {
               it.status||"รอดำเนินการ"
             ];
           }),
-          didDrawPage:()=>{pageNum++;hdr();ftr();}
+          didDrawPage:(data)=>{ if(data.pageNumber>1){pageNum++;} hdr();ftr(); }
         });
         curY=doc.lastAutoTable.finalY+10;
       }
@@ -981,7 +991,7 @@ async function runPdfExport() {
         }),
         foot:[["รวมทั้งหมด",lost,found,pickup,total]],
         footStyles:{fillColor:[240,243,248],textColor:[28,40,51],fontStyle:"bold"},
-        didDrawPage:()=>{pageNum++;hdr();ftr();}
+     didDrawPage:(data)=>{ if(data.pageNumber>1){pageNum++;} hdr();ftr(); }
       });
       curY=doc.lastAutoTable.finalY+10;
     } else if (pdfType==="yearly") {
@@ -1007,13 +1017,13 @@ async function runPdfExport() {
         }),
         foot:[["รวม",lost,found,pickup,total,rate]],
         footStyles:{fillColor:[240,243,248],textColor:[28,40,51],fontStyle:"bold"},
-        didDrawPage:()=>{pageNum++;hdr();ftr();}
+       didDrawPage:(data)=>{ if(data.pageNumber>1){pageNum++;} hdr();ftr(); }
       });
       curY=doc.lastAutoTable.finalY+10;
     }
 
     // ── กล่องลายเซ็น ──
-    if (curY > PH-75) { doc.addPage(); pageNum++; hdr(); ftr(); curY=36; }
+   if (curY > PH-75) { doc.addPage(); pageNum++; hdr(); ftr(); curY=40; }
     curY+=6;
     doc.setDrawColor(...BLACK); doc.setLineWidth(0.5); doc.line(ML,curY,PW-MR,curY); curY+=9;
     sf("bold",9.5); doc.setTextColor(...NAVY);
