@@ -729,12 +729,12 @@ function setPdfType(t){
   });
 }
 
-const _FONT_NAME = "Sarabun";
+const _FONT_NAME = "NotoSansThai";
 
   async function _registerThaiFont(doc) {
   const [rBuf, bBuf] = await Promise.all([
-    fetch("./fonts/Sarabun-Regular.ttf").then(r => r.arrayBuffer()),
-    fetch("./fonts/Sarabun-Bold.ttf").then(r => r.arrayBuffer()),
+    fetch("./fonts/NotoSansThai-Regular.ttf").then(r => r.arrayBuffer()),
+    fetch("./fonts/NotoSansThai-Bold.ttf").then(r => r.arrayBuffer()),
   ]);
   const toBase64 = buf => {
     const bytes = new Uint8Array(buf);
