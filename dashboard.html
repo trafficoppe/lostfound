@@ -994,8 +994,10 @@ async function runPdfExport() {
         styles:{fontSize:9,cellPadding:3,font:F,textColor:[28,40,51]},
         headStyles:{fillColor:[26,58,92],textColor:255,fontStyle:"bold"},
         head:[["วันที่","สูญหาย","พบของ","รับคืน","รวม"]],
-        body:Object.keys(byDay).map(Number).sort((a,b)=>a-b).map(d=>{
-          const r=byDay[d]; return[d,r.lost,r.found,r.pickup,r.lost+r.found+r.pickup];
+       body:Object.keys(byDay).map(Number).sort((a,b)=>a-b).map(d=>{
+          const r=byDay[d];
+          const monthName = THAI_MONTHS_FULL[parseInt(document.getElementById("p-monthly-month").value)-1];
+          return[d + " " + monthName, r.lost, r.found, r.pickup, r.lost+r.found+r.pickup];
         }),
         foot:[["รวมทั้งหมด",lost,found,pickup,total]],
         footStyles:{fillColor:[240,243,248],textColor:[28,40,51],fontStyle:"bold"},
