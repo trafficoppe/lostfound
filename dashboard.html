@@ -848,9 +848,10 @@ async function runPdfExport() {
       sf("bold", 8);
       doc.text("ช่วงเวลา: ", tx, 29);
       sf("normal", 8);
-      doc.text(periodTH + "   |   ", tx + doc.getTextWidth("ช่วงเวลา: "), 29);
+      const periodText = periodTH + "   |   ";
+      doc.text(periodText, tx + doc.getTextWidth("ช่วงเวลา: "), 29);
       sf("bold", 8);
-      const afterPeriod = tx + doc.getTextWidth("ช่วงเวลา: " + periodTH + "   |   ");
+      const afterPeriod = tx + doc.getTextWidth("ช่วงเวลา: " + periodText);
       doc.text("รหัสเอกสาร: ", afterPeriod, 29);
       sf("normal", 8);
       doc.text(docCode, afterPeriod + doc.getTextWidth("รหัสเอกสาร: "), 29);
@@ -860,26 +861,23 @@ async function runPdfExport() {
     };
 
     // ── Footer ──
-    const ftr = () => {
+   const ftr = () => {
       doc.setDrawColor(...BLACK); doc.setLineWidth(0.3); doc.line(ML,PH-14,PW-MR,PH-14);
       doc.setTextColor(...BLACK);
-      // ซ้าย บรรทัด 1: ผู้จัดทำ (bold) + ชื่อ (normal)
       sf("bold",7.5); doc.text("ผู้จัดทำ: ", ML, PH-10);
       sf("normal",7.5); doc.text(preparer + " (" + position + ")", ML + doc.getTextWidth("ผู้จัดทำ: "), PH-10);
-      // ซ้าย บรรทัด 2: วัตถุประสงค์ (bold) + ค่า (normal)
       sf("bold",7.5); doc.text("วัตถุประสงค์: ", ML, PH-6);
       sf("normal",7.5); doc.text(purpose, ML + doc.getTextWidth("วัตถุประสงค์: "), PH-6);
-      // ขวา บรรทัด 1: พิมพ์เมื่อ (bold) + เวลา (normal)
       const printTime = fmtDateTimeTH_pdf(now);
-      const timeWidth = doc.getTextWidth(printTime);
-      sf("normal",7.5); doc.text(printTime, PW-MR, PH-10, {align:"right"});
-      sf("bold",7.5); doc.text("พิมพ์เมื่อ: ", PW-MR - timeWidth, PH-10, {align:"right"});
-      // ขวา บรรทัด 2: งานจราจรฯ (normal)
-      sf("normal",7.5); doc.text("งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล", PW-MR, PH-6, {align:"right"});
+      const labelPrint = "พิมพ์เมื่อ: ";
+      const totalPrintWidth = doc.getTextWidth(labelPrint + printTime);
+      sf("bold",7.5); doc.text(labelPrint, PW-MR - totalPrintWidth, PH-10);
+      sf("normal",7.5); doc.text(printTime, PW-MR - totalPrintWidth + doc.getTextWidth(labelPrint), PH-10);
+      sf("bold",7.5); doc.text("งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล", PW-MR, PH-6, {align:"right"});
     };
 
     // ── วาด PAGE 1 ──
-    hdr(); ftr(); curY = 40;
+  pageNum = 1; hdr(); ftr(); curY = 44;
 
     const total    = items.length;
     const lost     = items.filter(i=>i.type==="สิ่งของสูญหาย").length;
@@ -891,8 +889,17 @@ async function runPdfExport() {
    // ── ชื่อรายงาน + รหัส ──
     sf("bold",14); doc.setTextColor(...NAVY);
     doc.text(periodTH + "  (" + reportLabel + ")", ML, curY); curY+=9;
-    sf("normal",10); doc.setTextColor(...BLACK);
-    doc.text("รหัสเอกสาร: " + docCode + "   |   สร้างเมื่อ: " + fmtDateTimeTH_pdf(now), ML, curY); curY+=12;
+   sf("bold",10); doc.setTextColor(...BLACK);
+    doc.text("รหัสเอกสาร: ", ML, curY);
+    sf("normal",10);
+    const afterRef = ML + doc.getTextWidth("รหัสเอกสาร: ");
+    doc.text(docCode + "   |   ", afterRef, curY);
+    sf("bold",10);
+    const afterDocCode = afterRef + doc.getTextWidth(docCode + "   |   ");
+    doc.text("สร้างเมื่อ: ", afterDocCode, curY);
+    sf("normal",10);
+    doc.text(fmtDateTimeTH_pdf(now), afterDocCode + doc.getTextWidth("สร้างเมื่อ: "), curY);
+    curY+=12;
 
     // เส้นคั่นสีดำ
     doc.setDrawColor(...BLACK); doc.setLineWidth(1); doc.line(ML,curY,PW-MR,curY); curY+=5; doc.setLineWidth(0.3);
@@ -932,25 +939,26 @@ async function runPdfExport() {
         // คอลัมน์: RefCode(22) | ประเภท(20) | รายละเอียด(50) | ผู้แจ้ง(26) | คณะ(28) | วันที่(22) | สถานะ(24)
         doc.autoTable({
           startY:curY, margin:{left:ML,right:MR},
-          styles:{
+           styles:{
             fontSize:8, cellPadding:2.5, font:F,
             overflow:"linebreak",
-            textColor:[28,40,51],    // body สีดำ
+            textColor:[28,40,51],
             halign:"left",
+            minCellHeight: 10,
           },
           headStyles:{
             fillColor:[26,58,92], textColor:255, fontStyle:"bold", fontSize:8,
             cellPadding:3,
           },
           alternateRowStyles:{fillColor:[248,250,253]},
-          columnStyles:{
-            0:{ cellWidth:22, overflow:"linebreak" },   // RefCode — ตัดที่ขีด
-            1:{ cellWidth:20 },                          // ประเภท
-            2:{ cellWidth:47, overflow:"linebreak" },   // รายละเอียด
-            3:{ cellWidth:26, overflow:"linebreak" },   // ผู้แจ้ง
-            4:{ cellWidth:28, overflow:"linebreak" },   // คณะ
-            5:{ cellWidth:22 },                          // วันที่
-            6:{ cellWidth:"auto" },                      // สถานะ
+         columnStyles:{
+            0:{ cellWidth:20 },
+            1:{ cellWidth:18 },
+            2:{ cellWidth:45, overflow:"linebreak" },
+            3:{ cellWidth:24, overflow:"linebreak" },
+            4:{ cellWidth:32, overflow:"linebreak" },
+            5:{ cellWidth:24 },
+            6:{ cellWidth:"auto" },
           },
           head:[["RefCode","ประเภท","รายละเอียด","ผู้แจ้ง","คณะ/หน่วยงาน","วันที่/เวลา","สถานะ"]],
           body:items.map(it=>{
@@ -966,7 +974,7 @@ async function runPdfExport() {
               it.status||"รอดำเนินการ"
             ];
           }),
-          didDrawPage:(data)=>{ if(data.pageNumber>1){pageNum++;} hdr();ftr(); }
+     didDrawPage:(data)=>{ pageNum = data.pageNumber; hdr();ftr(); }
         });
         curY=doc.lastAutoTable.finalY+10;
       }
@@ -991,7 +999,7 @@ async function runPdfExport() {
         }),
         foot:[["รวมทั้งหมด",lost,found,pickup,total]],
         footStyles:{fillColor:[240,243,248],textColor:[28,40,51],fontStyle:"bold"},
-     didDrawPage:(data)=>{ if(data.pageNumber>1){pageNum++;} hdr();ftr(); }
+     didDrawPage:(data)=>{ pageNum = data.pageNumber; hdr();ftr(); }
       });
       curY=doc.lastAutoTable.finalY+10;
     } else if (pdfType==="yearly") {
@@ -1017,7 +1025,7 @@ async function runPdfExport() {
         }),
         foot:[["รวม",lost,found,pickup,total,rate]],
         footStyles:{fillColor:[240,243,248],textColor:[28,40,51],fontStyle:"bold"},
-       didDrawPage:(data)=>{ if(data.pageNumber>1){pageNum++;} hdr();ftr(); }
+       didDrawPage:(data)=>{ pageNum = data.pageNumber; hdr();ftr(); }
       });
       curY=doc.lastAutoTable.finalY+10;
     }
