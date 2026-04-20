@@ -764,10 +764,7 @@ async function runPdfExport() {
   btn.disabled = true; btn.textContent = "⏳ กำลังสร้าง...";
   try {
     let fromDate, toDate, periodTH, reportLabel;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
-    await _registerThaiFont(doc);
-
+  
     // ▼▼▼ เพิ่มตรงนี้ ▼▼▼
     let _muLogoData = null;
     try {
@@ -776,10 +773,14 @@ async function runPdfExport() {
       let logoBin = "";
       for (let i = 0; i < logoBytes.length; i++) logoBin += String.fromCharCode(logoBytes[i]);
       _muLogoData = "data:image/png;base64," + btoa(logoBin);
-    } catch(e) { /* ไม่มีโลโก้ก็ข้ามไป */ }
+   } catch(e) { /* ไม่มีโลโก้ก็ข้ามไป */ }
     // ▲▲▲ จบที่เพิ่ม ▲▲▲
 
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+    await _registerThaiFont(doc);
     const PW = 210, PH = 297, ML = 14, MR = 14;
+
     if (pdfType === "daily") {
       const d = new Date(document.getElementById("p-daily-date").value);
       fromDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
