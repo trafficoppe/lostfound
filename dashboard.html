@@ -824,12 +824,7 @@ async function runPdfExport() {
       + now.getFullYear() + String(now.getMonth()+1).padStart(2,"0") + String(now.getDate()).padStart(2,"0")
       + "-" + String(Math.floor(Math.random()*900)+100);
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
-await _registerThaiFont(doc);
-
-    const PW = 210, PH = 297, ML = 14, MR = 14;
-    let curY = 15, pageNum = 1;
+       let curY = 15, pageNum = 1;
     const F = _FONT_NAME;
     const sf = (style="normal", size=9) => { doc.setFont(F, style); doc.setFontSize(size); };
     const BLACK  = [28,40,51];
