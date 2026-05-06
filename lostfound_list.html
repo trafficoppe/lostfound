@@ -311,6 +311,8 @@ function driveThumb(raw,size='w400'){
 function parseAnyDate(str){
   if(!str)return null;
   const s=String(str).trim();
+  const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if(iso){const d=new Date(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]),parseInt(iso[4]),parseInt(iso[5]),parseInt(iso[6]||0));if(!isNaN(d))return d;}
   const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if(m){const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0),parseInt(m[6]||0));if(!isNaN(d))return d;}
   try{const d=new Date(s);if(!isNaN(d)&&d.getFullYear()>2000)return d;}catch(e){}
@@ -525,6 +527,24 @@ function closeStatusModal(){document.getElementById('status-modal').classList.re
 async function saveStatus(){
   const status=document.getElementById('modal-status-select').value;
   const actionText=document.getElementById('modal-action-text').value;
+
+  // ★ บังคับกรอกชื่อผู้บันทึกก่อน
+  const staffName=(document.getElementById('staff-selected-name').value||'').trim()
+                ||(document.getElementById('staff-input').value||'').trim();
+  if(!staffName){
+    const inp=document.getElementById('staff-input');
+    inp.style.border='2px solid #c0392b';
+    inp.style.background='#fff5f5';
+    inp.placeholder='⚠️ กรุณากรอกชื่อก่อนบันทึก';
+    inp.focus();
+    setTimeout(()=>{
+      inp.style.border='';
+      inp.style.background='';
+      inp.placeholder='พิมพ์ชื่อเพื่อค้นหา...';
+    },3000);
+    return;
+  }
+
   if(!editingRef)return;
   const btn=document.getElementById('btn-save-modal');
   btn.textContent='⏳ กำลังบันทึก...';btn.disabled=true;
@@ -534,7 +554,6 @@ async function saveStatus(){
     params.append('refCode',editingRef);
     params.append('status',status);
     params.append('actionText',actionText);
-    const staffName=document.getElementById('staff-selected-name').value||document.getElementById('staff-input').value||'admin01';
     const now=new Date();
     const updatedAt=now.toLocaleString('th-TH');
     params.append('updatedBy',`${staffName} (${updatedAt})`);
