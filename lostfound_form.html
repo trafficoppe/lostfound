@@ -457,7 +457,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
           <div class="file-zone">
             <input type="file" accept="image/*" onchange="previewFile(this,'pv-lost')" multiple>
             <div class="file-zone-icon">📷</div>
-            <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+           <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ (บีบอัดอัตโนมัติ)</strong></div>
           </div>
           <div class="file-preview" id="pv-lost"></div>
         </div>
@@ -523,7 +523,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
           <div class="file-zone">
             <input type="file" accept="image/*" onchange="previewFile(this,'pv-found')" multiple>
             <div class="file-zone-icon">📷</div>
-            <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ ไม่เกิน 100MB</strong></div>
+            <div class="file-zone-text">แตะเพื่อแนบรูปภาพ<br><strong>สูงสุด 5 ไฟล์ (บีบอัดอัตโนมัติ)</strong></div>
           </div>
           <div class="file-preview" id="pv-found"></div>
         </div>
@@ -563,7 +563,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
         <div class="file-zone">
           <input type="file" accept="image/*" onchange="previewFile(this,'pv-pickup')">
           <div class="file-zone-icon">🪪</div>
-          <div class="file-zone-text">แตะเพื่อแนบรูปบัตร<br><strong>1 ไฟล์ ไม่เกิน 10MB</strong></div>
+         <div class="file-zone-text">แตะเพื่อแนบรูปบัตร<br><strong>1 ไฟล์ (บีบอัดอัตโนมัติ)</strong></div>
         </div>
         <div class="file-preview" id="pv-pickup"></div>
       </div>
@@ -919,6 +919,27 @@ function fileToBase64(file) {
     r.onerror = () => rej();
     r.readAsDataURL(file);
   });
+} // ========= IMAGE COMPRESSION =========
+async function compressImage(file, maxW = 1600, quality = 0.82) {
+  if (!file.type.startsWith('image/') || file.size < 300 * 1024) return file;
+  return new Promise((res) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const ratio  = Math.min(maxW / img.width, maxW / img.height, 1);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => res(blob ? new File([blob], file.name, {type: 'image/jpeg'}) : file),
+        'image/jpeg', quality
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(file); };
+    img.src = url;
+  });
 }
 
 // ========= SUBMIT =========
@@ -945,15 +966,16 @@ async function submitForm() {
     itemDesc = document.getElementById('d-pickup-desc').value;
   }
 
-  // Convert files to base64
+// Convert files to base64 (พร้อม compress ก่อน)
   const typeKey = currentType;
   const files = uploadedFiles[typeKey] || [];
   const fileData = [];
-  for (const f of files.slice(0,5)) {
+  for (const f of files.slice(0, 5)) {
     try {
-      const b64 = await fileToBase64(f);
-      fileData.push({ name: f.name, mime: f.type, data: b64 });
-    } catch(e) {}
+      const compressed = await compressImage(f);
+      const b64 = await fileToBase64(compressed);
+      fileData.push({ name: compressed.name, mime: compressed.type, data: b64 });
+    } catch(e) { console.warn('compress error:', e); }
   }
 
   const payload = {
@@ -970,33 +992,22 @@ async function submitForm() {
     files: fileData
   };
 
-  // Show sending overlay
+// Show sending overlay
   document.getElementById('sending-overlay').classList.add('show');
 
-  let submitOk = false;
-  try {
-    // ส่งแบบ URLSearchParams + no-cors → GAS รับได้ผ่าน e.parameter
-    const params = new URLSearchParams();
-    params.append('action', 'submit');
-    Object.keys(payload).forEach(k => {
-      if (k === 'files') {
-        params.append('files', JSON.stringify(payload.files));
-      } else {
-        params.append(k, String(payload[k] || ''));
-      }
-    });
+  const params = new URLSearchParams();
+  params.append('action', 'submit');
+  Object.keys(payload).forEach(k => {
+    if (k === 'files') {
+      params.append('files', JSON.stringify(payload.files));
+    } else {
+      params.append(k, String(payload[k] || ''));
+    }
+  });
 
-    await fetch(GAS_URL, {
-      method: 'POST',
-      body: params,
-      mode: 'no-cors'
-    });
-    submitOk = true;
-    console.log('✅ ส่งข้อมูลไป GAS สำเร็จ');
-  } catch(e) {
-    console.warn('⚠️ GAS fetch error:', e);
-    submitOk = false;
-  }
+  // Fire-and-forget: ไม่ await — GAS no-cors ไม่มีประโยชน์รอตอบ
+  fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors', keepalive: true })
+    .catch(e => console.warn('⚠️ GAS fetch error (non-fatal):', e));
 
   document.getElementById('sending-overlay').classList.remove('show');
 
