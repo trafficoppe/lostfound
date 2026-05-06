@@ -314,6 +314,14 @@ function fmtDate(d) {
 function parseDate(str) {
   if (!str) return null;
   const s = String(str).trim();
+  // ISO format: yyyy-MM-dd HH:mm:ss (จาก GAS v1.3.2+)
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (iso) {
+    const d = new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3]),
+                       parseInt(iso[4]), parseInt(iso[5]), parseInt(iso[6]||0));
+    if (!isNaN(d)) return d;
+  }
+  // dd/mm/yyyy (รูปแบบเดิม — backward compat)
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (m) {
     const d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]),
