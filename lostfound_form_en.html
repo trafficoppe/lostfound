@@ -758,7 +758,7 @@ function fileToBase64(file) {
     r.onerror = () => rej();
     r.readAsDataURL(file);
   });
-}async function compressImage(file, maxW = 1600, quality = 0.82) {
+async function compressImage(file, maxW = 1280, quality = 0.7) {
   if (!file.type.startsWith('image/') || file.size < 300 * 1024) return file;
   return new Promise((res) => {
     const img = new Image();
@@ -833,8 +833,15 @@ document.getElementById('sending-overlay').classList.add('show');
     else params.append(k, String(payload[k] || ''));
   });
 
-  fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors', keepalive: true })
-    .catch(e => console.warn('⚠️ GAS error (non-fatal):', e));
+// ลบ keepalive:true (64KB limit) — await ให้ overlay ค้างจนส่งจริง
+  if (params.toString().length > 60 * 1024) {
+    document.getElementById('sending-overlay').classList.remove('show');
+    alert('Image files are too large.\nPlease reduce the number of photos or select smaller images (max 3 recommended).');
+    return;
+  }
+  try {
+    await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
+  } catch(e) { console.warn('⚠️ GAS error (non-fatal):', e); }
 
   document.getElementById('sending-overlay').classList.remove('show');
 
