@@ -249,12 +249,7 @@ tr.row-overdue td:first-child{border-left:3px solid #c0392b;}
       🕐 <span id="timestamp-display">—</span>
     </div>
     <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">สถานะ</label>
-    <select id="modal-status-select">
-      <option value="รอดำเนินการ">⏳ รอดำเนินการ</option>
-      <option value="ช่วยหาแล้วยังไม่พบ">🔎 ช่วยหาแล้วยังไม่พบ</option>
-      <option value="รับของคืนแล้ว">✅ รับของคืนแล้ว</option>
-      <option value="เจ้าของยังไม่มารับคืน">⏳ เจ้าของยังไม่มารับคืน</option>
-    </select>
+<select id="modal-status-select"></select>
     <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">บันทึกการดำเนินการ</label>
     <textarea id="modal-action-text" placeholder="เช่น: โทรแจ้งเจ้าของแล้ว..."></textarea>
     <div class="modal-btns">
@@ -514,7 +509,22 @@ function goPage(p){
 function openStatusModal(refCode,currentStatus,currentNote){
   editingRef=refCode;
   document.getElementById('modal-ref').textContent=refCode;
-  document.getElementById('modal-status-select').value=currentStatus||'รอดำเนินการ';
+
+  // Build options ตาม type — "ช่วยหาแล้วยังไม่พบ" มีเฉพาะ สิ่งของสูญหาย
+  const item = allData.find(function(d){ return d.refCode === refCode; });
+  const itemType = item ? item.type : '';
+  const baseOpts = [
+    ['รอดำเนินการ',           '⏳ รอดำเนินการ'],
+    ['รับของคืนแล้ว',         '✅ รับของคืนแล้ว'],
+    ['เจ้าของยังไม่มารับคืน', '⏳ เจ้าของยังไม่มารับคืน']
+  ];
+  if (itemType === 'สิ่งของสูญหาย') {
+    baseOpts.splice(1, 0, ['ช่วยหาแล้วยังไม่พบ','🔎 ช่วยหาแล้วยังไม่พบ']);
+  }
+  const sel = document.getElementById('modal-status-select');
+  sel.innerHTML = baseOpts.map(function(o){ return '<option value="'+o[0]+'">'+o[1]+'</option>'; }).join('');
+  sel.value = currentStatus || 'รอดำเนินการ';
+
   document.getElementById('modal-action-text').value=currentNote||'';
   document.getElementById('staff-input').value='';
   document.getElementById('staff-selected-name').value='';
