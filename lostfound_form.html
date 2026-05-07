@@ -762,21 +762,41 @@ function chkRad(el, groupId) {
 }
 
 // ========= FILE PREVIEW =========
-function previewFile(input, previewId) {
-  const preview = document.getElementById(previewId);
+function removeFile(typeKey, idx) {
+  uploadedFiles[typeKey].splice(idx, 1);
+  renderPreviews(typeKey);
+}
+
+function renderPreviews(typeKey) {
+  const preview = document.getElementById('pv-' + typeKey);
+  if (!preview) return;
   preview.innerHTML = '';
-  const typeKey = previewId.replace('pv-','');
-  uploadedFiles[typeKey] = Array.from(input.files);
-  uploadedFiles[typeKey].forEach(file => {
+  (uploadedFiles[typeKey] || []).forEach((file, idx) => {
     const reader = new FileReader();
     reader.onload = e => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-block;margin:2px;';
       const img = document.createElement('img');
       img.src = e.target.result;
       img.className = 'file-thumb';
-      preview.appendChild(img);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '✕';
+      btn.title = 'ลบรูปนี้';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#c0392b;color:white;border:none;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:10;';
+      btn.onclick = () => removeFile(typeKey, idx);
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      preview.appendChild(wrap);
     };
     reader.readAsDataURL(file);
   });
+}
+
+function previewFile(input, previewId) {
+  const typeKey = previewId.replace('pv-', '');
+  uploadedFiles[typeKey] = Array.from(input.files);
+  renderPreviews(typeKey);
 }
 
 // ========= TOAST VALIDATION =========
@@ -972,7 +992,11 @@ async function submitForm() {
   const fileData = [];
   for (const f of files.slice(0, 5)) {
     try {
-      const compressed = await compressImage(f);
+      let compressed = await compressImage(f);
+      // second pass ถ้าหลัง compress แล้วยังใหญ่เกิน 500KB
+      if (compressed.size > 500 * 1024) {
+        compressed = await compressImage(compressed, 960, 0.6);
+      }
       const b64 = await fileToBase64(compressed);
       fileData.push({ name: compressed.name, mime: compressed.type, data: b64 });
     } catch(e) { console.warn('compress error:', e); }
@@ -1005,12 +1029,7 @@ async function submitForm() {
     }
   });
 
-// ลบ keepalive:true (64KB limit) — await ให้ overlay ค้างจนส่งจริง
-  if (params.toString().length > 60 * 1024) {
-    document.getElementById('sending-overlay').classList.remove('show');
-    alert('ขนาดรูปภาพรวมใหญ่เกินไป\nกรุณาลดจำนวนรูปหรือเลือกรูปขนาดเล็กกว่า (แนะนำ: ไม่เกิน 3 รูป)');
-    return;
-  }
+// keepalive:true ถูกลบแล้ว — GAS web app รับ POST ได้ถึง ~50MB
   try {
     await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
   } catch(e) { console.warn('⚠️ GAS fetch error (non-fatal):', e); }
