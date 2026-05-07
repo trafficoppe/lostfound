@@ -920,7 +920,7 @@ function fileToBase64(file) {
     r.readAsDataURL(file);
   });
 } // ========= IMAGE COMPRESSION =========
-async function compressImage(file, maxW = 1600, quality = 0.82) {
+async function compressImage(file, maxW = 1280, quality = 0.7) {
   if (!file.type.startsWith('image/') || file.size < 300 * 1024) return file;
   return new Promise((res) => {
     const img = new Image();
@@ -1005,9 +1005,15 @@ async function submitForm() {
     }
   });
 
-  // Fire-and-forget: ไม่ await — GAS no-cors ไม่มีประโยชน์รอตอบ
-  fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors', keepalive: true })
-    .catch(e => console.warn('⚠️ GAS fetch error (non-fatal):', e));
+// ลบ keepalive:true (64KB limit) — await ให้ overlay ค้างจนส่งจริง
+  if (params.toString().length > 60 * 1024) {
+    document.getElementById('sending-overlay').classList.remove('show');
+    alert('ขนาดรูปภาพรวมใหญ่เกินไป\nกรุณาลดจำนวนรูปหรือเลือกรูปขนาดเล็กกว่า (แนะนำ: ไม่เกิน 3 รูป)');
+    return;
+  }
+  try {
+    await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
+  } catch(e) { console.warn('⚠️ GAS fetch error (non-fatal):', e); }
 
   document.getElementById('sending-overlay').classList.remove('show');
 
