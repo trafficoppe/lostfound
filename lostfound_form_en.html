@@ -597,25 +597,45 @@ function chkRad(el, groupId) {
   el.classList.add('checked');
 }
 
-function previewFile(input, previewId) {
-  const preview = document.getElementById(previewId);
+function removeFile(typeKey, idx) {
+  uploadedFiles[typeKey].splice(idx, 1);
+  renderPreviews(typeKey);
+}
+
+function renderPreviews(typeKey) {
+  const preview = document.getElementById('pv-' + typeKey);
+  if (!preview) return;
   preview.innerHTML = '';
-  const typeKey = previewId.replace('pv-','');
-  uploadedFiles[typeKey] = Array.from(input.files);
-  uploadedFiles[typeKey].forEach(file => {
+  (uploadedFiles[typeKey] || []).forEach((file, idx) => {
     const reader = new FileReader();
     reader.onload = e => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-block;margin:2px;';
       const img = document.createElement('img');
       img.src = e.target.result;
       img.className = 'file-thumb';
-      preview.appendChild(img);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '✕';
+      btn.title = 'Remove this photo';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#c0392b;color:white;border:none;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:10;';
+      btn.onclick = () => removeFile(typeKey, idx);
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      preview.appendChild(wrap);
     };
     reader.readAsDataURL(file);
   });
-  // Remove required-empty styling when file is selected
-  if (typeKey === 'pickup') {
+}
+
+function previewFile(input, previewId) {
+  const typeKey = previewId.replace('pv-', '');
+  uploadedFiles[typeKey] = Array.from(input.files);
+  // Remove required-empty styling เมื่อมีไฟล์ (เฉพาะ en form)
+  if (typeKey === 'pickup' && uploadedFiles[typeKey].length > 0) {
     document.getElementById('pickup-file-zone').classList.remove('required-empty');
   }
+  renderPreviews(typeKey);
 }
 
 function showToast(errors) {
@@ -802,9 +822,13 @@ async function submitForm() {
 
  const files = uploadedFiles[currentType] || [];
   const fileData = [];
-  for (const f of files.slice(0, 5)) {
+ for (const f of files.slice(0, 5)) {
     try {
-      const compressed = await compressImage(f);
+      let compressed = await compressImage(f);
+      // second pass ถ้าหลัง compress แล้วยังใหญ่เกิน 500KB
+      if (compressed.size > 500 * 1024) {
+        compressed = await compressImage(compressed, 960, 0.6);
+      }
       const b64 = await fileToBase64(compressed);
       fileData.push({ name: compressed.name, mime: compressed.type, data: b64 });
     } catch(e) { console.warn('compress error:', e); }
@@ -833,12 +857,7 @@ document.getElementById('sending-overlay').classList.add('show');
     else params.append(k, String(payload[k] || ''));
   });
 
-// ลบ keepalive:true (64KB limit) — await ให้ overlay ค้างจนส่งจริง
-  if (params.toString().length > 60 * 1024) {
-    document.getElementById('sending-overlay').classList.remove('show');
-    alert('Image files are too large.\nPlease reduce the number of photos or select smaller images (max 3 recommended).');
-    return;
-  }
+// keepalive:true ถูกลบแล้ว — GAS web app accepts POST up to ~50MB
   try {
     await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
   } catch(e) { console.warn('⚠️ GAS error (non-fatal):', e); }
