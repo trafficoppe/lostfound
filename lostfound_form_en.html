@@ -331,7 +331,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
       <div class="card-section-head"><span class="dot"></span>Contact Information</div>
       <div class="card-section-body">
         <div class="field">
-          <label>Faculty / Department / Organization <span class="req">*</span></label>
+         <label id="lbl-dept">Faculty / Department / Organization <span class="req">*</span></label>
           <div class="autocomplete-wrap">
             <input type="text" id="f-dept" placeholder="Type to search or enter..." oninput="acSearch(this.value,'ac-dept','DEPTS')" autocomplete="off">
             <div class="autocomplete-list" id="ac-dept"></div>
@@ -596,6 +596,15 @@ function pickType(type) {
 function chkRad(el, groupId) {
   document.querySelectorAll('#'+groupId+' .radio-item').forEach(r => r.classList.remove('checked'));
   el.classList.add('checked');
+  if (groupId === 'rg-ptype') {
+    const val = el.querySelector('input[type=radio]') ? el.querySelector('input[type=radio]').value : '';
+    const lbl = document.getElementById('lbl-dept');
+    if (lbl) {
+      lbl.innerHTML = val.includes('External Person')
+        ? 'Visiting Faculty/Department/Other <span class="req">*</span>'
+        : 'Faculty / Department / Organization <span class="req">*</span>';
+    }
+  }
 }
 
 function removeFile(typeKey, idx) {
