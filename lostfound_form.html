@@ -634,7 +634,8 @@ const PLACES = ["ถนนชนนีประทาน","ถนนเทิด
 // ========= STATE =========
 let currentType = null;
 let currentStep = 1;
-let uploadedFiles = { lost: [], found: [], pickup: [] };
+let uploadedFiles  = { lost: [], found: [], pickup: [] };
+let isCompressing  = { lost: false, found: false, pickup: false };
 
 // ========= AUTOCOMPLETE =========
 function acSearch(q, listId, dataKey) {
@@ -793,12 +794,30 @@ function renderPreviews(typeKey) {
   });
 }
 
-function previewFile(input, previewId) {
-  const typeKey = previewId.replace('pv-', '');
-  uploadedFiles[typeKey] = Array.from(input.files);
-  renderPreviews(typeKey);
-}
+async function previewFile(input, previewId) {
+  const typeKey  = previewId.replace('pv-', '');
+  const rawFiles = Array.from(input.files);
+  uploadedFiles[typeKey] = rawFiles;
+  renderPreviews(typeKey);   // แสดง preview ทันทีจาก raw files
 
+  // Pre-compress in background — ลด wait time ตอน submit
+  isCompressing[typeKey] = true;
+  try {
+    const compressed = await Promise.all(rawFiles.map(async function(f) {
+      let c = await compressImage(f);
+      if (c.size > 500 * 1024) c = await compressImage(c, 960, 0.6);
+      return c;
+    }));
+    // อัปเดตเฉพาะถ้า user ไม่ได้เปลี่ยนไฟล์ระหว่าง compress
+    if (uploadedFiles[typeKey] === rawFiles) {
+      uploadedFiles[typeKey] = compressed;
+    }
+  } catch(e) {
+    console.warn('pre-compress error:', e);
+  } finally {
+    isCompressing[typeKey] = false;
+  }
+}
 // ========= TOAST VALIDATION =========
 function showToast(errors) {
   const list = document.getElementById('toast-list');
@@ -986,20 +1005,26 @@ async function submitForm() {
     itemDesc = document.getElementById('d-pickup-desc').value;
   }
 
-// Convert files to base64 (พร้อม compress ก่อน)
+// ข้อมูลรูปภาพ (pre-compressed ไว้ตอน previewFile แล้ว)
   const typeKey = currentType;
-  const files = uploadedFiles[typeKey] || [];
+  const files   = uploadedFiles[typeKey] || [];
   const fileData = [];
+  // รอ compress เสร็จถ้า user กด submit เร็วเกิน
+  if (isCompressing[typeKey]) {
+    const _ot = document.querySelector('.send-text');
+    if (_ot) _ot.textContent = 'กำลังเตรียมรูปภาพ...';
+    await new Promise(function(res) {
+      const _wc = setInterval(function() {
+        if (!isCompressing[typeKey]) { clearInterval(_wc); res(); }
+      }, 200);
+    });
+    if (_ot) _ot.textContent = 'กำลังส่งข้อมูล...';
+  }
   for (const f of files.slice(0, 5)) {
     try {
-      let compressed = await compressImage(f);
-      // second pass ถ้าหลัง compress แล้วยังใหญ่เกิน 500KB
-      if (compressed.size > 500 * 1024) {
-        compressed = await compressImage(compressed, 960, 0.6);
-      }
-      const b64 = await fileToBase64(compressed);
-      fileData.push({ name: compressed.name, mime: compressed.type, data: b64 });
-    } catch(e) { console.warn('compress error:', e); }
+      const b64 = await fileToBase64(f);
+      fileData.push({ name: f.name, mime: f.type, data: b64 });
+    } catch(e) { console.warn('encode error:', e); }
   }
 
   const payload = {
@@ -1016,9 +1041,13 @@ async function submitForm() {
     files: fileData
   };
 
-// Show sending overlay
-  document.getElementById('sending-overlay').classList.add('show');
-
+// Show sending overlay + beforeunload guard ป้องกัน user ปิดหน้า
+  const _overlay     = document.getElementById('sending-overlay');
+  const _overlayText = _overlay.querySelector('.send-text');
+  _overlay.classList.add('show');
+  _overlayText.textContent = 'กำลังส่งข้อมูล...';
+  const _beforeUnload = function(e) { e.preventDefault(); e.returnValue = ''; };
+  window.addEventListener('beforeunload', _beforeUnload);
   const params = new URLSearchParams();
   params.append('action', 'submit');
   Object.keys(payload).forEach(k => {
@@ -1029,12 +1058,13 @@ async function submitForm() {
     }
   });
 
-// keepalive:true ถูกลบแล้ว — GAS web app รับ POST ได้ถึง ~50MB
+_overlayText.textContent = 'กำลังบันทึกข้อมูล...';
   try {
     await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
   } catch(e) { console.warn('⚠️ GAS fetch error (non-fatal):', e); }
 
-  document.getElementById('sending-overlay').classList.remove('show');
+  window.removeEventListener('beforeunload', _beforeUnload);
+  _overlay.classList.remove('show');
 
   // Show success
   const icons = { lost:'📋', found:'✅', pickup:'🎉' };
