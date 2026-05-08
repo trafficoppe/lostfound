@@ -308,8 +308,14 @@ function parseAnyDate(str){
   const s=String(str).trim();
   const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
   if(iso){const d=new Date(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]),parseInt(iso[4]),parseInt(iso[5]),parseInt(iso[6]||0));if(!isNaN(d))return d;}
-  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if(m){const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0),parseInt(m[6]||0));if(!isNaN(d))return d;}
+const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){
+    const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0),parseInt(m[6]||0));
+    if(!isNaN(d)){
+      if(d.getFullYear()>2400)d.setFullYear(d.getFullYear()-543); // ป้องกัน Buddhist year input
+      return d;
+    }
+  }
   try{const d=new Date(s);if(!isNaN(d)&&d.getFullYear()>2000)return d;}catch(e){}
   return null;
 }
@@ -568,8 +574,18 @@ async function saveStatus(){
     const updatedAt=now.toLocaleString('th-TH');
     params.append('updatedBy',`${staffName} (${updatedAt})`);
     await fetch(GAS_URL,{method:'POST',body:params,mode:'no-cors'});
-    const item=allData.find(d=>d.refCode===editingRef);
-    if(item){item.status=status;item.actionText=actionText;item.updatedAt=new Date().toLocaleDateString('th-TH');}
+   const item=allData.find(d=>d.refCode===editingRef);
+    if(item){
+      const _n=new Date();
+      item.status=status;
+      item.actionText=actionText;
+      item.updatedAt=_n.getFullYear()+'-'+
+        String(_n.getMonth()+1).padStart(2,'0')+'-'+
+        String(_n.getDate()).padStart(2,'0')+' '+
+        String(_n.getHours()).padStart(2,'0')+':'+
+        String(_n.getMinutes()).padStart(2,'0')+':'+
+        String(_n.getSeconds()).padStart(2,'0');
+    }
     closeStatusModal(); applyFilters();
     setTimeout(loadData,2000);
     showToast('✅ อัปเดตสถานะ "'+status+'" สำเร็จ');
