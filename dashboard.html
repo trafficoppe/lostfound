@@ -869,19 +869,21 @@ async function runPdfExport() {
     };
 
     // ── Footer ──
-   const ftr = () => {
+  const ftr = () => {
+      const GAP = 1.5;
       doc.setDrawColor(...BLACK); doc.setLineWidth(0.3); doc.line(ML,PH-14,PW-MR,PH-14);
       doc.setTextColor(...BLACK);
-      sf("bold",7.5); doc.text("ผู้จัดทำ: ", ML, PH-10);
-      sf("normal",7.5); doc.text(preparer + " (" + position + ")", ML + doc.getTextWidth("ผู้จัดทำ: "), PH-10);
-      sf("bold",7.5); doc.text("วัตถุประสงค์: ", ML, PH-6);
-      sf("normal",7.5); doc.text(purpose, ML + doc.getTextWidth("วัตถุประสงค์: "), PH-6);
-      const printTime = fmtDateTimeTH_pdf(now);
-      const labelPrint = "พิมพ์เมื่อ: ";
-      const totalPrintWidth = doc.getTextWidth(labelPrint + printTime);
-      sf("bold",7.5); doc.text(labelPrint, PW-MR - totalPrintWidth, PH-10);
-      sf("normal",7.5); doc.text(printTime, PW-MR - totalPrintWidth + doc.getTextWidth(labelPrint), PH-10);
-      sf("bold",7.5); doc.text("งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล", PW-MR, PH-6, {align:"right"});
+      sf("bold",7.5);   doc.text("ผู้จัดทำ:", ML, PH-10);
+      sf("normal",7.5); doc.text(preparer + " (" + position + ")", ML + doc.getTextWidth("ผู้จัดทำ:") + GAP, PH-10);
+      sf("bold",7.5);   doc.text("วัตถุประสงค์:", ML, PH-6);
+      sf("normal",7.5); doc.text(purpose, ML + doc.getTextWidth("วัตถุประสงค์:") + GAP, PH-6);
+      const printTime  = fmtDateTimeTH_pdf(now);
+      const labelPrint = "พิมพ์เมื่อ:";
+      const labelPrintW = doc.getTextWidth(labelPrint);
+      const totalPrintWidth = labelPrintW + GAP + doc.getTextWidth(printTime);
+      sf("bold",7.5);   doc.text(labelPrint, PW-MR - totalPrintWidth, PH-10);
+      sf("normal",7.5); doc.text(printTime, PW-MR - totalPrintWidth + labelPrintW + GAP, PH-10);
+      sf("bold",7.5);   doc.text("งานจราจรและความปลอดภัย มหาวิทยาลัยมหิดล", PW-MR, PH-6, {align:"right"});
     };
 
     // ── วาด PAGE 1 ──
@@ -959,14 +961,14 @@ async function runPdfExport() {
             cellPadding:3,
           },
           alternateRowStyles:{fillColor:[248,250,253]},
-         columnStyles:{
-            0:{ cellWidth:20 },
-            1:{ cellWidth:18 },
-            2:{ cellWidth:45, overflow:"linebreak" },
-            3:{ cellWidth:24, overflow:"linebreak" },
-            4:{ cellWidth:32, overflow:"linebreak" },
-            5:{ cellWidth:24 },
-            6:{ cellWidth:"auto" },
+      columnStyles:{
+            0:{ cellWidth:22, overflow:"linebreak" },
+            1:{ cellWidth:18, overflow:"linebreak" },
+            2:{ cellWidth:40, overflow:"linebreak" },
+            3:{ cellWidth:22, overflow:"linebreak" },
+            4:{ cellWidth:26, overflow:"linebreak" },
+            5:{ cellWidth:22, overflow:"linebreak" },
+            6:{ cellWidth:32, overflow:"linebreak" },
           },
           head:[["RefCode","ประเภท","รายละเอียด","ผู้แจ้ง","คณะ/หน่วยงาน","วันที่/เวลา","สถานะ"]],
           body:items.map(it=>{
