@@ -586,8 +586,8 @@ async function saveStatus(){
         String(_n.getMinutes()).padStart(2,'0')+':'+
         String(_n.getSeconds()).padStart(2,'0');
     }
-    closeStatusModal(); applyFilters();
-    setTimeout(loadData,2000);
+  closeStatusModal(); applyFilters();
+    setTimeout(loadData,4000);
     showToast('✅ อัปเดตสถานะ "'+status+'" สำเร็จ');
   }catch(e){alert('❌ เชื่อมต่อไม่ได้: '+e);}
   finally{btn.textContent='💾 บันทึก';btn.disabled=false;}
