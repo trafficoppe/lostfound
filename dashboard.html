@@ -961,14 +961,14 @@ async function runPdfExport() {
             cellPadding:3,
           },
           alternateRowStyles:{fillColor:[248,250,253]},
-      columnStyles:{
-            0:{ cellWidth:22, overflow:"linebreak" },
-            1:{ cellWidth:18, overflow:"linebreak" },
-            2:{ cellWidth:40, overflow:"linebreak" },
-            3:{ cellWidth:22, overflow:"linebreak" },
-            4:{ cellWidth:26, overflow:"linebreak" },
-            5:{ cellWidth:22, overflow:"linebreak" },
-            6:{ cellWidth:32, overflow:"linebreak" },
+    columnStyles:{
+            0:{ cellWidth:22, overflow:"ellipsize" },
+            1:{ cellWidth:18, overflow:"ellipsize" },
+            2:{ cellWidth:40, overflow:"linebreak"  },
+            3:{ cellWidth:22, overflow:"ellipsize" },
+            4:{ cellWidth:28, overflow:"ellipsize" },
+            5:{ cellWidth:22, overflow:"ellipsize" },
+            6:{ cellWidth:30, overflow:"ellipsize" },
           },
           head:[["RefCode","ประเภท","รายละเอียด","ผู้แจ้ง","คณะ/หน่วยงาน","วันที่/เวลา","สถานะ"]],
           body:items.map(it=>{
