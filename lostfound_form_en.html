@@ -803,8 +803,10 @@ function fileToBase64(file) {
     const r = new FileReader();
     r.onload = e => res(e.target.result.split(',')[1]);
     r.onerror = () => rej();
-    r.readAsDataURL(file);
+  r.readAsDataURL(file);
   });
+}
+
 async function compressImage(file, maxW = 1280, quality = 0.7) {
   if (!file.type.startsWith('image/') || file.size < 300 * 1024) return file;
   return new Promise((res) => {
