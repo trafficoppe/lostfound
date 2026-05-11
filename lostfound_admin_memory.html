@@ -289,7 +289,7 @@ window.onload = () => {
 // ── Load badge counts for all buckets ──
 async function loadAllBadges() {
   try {
-    const r    = await fetch(GAS_URL + '?action=getMemoryStats&t=' + Date.now());
+ const r    = await fetch(GAS_URL + '?action=getMemoryStats&t=' + Date.now(), { credentials:'omit' });
     const json = await r.json();
     if (!json.success) return;
     const s = json.stats;
@@ -315,7 +315,7 @@ async function loadBucket(bucket) {
   });
 
   try {
-    const r    = await fetch(GAS_URL + '?action=getMemoryByBucket&bucket=' + bucket + '&status=all&t=' + Date.now());
+  const r    = await fetch(GAS_URL + '?action=getMemoryByBucket&bucket=' + bucket + '&status=all&t=' + Date.now(), { credentials:'omit' });
     const json = await r.json();
     if (!json.success) throw new Error('GAS error');
     allEntries = json.entries || [];
