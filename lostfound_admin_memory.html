@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>จัดการ Autofill | Lost & Found มหาวิทยาลัยมหิดล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary:#1a3a5c; --primary-mid:#2d5f8f; --accent:#e8a020;
+  --bg:#f0f3f8; --white:#fff; --border:#d5dce8; --muted:#6c7a89; --text:#1c2833;
+  --shadow:0 2px 16px rgba(26,58,92,0.10); --radius:14px;
+  --pending:#f5c442; --approved:#1e7e44; --rejected:#c0392b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* TOP BAR */
+.top-bar{background:linear-gradient(135deg,var(--primary),var(--primary-mid));padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(26,58,92,0.28);}
+.top-bar-left{display:flex;align-items:center;gap:12px;color:white;}
+.top-bar-left h1{font-size:16px;font-weight:700;}
+.top-bar-right{display:flex;gap:10px;align-items:center;}
+.btn-top{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13.5px;padding:7px 14px;border:1px solid rgba(255,255,255,0.3);border-radius:8px;background:none;cursor:pointer;font-family:'Sarabun',sans-serif;}
+.btn-top:hover{background:rgba(255,255,255,0.15);}
+
+/* MAIN */
+.main{max-width:1100px;margin:0 auto;padding:24px 20px 60px;}
+
+/* TABS */
+.bucket-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.bucket-tab{padding:10px 18px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:white;color:var(--muted);display:flex;align-items:center;gap:8px;transition:all 0.2s;}
+.bucket-tab:hover{border-color:var(--primary-mid);color:var(--primary);}
+.bucket-tab.active{background:var(--primary);color:white;border-color:var(--primary);}
+.bucket-tab .tab-badge{background:#e53e3e;color:white;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px;min-width:20px;text-align:center;}
+.bucket-tab.active .tab-badge{background:rgba(255,255,255,0.3);}
+
+/* TOOLBAR */
+.toolbar{background:white;border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.status-filter{display:flex;gap:6px;}
+.sf-btn{padding:7px 14px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:white;color:var(--muted);transition:all 0.18s;}
+.sf-btn:hover{border-color:var(--primary-mid);color:var(--primary);}
+.sf-btn.active{border-color:var(--primary);background:var(--primary);color:white;}
+.search-box{flex:1;min-width:180px;padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;outline:none;}
+.search-box:focus{border-color:var(--primary-mid);}
+.btn-add{padding:8px 18px;background:var(--accent);color:white;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-add:hover{opacity:0.9;}
+.btn-refresh-sm{padding:8px 14px;background:#f0f3f8;color:var(--primary);border:1.5px solid var(--border);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;}
+
+/* BULK BAR */
+.bulk-bar{background:#e8f0fb;border:1.5px solid var(--primary-mid);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:none;align-items:center;gap:12px;font-size:13.5px;color:var(--primary);}
+.bulk-bar.show{display:flex;}
+.bulk-bar strong{font-weight:700;}
+.btn-bulk{padding:7px 16px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;}
+.btn-bulk-approve{background:#1e7e44;color:white;}
+.btn-bulk-reject{background:#c0392b;color:white;}
+.btn-bulk-delete{background:#6c7a89;color:white;}
+.btn-bulk-clear{background:none;color:var(--muted);border:1.5px solid var(--border);padding:6px 12px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;}
+
+/* TABLE */
+.table-wrap{background:white;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.table-head{display:grid;grid-template-columns:36px 1fr 80px 110px 140px 180px;gap:0;background:#f0f3f8;border-bottom:2px solid var(--border);padding:10px 16px;font-size:12px;font-weight:700;color:var(--muted);align-items:center;}
+.table-row{display:grid;grid-template-columns:36px 1fr 80px 110px 140px 180px;gap:0;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center;font-size:13.5px;transition:background 0.15s;}
+.table-row:last-child{border-bottom:none;}
+.table-row:hover{background:#f8fafd;}
+.table-row.selected{background:#eef3fb;}
+.entry-value{font-weight:600;color:var(--text);word-break:break-word;}
+.entry-count{font-weight:700;color:var(--primary-mid);}
+.status-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+.status-chip.pending{background:#fff3cd;color:#6b4c00;}
+.status-chip.approved{background:#d9f2e0;color:#1a5c2e;}
+.status-chip.rejected{background:#fce4e4;color:#7b1a1a;}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;}
+.btn-action{padding:5px 12px;border-radius:6px;font-family:'Sarabun',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:opacity 0.15s;}
+.btn-action:hover{opacity:0.8;}
+.btn-approve{background:#1e7e44;color:white;}
+.btn-reject{background:#c0392b;color:white;}
+.btn-delete{background:#6c7a89;color:white;}
+.btn-restore{background:#2d5f8f;color:white;}
+.btn-edit{background:#e8a020;color:white;}
+
+/* EMPTY / LOADING */
+.table-empty{text-align:center;padding:40px;color:var(--muted);font-size:14px;}
+.table-loading{text-align:center;padding:30px;color:var(--muted);}
+.spinner-sm{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary-mid);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* MODAL */
+.modal-wrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.modal-wrap.show{display:flex;}
+.modal-box{background:white;border-radius:16px;padding:28px;max-width:440px;width:100%;box-shadow:0 16px 50px rgba(0,0,0,0.25);}
+.modal-box h3{font-size:16px;font-weight:700;color:var(--primary);margin-bottom:18px;}
+.modal-field{margin-bottom:14px;}
+.modal-field label{font-size:13px;font-weight:600;display:block;margin-bottom:6px;}
+.modal-field select,.modal-field input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:14px;outline:none;}
+.modal-field select:focus,.modal-field input:focus{border-color:var(--primary-mid);}
+.modal-actions{display:flex;gap:10px;margin-top:18px;}
+.btn-modal-ok{flex:1;padding:11px;background:var(--primary);color:white;border:none;border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:700;cursor:pointer;}
+.btn-modal-ok:hover{background:var(--primary-mid);}
+.btn-modal-ok:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-modal-cancel{flex:1;padding:11px;background:#f0f3f8;border:1.5px solid var(--border);border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;cursor:pointer;}
+.modal-err{color:#c0392b;font-size:12.5px;margin-top:6px;display:none;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:#1a3a5c;color:white;padding:12px 20px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:999;transform:translateY(80px);opacity:0;transition:all 0.3s;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{background:#1e7e44;}
+.toast.error{background:#c0392b;}
+
+/* SUMMARY BAR */
+.summary-bar{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
+.sum-chip{background:white;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px;}
+.sum-chip .num{font-size:20px;font-weight:800;}
+.sum-chip.pend .num{color:#f5a623;}
+.sum-chip.appr .num{color:#1e7e44;}
+.sum-chip.reje .num{color:#c0392b;}
+
+@media(max-width:700px){
+  .table-head,.table-row{grid-template-columns:28px 1fr 60px 90px;}
+  .table-head .col-date,.table-row .col-date,
+  .table-head .col-actions,.table-row .col-actions{display:none;}
+  .row-actions{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="top-bar-left">
+    <span style="font-size:20px;">🗂️</span>
+    <h1>จัดการ Autofill <span style="font-size:11px;background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:10px;font-weight:400;margin-left:6px;">v1.0.0</span></h1>
+  </div>
+  <div class="top-bar-right">
+    <a href="dashboard.html" class="btn-top">← กลับ Dashboard</a>
+    <button class="btn-top" onclick="logout()">ออกจากระบบ</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- BUCKET TABS -->
+  <div class="bucket-tabs" id="bucket-tabs">
+    <button class="bucket-tab active" data-bucket="dept_th" onclick="switchBucket('dept_th')">
+      🏢 คณะ/หน่วยงาน (ไทย) <span class="tab-badge" id="badge-dept_th">…</span>
+    </button>
+    <button class="bucket-tab" data-bucket="dept_en" onclick="switchBucket('dept_en')">
+      🏢 Dept (EN) <span class="tab-badge" id="badge-dept_en">…</span>
+    </button>
+    <button class="bucket-tab" data-bucket="loc_th" onclick="switchBucket('loc_th')">
+      📍 สถานที่ (ไทย) <span class="tab-badge" id="badge-loc_th">…</span>
+    </button>
+    <button class="bucket-tab" data-bucket="loc_en" onclick="switchBucket('loc_en')">
+      📍 Location (EN) <span class="tab-badge" id="badge-loc_en">…</span>
+    </button>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-bar" id="summary-bar">
+    <div class="sum-chip pend"><span class="num" id="sum-pending">–</span> รอตรวจสอบ</div>
+    <div class="sum-chip appr"><span class="num" id="sum-approved">–</span> อนุมัติแล้ว</div>
+    <div class="sum-chip reje"><span class="num" id="sum-rejected">–</span> ปฏิเสธแล้ว</div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="status-filter">
+      <button class="sf-btn active" id="sf-all"      onclick="setFilter('all')">ทั้งหมด</button>
+      <button class="sf-btn"        id="sf-pending"  onclick="setFilter('pending')">⏳ รอตรวจสอบ</button>
+      <button class="sf-btn"        id="sf-approved" onclick="setFilter('approved')">✅ อนุมัติแล้ว</button>
+      <button class="sf-btn"        id="sf-rejected" onclick="setFilter('rejected')">❌ ปฏิเสธ</button>
+    </div>
+    <input class="search-box" id="search-box" placeholder="🔍 ค้นหา..." oninput="renderTable()">
+    <button class="btn-refresh-sm" onclick="loadBucket(currentBucket)">🔄</button>
+    <button class="btn-add" onclick="openAddModal()">+ เพิ่ม Entry</button>
+  </div>
+
+  <!-- BULK BAR -->
+  <div class="bulk-bar" id="bulk-bar">
+    <strong id="bulk-count">0</strong> รายการที่เลือก
+    <button class="btn-bulk btn-bulk-approve" onclick="bulkAction('approved')">✅ อนุมัติ</button>
+    <button class="btn-bulk btn-bulk-reject"  onclick="bulkAction('rejected')">❌ ปฏิเสธ</button>
+    <button class="btn-bulk btn-bulk-delete"  onclick="bulkAction('deleted')">🗑️ ลบ</button>
+    <button class="btn-bulk-clear" onclick="clearSelection()">ยกเลิก</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <div class="table-head">
+      <div><input type="checkbox" id="chk-all" onchange="toggleSelectAll(this.checked)"></div>
+      <div>ชื่อ Entry</div>
+      <div style="text-align:center;">จำนวน</div>
+      <div style="text-align:center;">สถานะ</div>
+      <div class="col-date">เพิ่มเมื่อ</div>
+      <div class="col-actions" style="text-align:right;">Actions</div>
+    </div>
+    <div id="table-body">
+      <div class="table-loading"><div class="spinner-sm"></div>กำลังโหลด...</div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ADD MODAL -->
+<div class="modal-wrap" id="add-modal">
+  <div class="modal-box">
+    <h3>➕ เพิ่ม Entry ใหม่</h3>
+    <div class="modal-field">
+      <label>Bucket</label>
+      <select id="add-bucket">
+        <option value="dept_th">คณะ/หน่วยงาน (ไทย)</option>
+        <option value="dept_en">Dept (EN)</option>
+        <option value="loc_th">สถานที่ (ไทย)</option>
+        <option value="loc_en">Location (EN)</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>ชื่อ Entry <span style="color:#c0392b">*</span></label>
+      <input type="text" id="add-value" placeholder="พิมพ์ชื่อ entry...">
+      <div class="modal-err" id="add-err">กรุณากรอกชื่อ entry (อย่างน้อย 2 ตัวอักษร)</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeAddModal()">ยกเลิก</button>
+      <button class="btn-modal-ok" id="add-ok-btn" onclick="submitAdd()">✅ เพิ่ม (Approved ทันที)</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-wrap" id="edit-modal">
+  <div class="modal-box">
+    <h3>✏️ แก้ไข Entry</h3>
+    <div class="modal-field">
+      <label>ชื่อ Entry</label>
+      <input type="text" id="edit-value" placeholder="แก้ไขชื่อ...">
+      <div class="modal-err" id="edit-err">กรุณากรอกชื่อ entry</div>
+    </div>
+    <div class="modal-field">
+      <label>หมายเหตุ (optional)</label>
+      <input type="text" id="edit-note" placeholder="หมายเหตุ admin...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeEditModal()">ยกเลิก</button>
+      <button class="btn-modal-ok" id="edit-ok-btn" onclick="submitEdit()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+ * Lost & Found — lostfound_admin_memory.html  v1.0.0
+ * Phase E3 — Admin Autofill Management
+ * © 2025–2026 Traffic Control and Premises Security Unit,
+ *   Mahidol University. All rights reserved.
+ * ===================================================== */
+
+const GAS_URL     = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
+const ADMIN_NAME  = 'admin01';
+const BUCKET_LABELS = {
+  dept_th: 'คณะ/หน่วยงาน (ไทย)',
+  dept_en: 'Dept (EN)',
+  loc_th:  'สถานที่ (ไทย)',
+  loc_en:  'Location (EN)'
+};
+
+// ── Auth gate ──
+if (sessionStorage.getItem('lf_auth') !== '1') {
+  window.location.href = 'dashboard.html';
+}
+function logout() { sessionStorage.removeItem('lf_auth'); window.location.href = 'dashboard.html'; }
+
+// ── State ──
+let currentBucket  = 'dept_th';
+let currentFilter  = 'all';
+let allEntries     = [];   // raw from GAS (current bucket)
+let selectedRows   = new Set(); // rowNum of selected
+let editingRowNum  = null;
+
+// ── Init ──
+window.onload = () => {
+  document.getElementById('add-bucket').value = currentBucket;
+  loadAllBadges();
+  loadBucket(currentBucket);
+};
+
+// ── Load badge counts for all buckets ──
+async function loadAllBadges() {
+  try {
+    const r    = await fetch(GAS_URL + '?action=getMemoryStats&t=' + Date.now());
+    const json = await r.json();
+    if (!json.success) return;
+    const s = json.stats;
+    ['dept_th','dept_en','loc_th','loc_en'].forEach(b => {
+      const el = document.getElementById('badge-' + b);
+      if (el) el.textContent = s[b] || 0;
+    });
+  } catch(e) { console.warn('badge load error', e); }
+}
+
+// ── Load entries for a bucket ──
+async function loadBucket(bucket) {
+  currentBucket = bucket;
+  selectedRows.clear();
+  updateBulkBar();
+  document.getElementById('table-body').innerHTML = '<div class="table-loading"><div class="spinner-sm"></div>กำลังโหลด...</div>';
+  document.getElementById('add-bucket').value = bucket;
+  document.getElementById('chk-all').checked = false;
+
+  // update tab UI
+  document.querySelectorAll('.bucket-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.bucket === bucket);
+  });
+
+  try {
+    const r    = await fetch(GAS_URL + '?action=getMemoryByBucket&bucket=' + bucket + '&status=all&t=' + Date.now());
+    const json = await r.json();
+    if (!json.success) throw new Error('GAS error');
+    allEntries = json.entries || [];
+    updateSummary();
+    renderTable();
+  } catch(e) {
+    document.getElementById('table-body').innerHTML = '<div class="table-empty">❌ โหลดข้อมูลไม่ได้ — ลองรีเฟรช</div>';
+    showToast('โหลดข้อมูลไม่ได้', 'error');
+  }
+}
+
+function switchBucket(bucket) { loadBucket(bucket); }
+
+// ── Summary ──
+function updateSummary() {
+  document.getElementById('sum-pending').textContent  = allEntries.filter(r => r.status === 'pending').length;
+  document.getElementById('sum-approved').textContent = allEntries.filter(r => r.status === 'approved').length;
+  document.getElementById('sum-rejected').textContent = allEntries.filter(r => r.status === 'rejected').length;
+}
+
+// ── Filter ──
+function setFilter(f) {
+  currentFilter = f;
+  ['all','pending','approved','rejected'].forEach(x => {
+    document.getElementById('sf-' + x).classList.toggle('active', x === f);
+  });
+  selectedRows.clear();
+  updateBulkBar();
+  document.getElementById('chk-all').checked = false;
+  renderTable();
+}
+
+// ── Render table ──
+function renderTable() {
+  const q = (document.getElementById('search-box').value || '').toLowerCase().trim();
+  let rows = allEntries.filter(r => {
+    if (currentFilter !== 'all' && r.status !== currentFilter) return false;
+    if (q && !r.value.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  if (!rows.length) {
+    document.getElementById('table-body').innerHTML = '<div class="table-empty">ไม่พบรายการ</div>';
+    return;
+  }
+
+  // sort: pending first, then by count desc
+  rows.sort((a,b) => {
+    const order = { pending:0, approved:1, rejected:2 };
+    if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+    return b.count - a.count;
+  });
+
+  document.getElementById('table-body').innerHTML = rows.map(r => renderRow(r)).join('');
+}
+
+function renderRow(r) {
+  const isSelected = selectedRows.has(r.rowNum);
+  const statusLabel = { pending:'⏳ รอตรวจสอบ', approved:'✅ อนุมัติ', rejected:'❌ ปฏิเสธ' };
+  const addedAt = r.addedAt ? String(r.addedAt).substring(0, 10) : '—';
+
+  let actions = '';
+  if (r.status === 'pending') {
+    actions = `
+      <button class="btn-action btn-approve" onclick="singleAction(${r.rowNum},'approved')">✔ อนุมัติ</button>
+      <button class="btn-action btn-reject"  onclick="singleAction(${r.rowNum},'rejected')">✗ ปฏิเสธ</button>
+      <button class="btn-action btn-delete"  onclick="singleAction(${r.rowNum},'deleted')">🗑</button>`;
+  } else if (r.status === 'approved') {
+    actions = `
+      <button class="btn-action btn-edit"   onclick="openEditModal(${r.rowNum})">✏️</button>
+      <button class="btn-action btn-reject" onclick="singleAction(${r.rowNum},'rejected')">✗ ปฏิเสธ</button>
+      <button class="btn-action btn-delete" onclick="singleAction(${r.rowNum},'deleted')">🗑</button>`;
+  } else {
+    actions = `
+      <button class="btn-action btn-restore" onclick="singleAction(${r.rowNum},'approved')">↩ คืน</button>
+      <button class="btn-action btn-delete"  onclick="singleAction(${r.rowNum},'deleted')">🗑</button>`;
+  }
+
+  return `
+    <div class="table-row ${isSelected ? 'selected' : ''}" id="row-${r.rowNum}">
+      <div><input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRow(${r.rowNum}, this.checked)"></div>
+      <div class="entry-value">${escHtml(r.value)}</div>
+      <div style="text-align:center;" class="entry-count">${r.count}</div>
+      <div style="text-align:center;"><span class="status-chip ${r.status}">${statusLabel[r.status] || r.status}</span></div>
+      <div class="col-date" style="font-size:12px;color:var(--muted);">${addedAt}</div>
+      <div class="row-actions col-actions">${actions}</div>
+    </div>`;
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Selection ──
+function toggleRow(rowNum, checked) {
+  if (checked) selectedRows.add(rowNum); else selectedRows.delete(rowNum);
+  const el = document.getElementById('row-' + rowNum);
+  if (el) el.classList.toggle('selected', checked);
+  updateBulkBar();
+}
+
+function toggleSelectAll(checked) {
+  const q = (document.getElementById('search-box').value || '').toLowerCase().trim();
+  const visible = allEntries.filter(r => {
+    if (currentFilter !== 'all' && r.status !== currentFilter) return false;
+    if (q && !r.value.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  visible.forEach(r => {
+    if (checked) selectedRows.add(r.rowNum); else selectedRows.delete(r.rowNum);
+  });
+  renderTable();
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selectedRows.clear();
+  document.getElementById('chk-all').checked = false;
+  renderTable();
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const n   = selectedRows.size;
+  document.getElementById('bulk-count').textContent = n;
+  bar.classList.toggle('show', n > 0);
+}
+
+// ── Single action ──
+async function singleAction(rowNum, newStatus) {
+  const label = { approved:'อนุมัติ', rejected:'ปฏิเสธ', deleted:'ลบ' };
+  if (!confirm('ยืนยัน' + label[newStatus] + ' entry นี้?')) return;
+  await postAction([rowNum], newStatus);
+}
+
+// ── Bulk action ──
+async function bulkAction(newStatus) {
+  const ids  = Array.from(selectedRows);
+  const label = { approved:'อนุมัติ', rejected:'ปฏิเสธ', deleted:'ลบ' };
+  if (!confirm('ยืนยัน' + label[newStatus] + ' ' + ids.length + ' รายการ?')) return;
+  await postAction(ids, newStatus);
+}
+
+// ── Post action (single or bulk) ──
+async function postAction(rowNums, newStatus) {
+  let success = 0, fail = 0;
+  // serial to avoid race on sheet
+  for (const rowNum of rowNums) {
+    try {
+      const params = new URLSearchParams({
+        action: 'updateMemoryStatus',
+        rowNum: rowNum,
+        newStatus: newStatus,
+        adminName: ADMIN_NAME
+      });
+      const r = await fetch(GAS_URL, { method:'POST', body:params, mode:'no-cors' });
+      success++;
+    } catch(e) { fail++; }
+  }
+  showToast(
+    fail === 0
+      ? '✅ ดำเนินการ ' + success + ' รายการสำเร็จ'
+      : '⚠️ สำเร็จ ' + success + ' / ล้มเหลว ' + fail,
+    fail === 0 ? 'success' : 'error'
+  );
+  selectedRows.clear();
+  await loadBucket(currentBucket);
+  await loadAllBadges();
+}
+
+// ── Add modal ──
+function openAddModal() {
+  document.getElementById('add-value').value = '';
+  document.getElementById('add-err').style.display = 'none';
+  document.getElementById('add-modal').classList.add('show');
+  setTimeout(() => document.getElementById('add-value').focus(), 100);
+}
+function closeAddModal() { document.getElementById('add-modal').classList.remove('show'); }
+
+async function submitAdd() {
+  const bucket = document.getElementById('add-bucket').value;
+  const value  = document.getElementById('add-value').value.trim();
+  const errEl  = document.getElementById('add-err');
+  const btn    = document.getElementById('add-ok-btn');
+
+  if (value.length < 2) { errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = '⏳ กำลังเพิ่ม...';
+
+  try {
+    const params = new URLSearchParams({
+      action: 'adminAddMemory',
+      bucket: bucket,
+      value: value,
+      adminName: ADMIN_NAME
+    });
+    await fetch(GAS_URL, { method:'POST', body:params, mode:'no-cors' });
+    showToast('✅ เพิ่ม entry สำเร็จ', 'success');
+    closeAddModal();
+    // switch to the bucket that was added
+    if (bucket !== currentBucket) await loadBucket(bucket);
+    else await loadBucket(currentBucket);
+    await loadAllBadges();
+  } catch(e) {
+    showToast('❌ เพิ่มไม่สำเร็จ', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ เพิ่ม (Approved ทันที)';
+  }
+}
+
+// ── Edit modal ──
+function openEditModal(rowNum) {
+  const entry = allEntries.find(r => r.rowNum === rowNum);
+  if (!entry) return;
+  editingRowNum = rowNum;
+  document.getElementById('edit-value').value = entry.value;
+  document.getElementById('edit-note').value  = '';
+  document.getElementById('edit-err').style.display = 'none';
+  document.getElementById('edit-modal').classList.add('show');
+  setTimeout(() => document.getElementById('edit-value').focus(), 100);
+}
+function closeEditModal() { document.getElementById('edit-modal').classList.remove('show'); editingRowNum = null; }
+
+async function submitEdit() {
+  const value = document.getElementById('edit-value').value.trim();
+  const note  = document.getElementById('edit-note').value.trim();
+  const errEl = document.getElementById('edit-err');
+  const btn   = document.getElementById('edit-ok-btn');
+
+  if (value.length < 2) { errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
+
+  // Edit = delete old + add new approved (เพราะ GAS ไม่มี editValue endpoint)
+  // แต่ถ้า value ไม่เปลี่ยน ใช้ approve + note อย่างเดียว
+  const entry = allEntries.find(r => r.rowNum === editingRowNum);
+  const valueChanged = entry && entry.value !== value;
+
+  try {
+    if (valueChanged) {
+      // 1) ลบ row เดิม
+      const p1 = new URLSearchParams({ action:'updateMemoryStatus', rowNum:editingRowNum, newStatus:'deleted', adminName:ADMIN_NAME });
+      await fetch(GAS_URL, { method:'POST', body:p1, mode:'no-cors' });
+      // 2) เพิ่ม row ใหม่
+      const p2 = new URLSearchParams({ action:'adminAddMemory', bucket:currentBucket, value:value, adminName:ADMIN_NAME });
+      await fetch(GAS_URL, { method:'POST', body:p2, mode:'no-cors' });
+    } else {
+      // แค่ note
+      const p = new URLSearchParams({ action:'updateMemoryStatus', rowNum:editingRowNum, newStatus:'approved', adminName:ADMIN_NAME, note:note });
+      await fetch(GAS_URL, { method:'POST', body:p, mode:'no-cors' });
+    }
+    showToast('✅ แก้ไขสำเร็จ', 'success');
+    closeEditModal();
+    await loadBucket(currentBucket);
+  } catch(e) {
+    showToast('❌ แก้ไขไม่สำเร็จ', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 บันทึก';
+  }
+}
+
+// ── Toast ──
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeAddModal(); closeEditModal(); }
+  if (e.key === 'Enter' && document.getElementById('add-modal').classList.contains('show')) submitAdd();
+  if (e.key === 'Enter' && document.getElementById('edit-modal').classList.contains('show')) submitEdit();
+});
+</script>
+
+<footer style="background:#1a3a5c;color:rgba(255,255,255,0.7);font-family:'Sarabun',sans-serif;font-size:12px;padding:16px 24px;text-align:center;line-height:1.8;margin-top:20px;">
+  <div><span style="font-weight:700;color:#e8a020;letter-spacing:0.5px;">Lost &amp; Found Admin Memory — v1.0.0</span></div>
+  <div style="font-size:11.5px;margin-top:3px;">
+    © 2025–2026 Traffic Control and Premises Security Unit, Mahidol University. All rights reserved.
+  </div>
+</footer>
+</body>
+</html>
