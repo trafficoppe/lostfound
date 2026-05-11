@@ -684,7 +684,9 @@ function acSearchMemory(q, listId, dataKey, memKey) {
   if (!list) return;
 
   // ดึงข้อมูล
-  const staticData = dataKey === 'DEPTS' ? DEPTS : dataKey === 'PLACES' ? PLACES : [];
+ // ดึงข้อมูล (รวม server memory)
+  const bucket     = dataKey === 'DEPTS' ? 'dept_th' : dataKey === 'PLACES' ? 'loc_th' : null;
+  const staticData = bucket ? mergedList(dataKey, bucket) : [];
   const memory = memKey ? getMemory(memKey) : [];
 
   if (!q.trim()) {
@@ -1036,9 +1038,10 @@ async function submitForm() {
     } catch(e) { console.warn('encode error:', e); }
   }
 
-  const payload = {
+ const payload = {
     timestamp: now.toISOString(),
     refCode: ref,
+    formLang: 'th',
     type: currentType === 'lost' ? 'สิ่งของสูญหาย' : currentType === 'found' ? 'พบสิ่งของ' : 'รับของคืน',
     prefix: document.getElementById('f-prefix').value,
     name: (document.getElementById('f-prefix').value ? document.getElementById('f-prefix').value + ' ' : '') + document.getElementById('f-name').value,
@@ -1071,7 +1074,26 @@ _overlayText.textContent = 'กำลังบันทึกข้อมูล.
   try {
     await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
   } catch(e) { console.warn('⚠️ GAS fetch error (non-fatal):', e); }
+// ── E2: touch memory entries (best-effort) ──
+  try {
+    const dept = document.getElementById('f-dept').value.trim();
+    const loc  = currentType === 'lost'  ? document.getElementById('d-lost-loc').value.trim()
+               : currentType === 'found' ? document.getElementById('d-found-loc').value.trim()
+               : '';
+    if (dept) {
+      const p1 = new URLSearchParams({ action:'touchMemoryEntry', bucket:'dept_th', value:dept, refCode:ref });
+      fetch(GAS_URL, { method:'POST', body:p1, mode:'no-cors' }).catch(()=>{});
+    }
+    if (loc) {
+      const p2 = new URLSearchParams({ action:'touchMemoryEntry', bucket:'loc_th', value:loc, refCode:ref });
+      fetch(GAS_URL, { method:'POST', body:p2, mode:'no-cors' }).catch(()=>{});
+    }
+    // invalidate cache ให้โหลดใหม่ครั้งหน้า
+    sessionStorage.removeItem('lf_mem_dept_th');
+    sessionStorage.removeItem('lf_mem_loc_th');
+  } catch(e) {}
 
+  // Show success
   window.removeEventListener('beforeunload', _beforeUnload);
   _overlay.classList.remove('show');
 
@@ -1108,6 +1130,51 @@ function resetAll() {
   showStep('s1');
   setProgress(1);
 }
+// ========= SERVER MEMORY (E2) =========
+const _MEM_CACHE_TTL = 5 * 60 * 1000; // 5 นาที
+let _serverMem = { dept_th:[], loc_th:[] }; // cache in-memory
+
+async function loadServerMemory() {
+  const buckets = ['dept_th','loc_th'];
+  const now = Date.now();
+  await Promise.all(buckets.map(async function(bucket) {
+    // ตรวจ sessionStorage cache ก่อน
+    try {
+      const cached = sessionStorage.getItem('lf_mem_' + bucket);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed._ts && (now - parsed._ts) < _MEM_CACHE_TTL) {
+          _serverMem[bucket] = parsed.entries || [];
+          return;
+        }
+      }
+    } catch(e) {}
+    // fetch จาก GAS
+    try {
+      const r    = await fetch(GAS_URL + '?action=getMemory&bucket=' + bucket + '&t=' + now, { credentials:'omit' });
+      const json = await r.json();
+      if (json.success && json.entries) {
+        _serverMem[bucket] = json.entries;
+        sessionStorage.setItem('lf_mem_' + bucket, JSON.stringify({ _ts: now, entries: json.entries }));
+      }
+    } catch(e) {
+      console.warn('[Memory] fetch error for', bucket, e);
+    }
+  }));
+}
+
+// Merge static + server + localStorage memory (dedup by value)
+function mergedList(dataKey, bucket) {
+  const staticArr = dataKey === 'DEPTS' ? DEPTS : PLACES;
+  const serverArr = (_serverMem[bucket] || []).map(function(e) { return e.value; });
+  const seen      = new Set(staticArr.map(function(s) { return s.toLowerCase(); }));
+  const extras    = serverArr.filter(function(v) {
+    if (seen.has(v.toLowerCase())) return false;
+    seen.add(v.toLowerCase());
+    return true;
+  });
+  return [...staticArr, ...extras];
+}
 
 // ========= INIT =========
 window.onload = () => {
@@ -1120,6 +1187,7 @@ window.onload = () => {
     if (d) d.value = today;
     if (ti) ti.value = nowTime;
   });
+  loadServerMemory(); // E2: โหลด server memory (best-effort, ไม่ block UI)
 };
 </script>
 
