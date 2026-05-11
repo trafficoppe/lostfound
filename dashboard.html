@@ -497,7 +497,7 @@ function toggleStaffStats() {
 // ── Memory Stats (E4) ──
 async function loadMemoryStats() {
   try {
-    const r    = await fetch(GAS_URL + '?action=getMemoryStats&t=' + Date.now());
+  const r    = await fetch(GAS_URL + '?action=getMemoryStats&t=' + Date.now(), { credentials:'omit' });
     const json = await r.json();
     if (!json.success) return;
     const total = json.stats.total || 0;
