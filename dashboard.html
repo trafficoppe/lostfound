@@ -837,7 +837,14 @@ function fmtDateTimeTH_pdf(d) {
        + String(d.getMinutes()).padStart(2,"0") + " น.";
 }
   
-
+function fmtDateForPDFCol(d) {
+  if (!d) return "-";
+  const M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+             "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  return d.getDate() + " " + M[d.getMonth()] + "\n" + (d.getFullYear()+543) + " " + hh + ":" + mm + " น.";
+}
 async function runPdfExport() {
   const btn = document.getElementById("pdf-btn-gen");
   btn.disabled = true; btn.textContent = "⏳ กำลังสร้าง...";
@@ -924,16 +931,18 @@ async function runPdfExport() {
       doc.text("รายงานสรุประบบแจ้งของหาย/พบของ", tx, 12);
       sf("normal", 10);
       doc.text("งานจราจรและความปลอดภัย กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล", tx, 21);
+    const _HG = 1.5;
       sf("bold", 8);
-      doc.text("ช่วงเวลา: ", tx, 29);
+      doc.text("ช่วงเวลา:", tx, 29);
       sf("normal", 8);
+      const _hLw1 = tx + doc.getTextWidth("ช่วงเวลา:") + _HG;
       const periodText = periodTH + "   |   ";
-      doc.text(periodText, tx + doc.getTextWidth("ช่วงเวลา: "), 29);
+      doc.text(periodText, _hLw1, 29);
       sf("bold", 8);
-      const afterPeriod = tx + doc.getTextWidth("ช่วงเวลา: " + periodText);
-      doc.text("รหัสเอกสาร: ", afterPeriod, 29);
+      const _hLw2 = _hLw1 + doc.getTextWidth(periodText);
+      doc.text("รหัสเอกสาร:", _hLw2, 29);
       sf("normal", 8);
-      doc.text(docCode, afterPeriod + doc.getTextWidth("รหัสเอกสาร: "), 29);
+      doc.text(docCode, _hLw2 + doc.getTextWidth("รหัสเอกสาร:") + _HG, 29);
       sf("bold", 8);
       doc.text("หน้า " + pageNum, PW-MR, 29, {align:"right"});
       doc.setTextColor(...BLACK);
@@ -971,15 +980,16 @@ async function runPdfExport() {
     sf("bold",14); doc.setTextColor(...NAVY);
     doc.text(periodTH + "  (" + reportLabel + ")", ML, curY); curY+=9;
    sf("bold",10); doc.setTextColor(...BLACK);
-    doc.text("รหัสเอกสาร: ", ML, curY);
+   const _BG = 1.5;
+    doc.text("รหัสเอกสาร:", ML, curY);
     sf("normal",10);
-    const afterRef = ML + doc.getTextWidth("รหัสเอกสาร: ");
+    const afterRef = ML + doc.getTextWidth("รหัสเอกสาร:") + _BG;
     doc.text(docCode + "   |   ", afterRef, curY);
     sf("bold",10);
     const afterDocCode = afterRef + doc.getTextWidth(docCode + "   |   ");
-    doc.text("สร้างเมื่อ: ", afterDocCode, curY);
+    doc.text("สร้างเมื่อ:", afterDocCode, curY);
     sf("normal",10);
-    doc.text(fmtDateTimeTH_pdf(now), afterDocCode + doc.getTextWidth("สร้างเมื่อ: "), curY);
+    doc.text(fmtDateTimeTH_pdf(now), afterDocCode + doc.getTextWidth("สร้างเมื่อ:") + _BG, curY);
     curY+=12;
 
     // เส้นคั่นสีดำ
@@ -1032,27 +1042,28 @@ async function runPdfExport() {
             cellPadding:3,
           },
           alternateRowStyles:{fillColor:[248,250,253]},
-    columnStyles:{
-            0:{ cellWidth:22, overflow:"ellipsize" },
+   columnStyles:{
+            0:{ cellWidth:26, overflow:"linebreak"  },
             1:{ cellWidth:18, overflow:"ellipsize" },
-            2:{ cellWidth:40, overflow:"linebreak"  },
+            2:{ cellWidth:38, overflow:"ellipsize"  },
             3:{ cellWidth:22, overflow:"ellipsize" },
-            4:{ cellWidth:28, overflow:"ellipsize" },
-            5:{ cellWidth:22, overflow:"ellipsize" },
-            6:{ cellWidth:30, overflow:"ellipsize" },
+            4:{ cellWidth:26, overflow:"ellipsize" },
+            5:{ cellWidth:20, overflow:"linebreak" },
+            6:{ cellWidth:32, overflow:"ellipsize" },
           },
           head:[["RefCode","ประเภท","รายละเอียด","ผู้แจ้ง","คณะ/หน่วยงาน","วันที่/เวลา","สถานะ"]],
           body:items.map(it=>{
-            // RefCode: แทรก zero-width space หลัง "-" เพื่อช่วย wrap
-            const ref = (it.refCode||"(เดิม)").replace(/-/g, "-​");
+            const ref  = it.refCode || "(เดิม)";
+            const desc = it.title   || "";
+            const name = it.name    || "-";
             return [
               ref,
-              it.type||"",
-              it.title||"",
-              it.name||"-",
-              it.dept||"-",
-              fmtDateTimeTH_pdf(it.dateObj),
-              it.status||"รอดำเนินการ"
+              it.type || "",
+              desc.length > 40 ? desc.substring(0,40)+"..." : desc,
+              name.length > 18 ? name.substring(0,18)+"..." : name,
+              it.dept || "-",
+              fmtDateForPDFCol(it.dateObj),
+              it.status || "รอดำเนินการ"
             ];
           }),
      didDrawPage:(data)=>{ pageNum = data.pageNumber; hdr();ftr(); }
