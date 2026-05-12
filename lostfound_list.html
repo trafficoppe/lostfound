@@ -565,14 +565,14 @@ async function saveStatus(){
   const btn=document.getElementById('btn-save-modal');
   btn.textContent='⏳ กำลังบันทึก...';btn.disabled=true;
   try{
-    const params=new URLSearchParams();
+   const params=new URLSearchParams();
     params.append('action','updateStatus');
     params.append('refCode',editingRef);
-    params.append('status',status);
-    params.append('actionText',actionText);
+    params.append('newStatus',status);
+    params.append('note',actionText);
     const now=new Date();
     const updatedAt=now.toLocaleString('th-TH');
-    params.append('updatedBy',`${staffName} (${updatedAt})`);
+    params.append('adminName',`${staffName} (${updatedAt})`);
     await fetch(GAS_URL,{method:'POST',body:params,mode:'no-cors'});
    const item=allData.find(d=>d.refCode===editingRef);
     if(item){
