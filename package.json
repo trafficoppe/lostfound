@@ -1,0 +1,8 @@
+{
+  "name": "lostfound",
+  "private": true,
+  "description": "Lost & Found — Traffic Control and Premises Security Unit, Mahidol University",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs"
+  }
+}

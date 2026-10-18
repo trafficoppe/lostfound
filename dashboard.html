@@ -133,6 +133,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
   .quick-cards{flex-direction:column;}
 }
 </style>
+<link rel="stylesheet" href="assets/lf.css">
 </head>
 <body>
 
@@ -230,11 +231,12 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
     </div>
 
     <!-- KPI -->
+    <div class="lf-status" id="lf-status" role="status" aria-live="polite" hidden></div>
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-num" id="kpi-total">-</div><div class="kpi-label">รายการทั้งหมด</div></div>
       <div class="kpi kpi-lost"><div class="kpi-num" id="kpi-lost">-</div><div class="kpi-label">😟 สิ่งของสูญหาย</div></div>
       <div class="kpi kpi-found"><div class="kpi-num" id="kpi-found">-</div><div class="kpi-label">📦 พบสิ่งของ</div></div>
-      <div class="kpi kpi-pickup"><div class="kpi-num" id="kpi-pickup">-</div><div class="kpi-label">✅ รับของคืนแล้ว</div></div>
+      <div class="kpi kpi-pickup"><div class="kpi-num" id="kpi-pickup">-</div><div class="kpi-label" title="นับทุกประเภทที่สถานะเป็น &quot;รับของคืนแล้ว&quot; (ต่างจากจำนวนแบบฟอร์มรับของคืนในหน้ารายการ)">✅ สถานะรับของคืนแล้ว</div></div>
       <div class="kpi kpi-rate"><div class="kpi-num" id="kpi-rate">-</div><div class="kpi-label">📈 อัตราคืนสำเร็จ</div></div>
     </div>
 
@@ -408,71 +410,61 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
   </div>
 </div>
 
+<script src="assets/lf-data.js"></script>
 <script>
 /* =====================================================
  * Lost & Found Web App — dashboard.html  v1.3.1
  * © 2025–2026 Traffic Control and Premises Security Unit,
  *   Mahidol University. All rights reserved.
  * ===================================================== */
-const CREDENTIALS = { user:'admin01', pass:'024414400' };
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
+const GAS_URL = LF.API_URL;
+const W = d => LF.wall(d);
   const PENDING_BADGE_THRESHOLD  = 5;   // pending ≥ 5 → แสดง red dot
 const PENDING_BANNER_THRESHOLD = 20;  // pending ≥ 20 → แสดง banner
 const THAI_MONTHS      = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const THAI_MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const EN_MONTHS        = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function parseAnyDate(str) {
-  if (!str) return null;
-  const s = String(str).trim();
-  // ISO format: yyyy-MM-dd HH:mm:ss (จาก GAS v1.3.2+)
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (iso) {
-    const d = new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3]),
-                       parseInt(iso[4]), parseInt(iso[5]), parseInt(iso[6]||0));
-    if (!isNaN(d)) return d;
-  }
-  // dd/mm/yyyy (backward compat)
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (m) {
-    const d = new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0));
-    if (!isNaN(d)) return d;
-  }
-  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e) {}
-  return null;
-}
+function parseAnyDate(v) { return LF.parseDate(v); }
 
 let allData = [], filteredData = [], charts = {}, customRangeActive = false;
 
-function doLogin() {
+async function doLogin() {
   const u = document.getElementById('login-user').value.trim();
-  const p = document.getElementById('login-pass').value.trim();
-  if (u === CREDENTIALS.user && p === CREDENTIALS.pass) {
-    sessionStorage.setItem('lf_auth','1');
-    document.getElementById('login-wrap').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    loadDashboard(); startAutoRefresh();
-  } else {
-    document.getElementById('login-err').style.display = 'block';
+  const p = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  const btn = document.querySelector('.login-btn');
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'กำลังตรวจสอบ...';
+  try {
+    await LF.login(u, p);
+    document.getElementById('login-pass').value = '';
+    showDashboard();
+  } catch (e) {
+    err.textContent = e.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
   }
 }
-function logout() { sessionStorage.removeItem('lf_auth'); location.reload(); }
+function showDashboard() {
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  loadDashboard(false); startAutoRefresh();
+}
+async function logout() { await LF.logout(); location.reload(); }
 
-window.onload = () => {
-  if (sessionStorage.getItem('lf_auth') === '1') {
-    document.getElementById('login-wrap').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    loadDashboard(); startAutoRefresh();
-  }
-  const yr = new Date().getFullYear();
+window.onload = async () => {
+  if (LF.token() && await LF.whoami()) showDashboard();
+  const yr = LF.part(new Date(), 'year');
   ['p-monthly-year','p-yearly-year'].forEach(id => {
     const sel = document.getElementById(id);
     for (let y = yr; y >= yr-5; y--) sel.innerHTML += `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`;
   });
-  document.getElementById('p-daily-date').value  = new Date().toISOString().split('T')[0];
-  document.getElementById('p-custom-from').value = new Date().toISOString().split('T')[0];
-  document.getElementById('p-custom-to').value   = new Date().toISOString().split('T')[0];
-  document.getElementById('p-monthly-month').value = new Date().getMonth()+1;
+  document.getElementById('p-daily-date').value  = LF.todayISO();
+  document.getElementById('p-custom-from').value = LF.todayISO();
+  document.getElementById('p-custom-to').value   = LF.todayISO();
+  document.getElementById('p-monthly-month').value = LF.part(new Date(), 'month');
 };
 
 // v1.3.1: วัตถุประสงค์ อื่นๆ
@@ -539,61 +531,30 @@ async function loadMemoryStats() {
 function openMemoryAdmin() {
   window.location.href = 'lostfound_admin_memory.html';
 }  
-let refreshInterval = null;
-function startAutoRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(loadDashboard, 300000); }
-async function manualRefresh() { await loadDashboard(); }
+let refreshInterval = null, dashLoaded = false;
+function startAutoRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(() => loadDashboard(false), 300000); }
+async function manualRefresh() { await loadDashboard(true); }
 
-async function loadDashboard() {
+async function loadDashboard(force) {
+  LF.status('lf-status', 'loading');
   try {
-    const r    = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
-    const json = await r.json();
-    let newItems = [], oldItems = [];
-    if (json?.newData) {
-      newItems = json.newData.map(r => ({
-        source:'new', refCode:r['RefCode']||'', type:r['ประเภท']||'',
-        title:r['รายละเอียด']||'', location:r['สถานที่']||'',
-        dateObj:parseAnyDate(r['Timestamp']),
-        name:r['ชื่อ-นามสกุล']||'', personType:r['ประเภทบุคคล']||'',
-        dept:r['คณะ/หน่วยงาน']||'', phone:r['เบอร์โทร']||'',
-        status:r['สถานะ']||'', actionText:r['การดำเนินการ']||'',
-        imgUrl:r['URL รูปภาพ']||'', updatedBy:r['อัปเดตโดย']||''
-      }));
-    }
-    if (json?.oldData) oldItems = parseOldSheetRaw(json.oldData);
-    const today = new Date();
-    allData = [...newItems, ...oldItems].filter(it => !it.dateObj || it.dateObj <= today);
+    const res = await LF.load({ admin: true, force: !!force });
+    allData = res.records;
+    dashLoaded = true;
+    LF.status('lf-status', 'ok', res);
     buildYearFilter(); applyDashFilter();
-  if (document.getElementById('staff-stats-list').style.display !== 'none') renderStaffStats();
+    if (document.getElementById('staff-stats-list').style.display !== 'none') renderStaffStats();
     loadMemoryStats();
-  } catch(e) { console.error(e); }
-}
-
-function parseOldSheetRaw(rows) {
-  if (!rows || rows.length < 2) return [];
-  return rows.slice(1).map(row => {
-    const g = i => String(row[i]||'').trim();
-    const d = parseAnyDate(g(0));
-    if (!d || d.getFullYear() < 2020) return null;
-    const cG=g(6),cH=g(7),cK=g(10),cN=g(13);
-    let type='';
-    if(cG.includes('สูญหาย')||cG.includes('หาย'))type='สิ่งของสูญหาย';
-    else if(cG.includes('พบ')||cG.includes('เก็บ'))type='พบสิ่งของ';
-    else if(cG.includes('คืน'))type='รับของคืน';
-    if(!type){if(cH.length>2)type='สิ่งของสูญหาย';else if(cK.length>2)type='พบสิ่งของ';else if(cN.length>2)type='รับของคืน';}
-    if(!type)return null;
-    let title='',loc='';
-    if(type==='สิ่งของสูญหาย'){title=g(7);loc=g(8);}
-    else if(type==='พบสิ่งของ'){title=g(10);loc=g(11);}
-    else{title=g(13);}
-    if(/^[\d\s\-\+]{7,15}$/.test(title)||!title)title=g(2)||'ไม่ระบุ';
-    return {source:'old',refCode:'',type,title:title||'ไม่ระบุ',location:loc||'-',
-      dateObj:d,name:g(2),personType:g(3),dept:g(4),phone:g(5),
-      status:g(18)||'',actionText:g(17)||'',imgUrl:'',updatedBy:''};
-  }).filter(Boolean);
+  } catch (e) {
+    console.error(e);
+    if (e.code === 401) { alert('สิทธิ์หมดอายุ กรุณาเข้าสู่ระบบใหม่'); location.reload(); return; }
+    LF.status('lf-status', 'error', { message: e.message, hasData: dashLoaded });
+    if (!dashLoaded) ['kpi-total','kpi-lost','kpi-found','kpi-pickup','kpi-rate'].forEach(id => document.getElementById(id).textContent = '–');
+  }
 }
 
 function buildYearFilter() {
-  const years = [...new Set(allData.map(d=>d.dateObj?.getFullYear()).filter(Boolean))].sort((a,b)=>b-a);
+  const years = [...new Set(allData.map(d=>d.dateObj?W(d.dateObj).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
   const sel = document.getElementById('filter-year');
   const cur = sel.value;
   sel.innerHTML = '<option value="all">ทุกปี</option>' + years.map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
@@ -645,7 +606,7 @@ function applyDashFilter() {
     const mt=parseInt(document.getElementById('filter-month-to').value)||12;
     filteredData=allData.filter(d=>{
       if(!d.dateObj)return false;
-      const y=d.dateObj.getFullYear(); const m=d.dateObj.getMonth()+1;
+      const y=W(d.dateObj).getFullYear(); const m=W(d.dateObj).getMonth()+1;
       if(yf&&yt&&yf===yt)return y===yf&&m>=mf&&m<=mt;
       if(yf&&yt){if(y<yf||y>yt)return false;if(y===yf&&m<mf)return false;if(y===yt&&m>mt)return false;return true;}
       if(yf)return y>=yf; if(yt)return y<=yt; return m>=mf&&m<=mt;
@@ -655,7 +616,7 @@ function applyDashFilter() {
   } else {
     filteredData=allData.filter(d=>{
       if(!d.dateObj)return yr==='all';
-      const y=d.dateObj.getFullYear().toString(); const m=d.dateObj.getMonth()+1;
+      const y=W(d.dateObj).getFullYear().toString(); const m=W(d.dateObj).getMonth()+1;
       return(yr==='all'||y===yr)&&(mo==='all'||m===parseInt(mo))&&(q==='all'||(qm[q]||[]).includes(m));
     });
     document.getElementById('filter-active-label').textContent='';
@@ -707,7 +668,7 @@ function renderStaffStats() {
   el.innerHTML=sorted.map(([name,cnt],i)=>`
     <div class="staff-row">
       <div class="staff-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</div>
-      <div class="staff-name">${name}</div>
+      <div class="staff-name">${LF.esc(name)}</div>
       <div class="staff-count-bar"><div class="staff-count-fill" style="width:${Math.round(cnt/maxVal*100)}%"></div></div>
       <div class="staff-count">${cnt}</div>
     </div>`).join('');
@@ -721,7 +682,7 @@ function drawMonthlyChart(){
   const mm={};
   filteredData.forEach(d=>{
     if(!d.dateObj)return;
-    const k=`${d.dateObj.getFullYear()}-${String(d.dateObj.getMonth()+1).padStart(2,'0')}`;
+    const k=`${W(d.dateObj).getFullYear()}-${String(W(d.dateObj).getMonth()+1).padStart(2,'0')}`;
     if(!mm[k])mm[k]={lost:0,found:0,pickup:0};
     if(d.type==='สิ่งของสูญหาย')mm[k].lost++;else if(d.type==='พบสิ่งของ')mm[k].found++;else mm[k].pickup++;
   });
@@ -829,6 +790,7 @@ const _FONT_NAME = "NotoSansThai";
 
 function fmtDateTimeTH_pdf(d) {
   if (!d) return "-";
+  d = W(d);
   const M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
              "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
     return d.getDate() + " " + M[d.getMonth()] + " "
@@ -839,6 +801,7 @@ function fmtDateTimeTH_pdf(d) {
   
 function fmtDateForPDFCol(d) {
   if (!d) return "-";
+  d = W(d);
   const M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
              "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
   const hh = String(d.getHours()).padStart(2,"0");
@@ -868,27 +831,28 @@ async function runPdfExport() {
     const PW = 210, PH = 297, ML = 14, MR = 14;
 
     if (pdfType === "daily") {
-      const d = new Date(document.getElementById("p-daily-date").value);
-      fromDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      toDate   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+      const dv = document.getElementById("p-daily-date").value;
+      fromDate = LF.startOfDay(dv);
+      toDate   = LF.endOfDay(dv);
+      const d = W(fromDate);
       periodTH = "วันที่ " + d.getDate() + " " + THAI_MONTHS_FULL[d.getMonth()] + " พ.ศ. " + (d.getFullYear()+543);
       reportLabel = "รายงานรายวัน";
     } else if (pdfType === "monthly") {
       const y = parseInt(document.getElementById("p-monthly-year").value);
       const m = parseInt(document.getElementById("p-monthly-month").value) - 1;
-      fromDate = new Date(y, m, 1);
-      toDate   = new Date(y, m+1, 0, 23, 59, 59);
+      fromDate = LF.bkk(y, m+1, 1);
+      toDate   = new Date((m === 11 ? LF.bkk(y+1, 1, 1) : LF.bkk(y, m+2, 1)).getTime() - 1);
       periodTH = "เดือน" + THAI_MONTHS_FULL[m] + " พ.ศ. " + (y+543);
       reportLabel = "รายงานรายเดือน";
     } else if (pdfType === "yearly") {
       const y = parseInt(document.getElementById("p-yearly-year").value);
-      fromDate = new Date(y, 0, 1);
-      toDate   = new Date(y, 11, 31, 23, 59, 59);
+      fromDate = LF.bkk(y, 1, 1);
+      toDate   = new Date(LF.bkk(y+1, 1, 1).getTime() - 1);
       periodTH = "ประจำปี พ.ศ. " + (y+543);
       reportLabel = "รายงานประจำปี";
     } else {
-      fromDate = new Date(document.getElementById("p-custom-from").value);
-      toDate   = new Date(document.getElementById("p-custom-to").value + "T23:59:59");
+      fromDate = LF.startOfDay(document.getElementById("p-custom-from").value);
+      toDate   = LF.endOfDay(document.getElementById("p-custom-to").value);
       periodTH = document.getElementById("p-custom-from").value + " ถึง " + document.getElementById("p-custom-to").value;
       reportLabel = "รายงานช่วงที่กำหนด";
     }
@@ -902,13 +866,12 @@ async function runPdfExport() {
 
     const items = allData.filter(it => {
       if (!it.dateObj) return false;
-      const d = new Date(it.dateObj.getFullYear(), it.dateObj.getMonth(), it.dateObj.getDate());
-      return d >= fromDate && d <= toDate;
+      return it.dateObj >= fromDate && it.dateObj <= toDate;
     });
 
     const now = new Date();
     const docCode = "LF-" + pdfType.toUpperCase().substring(0,3) + "-"
-      + now.getFullYear() + String(now.getMonth()+1).padStart(2,"0") + String(now.getDate()).padStart(2,"0")
+      + LF.todayISO(now).replace(/-/g, "")
       + "-" + String(Math.floor(Math.random()*900)+100);
 
        let curY = 15, pageNum = 1;
@@ -973,7 +936,7 @@ async function runPdfExport() {
     const lost     = items.filter(i=>i.type==="สิ่งของสูญหาย").length;
     const found    = items.filter(i=>i.type==="พบสิ่งของ").length;
     const pickup   = items.filter(i=>i.type==="รับของคืน").length;
-    const returned = items.filter(i=>(i.status||"").includes("รับของคืนแล้ว")||i.type==="รับของคืน").length;
+    const returned = items.filter(i=>(i.status||"").includes("รับของคืนแล้ว")).length;   // นิยามเดียวกับ KPI บน Dashboard
     const rate     = total > 0 ? Math.round((returned/total)*100)+"%" : "0%";
 
    // ── ชื่อรายงาน + รหัส ──
@@ -1003,8 +966,8 @@ async function runPdfExport() {
       {l:"รวมทั้งหมด",   v:total,   c:[26,58,92],  bg:[240,243,248]},
       {l:"สิ่งของสูญหาย", v:lost,    c:[192,57,43], bg:[253,238,234]},
       {l:"พบสิ่งของ",    v:found,   c:[30,126,68], bg:[237,247,241]},
-      {l:"รับของคืน",    v:pickup,  c:[26,82,118], bg:[234,241,251]},
-      {l:"คืนสำเร็จแล้ว",v:returned,c:[30,126,68], bg:[237,247,241]},
+      {l:"แบบฟอร์มรับคืน",v:pickup,  c:[26,82,118], bg:[234,241,251]},
+      {l:"สถานะรับคืนแล้ว",v:returned,c:[30,126,68], bg:[237,247,241]},
       {l:"อัตราสำเร็จ",  v:rate,    c:[232,160,32],bg:[255,251,235]},
     ];
     const kw=(PW-ML-MR-15)/6;
@@ -1073,7 +1036,7 @@ async function runPdfExport() {
     } else if (pdfType==="monthly") {
       const byDay={};
       items.forEach(it=>{
-        const d=it.dateObj.getDate();
+        const d=W(it.dateObj).getDate();
         if(!byDay[d])byDay[d]={lost:0,found:0,pickup:0};
         if(it.type==="สิ่งของสูญหาย")byDay[d].lost++;
         else if(it.type==="พบสิ่งของ")byDay[d].found++;
@@ -1100,7 +1063,7 @@ async function runPdfExport() {
       const byMonth={};
       for(let m=0;m<12;m++)byMonth[m]={lost:0,found:0,pickup:0,returned:0};
       items.forEach(it=>{
-        const m=it.dateObj.getMonth();
+        const m=W(it.dateObj).getMonth();
         if(it.type==="สิ่งของสูญหาย")byMonth[m].lost++;
         else if(it.type==="พบสิ่งของ")byMonth[m].found++;
         else byMonth[m].pickup++;

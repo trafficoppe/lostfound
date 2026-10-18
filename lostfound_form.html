@@ -614,6 +614,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
   <div class="send-text">กำลังส่งข้อมูล...</div>
 </div>
 
+<script src="assets/lf-data.js"></script>
 <script>
 /* =====================================================
  * Lost & Found Web App — lostfound_form.html
@@ -624,7 +625,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
  *   Mahidol University. All rights reserved.
  * ===================================================== */
 // ========= CONFIG =========
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
+const GAS_URL = LF.API_URL;
 
 // ========= DATA =========
 const DEPTS = ["กองกฎหมาย","กองกิจการนักศึกษา","กองกายภาพและสิ่งแวดล้อม","กองคลัง","กองทรัพยากรบุคคล","กองเทคโนโลยีสารสนเทศ","กองบริหารการศึกษา","กองบริหารงานทั่วไป","กองบริหารงานวิจัย","กองแผนงาน","กองพัฒนาคุณภาพ","กองวิเทศสัมพันธ์","คณะกายภาพบำบัด","คณะทันตแพทยศาสตร์","คณะเทคนิคการแพทย์","คณะเทคโนโลยีสารสนเทศและการสื่อสาร","คณะพยาบาลศาสตร์","คณะเภสัชศาสตร์","คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี","คณะแพทยศาสตร์ศิริราชพยาบาล","คณะวิทยาศาสตร์","คณะวิศวกรรมศาสตร์","คณะเวชศาสตร์เขตร้อน","คณะศิลปศาสตร์","คณะสังคมศาสตร์และมนุษยศาสตร์","คณะสัตวแพทยศาสตร์","คณะสาธารณสุขศาสตร์","คณะสิ่งแวดล้อมและทรัพยากรศาสตร์","บัณฑิตวิทยาลัย","โรงเรียนสาธิตนานาชาติ","วิทยาเขตกาญจนบุรี","วิทยาลัยการจัดการ","วิทยาลัยดุริยางคศิลป์","วิทยาลัยนานาชาติ","วิทยาลัยวิทยาศาสตร์และเทคโนโลยีการกีฬา","วิทยาลัยศาสนศึกษา","ศูนย์การแพทย์กาญจนาภิเษก","ศูนย์จิตตปัญญาศึกษา","ศูนย์บริหารสินทรัพย์","ศูนย์ส่งเสริมการเรียนรู้แบบบูรณาการชีวิต","ศูนย์สัตว์ทดลองแห่งชาติ","สถาบันชีววิทยาศาสตร์โมเลกุล","สถาบันนวัตกรรมการเรียนรู้","สถาบันพัฒนาสุขภาพอาเซียน","สถาบันวิจัยประชากรและสังคม","สถาบันวิจัยภาษาและวัฒนธรรมเอเชีย","สถาบันโภชนาการ","สำนักงานคณะกรรมการตรวจสอบการบริหารงานประจำมหาวิทยาลัย","สำนักงานสภามหาวิทยาลัยมหิดล","หอสมุดและคลังความรู้มหาวิทยาลัยมหิดล","บุคคลภายนอก","อื่นๆ"];
@@ -925,28 +926,28 @@ function buildSummary() {
   let details = '';
   if (currentType==='lost') {
     details = `
-      <div class="sum-row"><span class="sum-k">วันที่หาย</span><span class="sum-v">${document.getElementById('d-lost-date').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${document.getElementById('d-lost-time').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${document.getElementById('d-lost-desc').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">สถานที่</span><span class="sum-v">${document.getElementById('d-lost-loc').value||'-'}</span></div>`;
+      <div class="sum-row"><span class="sum-k">วันที่หาย</span><span class="sum-v">${LF.esc(document.getElementById('d-lost-date').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${LF.esc(document.getElementById('d-lost-time').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${LF.esc(document.getElementById('d-lost-desc').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">สถานที่</span><span class="sum-v">${LF.esc(document.getElementById('d-lost-loc').value||'-')}</span></div>`;
   } else if (currentType==='found') {
     details = `
-      <div class="sum-row"><span class="sum-k">วันที่พบ</span><span class="sum-v">${document.getElementById('d-found-date').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${document.getElementById('d-found-time').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${document.getElementById('d-found-desc').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">สถานที่พบ</span><span class="sum-v">${document.getElementById('d-found-loc').value||'-'}</span></div>`;
+      <div class="sum-row"><span class="sum-k">วันที่พบ</span><span class="sum-v">${LF.esc(document.getElementById('d-found-date').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${LF.esc(document.getElementById('d-found-time').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${LF.esc(document.getElementById('d-found-desc').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">สถานที่พบ</span><span class="sum-v">${LF.esc(document.getElementById('d-found-loc').value||'-')}</span></div>`;
   } else {
     details = `
-      <div class="sum-row"><span class="sum-k">วันที่มารับ</span><span class="sum-v">${document.getElementById('d-pickup-date').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${document.getElementById('d-pickup-time').value||'-'}</span></div>
-      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${document.getElementById('d-pickup-desc').value||'-'}</span></div>`;
+      <div class="sum-row"><span class="sum-k">วันที่มารับ</span><span class="sum-v">${LF.esc(document.getElementById('d-pickup-date').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">เวลา</span><span class="sum-v">${LF.esc(document.getElementById('d-pickup-time').value||'-')}</span></div>
+      <div class="sum-row"><span class="sum-k">รายละเอียด</span><span class="sum-v">${LF.esc(document.getElementById('d-pickup-desc').value||'-')}</span></div>`;
   }
   document.getElementById('sum-card').innerHTML = `
     <div class="summary-type-banner ${typeBanner[currentType]}">${typeLabel[currentType]}</div>
-    <div class="sum-row"><span class="sum-k">ชื่อ-นามสกุล</span><span class="sum-v">${(document.getElementById('f-prefix').value||'')+' '+document.getElementById('f-name').value}</span></div>
-    <div class="sum-row"><span class="sum-k">ประเภทบุคคล</span><span class="sum-v">${ptype.split(' ')[0]}</span></div>
-    <div class="sum-row"><span class="sum-k">คณะ/หน่วยงาน</span><span class="sum-v">${document.getElementById('f-dept').value}</span></div>
-    <div class="sum-row"><span class="sum-k">โทรศัพท์</span><span class="sum-v">${document.getElementById('f-phone').value}</span></div>
+    <div class="sum-row"><span class="sum-k">ชื่อ-นามสกุล</span><span class="sum-v">${LF.esc((document.getElementById('f-prefix').value||'')+' '+document.getElementById('f-name').value)}</span></div>
+    <div class="sum-row"><span class="sum-k">ประเภทบุคคล</span><span class="sum-v">${LF.esc(ptype.split(' ')[0])}</span></div>
+    <div class="sum-row"><span class="sum-k">คณะ/หน่วยงาน</span><span class="sum-v">${LF.esc(document.getElementById('f-dept').value)}</span></div>
+    <div class="sum-row"><span class="sum-k">โทรศัพท์</span><span class="sum-v">${LF.esc(document.getElementById('f-phone').value)}</span></div>
     ${details}`;
 }
 
@@ -993,8 +994,15 @@ async function compressImage(file, maxW = 1280, quality = 0.7) {
 }
 
 // ========= SUBMIT =========
+let _lfSubmitting = false, _lfRequestId = null;
 async function submitForm() {
-  const ref = genRef();
+  if (_lfSubmitting) return;            // กันกดซ้ำระหว่างส่ง
+  _lfSubmitting = true;
+  document.querySelectorAll('.btn-submit').forEach(b => b.disabled = true);
+  try { await _submitFormInner(); }
+  finally { _lfSubmitting = false; document.querySelectorAll('.btn-submit').forEach(b => b.disabled = false); }
+}
+async function _submitFormInner() {
   const now = new Date();
   const ptype = document.querySelector('input[name="ptype"]:checked')?.value || '';
 
@@ -1039,8 +1047,7 @@ async function submitForm() {
   }
 
  const payload = {
-    timestamp: now.toISOString(),
-    refCode: ref,
+    clientRequestId: (_lfRequestId = _lfRequestId || LF.requestId()),
     formLang: 'th',
     type: currentType === 'lost' ? 'สิ่งของสูญหาย' : currentType === 'found' ? 'พบสิ่งของ' : 'รับของคืน',
     prefix: document.getElementById('f-prefix').value,
@@ -1060,44 +1067,34 @@ async function submitForm() {
   _overlayText.textContent = 'กำลังส่งข้อมูล...';
   const _beforeUnload = function(e) { e.preventDefault(); e.returnValue = ''; };
   window.addEventListener('beforeunload', _beforeUnload);
-  const params = new URLSearchParams();
-  params.append('action', 'submit');
-  Object.keys(payload).forEach(k => {
-    if (k === 'files') {
-      params.append('files', JSON.stringify(payload.files));
-    } else {
-      params.append(k, String(payload[k] || ''));
-    }
-  });
-
-_overlayText.textContent = 'กำลังบันทึกข้อมูล...';
+  _overlayText.textContent = 'กำลังบันทึกข้อมูล...';
+  let result;
   try {
-    await fetch(GAS_URL, { method: 'POST', body: params, mode: 'no-cors' });
-  } catch(e) { console.warn('⚠️ GAS fetch error (non-fatal):', e); }
-// ── E2: touch memory entries (best-effort) ──
+    result = await LF.post('submit', payload, 180000);
+  } catch (e) {
+    result = { success: false, message: e.message };
+  }
+  window.removeEventListener('beforeunload', _beforeUnload);
+  _overlay.classList.remove('show');
+  if (!result || result.success !== true) {
+    const reason = (result && (result.message || result.error)) || '-';
+    showToast(['ส่งข้อมูลไม่สำเร็จ: ' + reason, 'ข้อมูลที่กรอกยังอยู่ กรุณากด “ยืนยันและส่ง” อีกครั้ง (ระบบป้องกันการบันทึกซ้ำ)']);
+    return;
+  }
+  _lfRequestId = null;
+  const ref = result.refCode;
+  // ── E2: touch memory entries (best-effort) ──
   try {
     const dept = document.getElementById('f-dept').value.trim();
     const loc  = currentType === 'lost'  ? document.getElementById('d-lost-loc').value.trim()
-               : currentType === 'found' ? document.getElementById('d-found-loc').value.trim()
-               : '';
-    if (dept) {
-      const p1 = new URLSearchParams({ action:'touchMemoryEntry', bucket:'dept_th', value:dept, refCode:ref });
-      fetch(GAS_URL, { method:'POST', body:p1, mode:'no-cors' }).catch(()=>{});
-    }
-    if (loc) {
-      const p2 = new URLSearchParams({ action:'touchMemoryEntry', bucket:'loc_th', value:loc, refCode:ref });
-      fetch(GAS_URL, { method:'POST', body:p2, mode:'no-cors' }).catch(()=>{});
-    }
-    // invalidate cache ให้โหลดใหม่ครั้งหน้า
+               : currentType === 'found' ? document.getElementById('d-found-loc').value.trim() : '';
+    if (dept) LF.post('touchMemoryEntry', { bucket:'dept_th', value:dept, refCode:ref }, 20000).catch(()=>{});
+    if (loc)  LF.post('touchMemoryEntry', { bucket:'loc_th', value:loc,  refCode:ref }, 20000).catch(()=>{});
     sessionStorage.removeItem('lf_mem_dept_th');
     sessionStorage.removeItem('lf_mem_loc_th');
   } catch(e) {}
+  const imgWarn = result.imagesFailed > 0 ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่แนบรูปไม่สำเร็จ ' + result.imagesFailed + ' ไฟล์ — กรุณาส่งรูปให้เจ้าหน้าที่พร้อมแจ้งเลขอ้างอิง' : '';
 
-  // Show success
-  window.removeEventListener('beforeunload', _beforeUnload);
-  _overlay.classList.remove('show');
-
-  // Show success
   const icons = { lost:'📋', found:'✅', pickup:'🎉' };
   const titles = { lost:'แจ้งของหายสำเร็จ', found:'แจ้งพบของสำเร็จ ขอบคุณ! 🙏', pickup:'บันทึกการรับของคืนแล้ว' };
   const msgs = {
@@ -1108,7 +1105,7 @@ _overlayText.textContent = 'กำลังบันทึกข้อมูล.
   document.getElementById('suc-icon').textContent = icons[currentType];
   document.getElementById('suc-title').textContent = titles[currentType];
   document.getElementById('suc-ref').textContent = ref;
-  document.getElementById('suc-msg').innerHTML = msgs[currentType];
+  document.getElementById('suc-msg').innerHTML = msgs[currentType] + imgWarn;
 
   document.querySelector('.progress-bar-wrap').style.display = 'none';
   showStep('s5');
@@ -1116,6 +1113,7 @@ _overlayText.textContent = 'กำลังบันทึกข้อมูล.
 
 // ========= RESET =========
 function resetAll() {
+  _lfRequestId = null;
   currentType = null;
   currentStep = 1;
   uploadedFiles = { lost:[], found:[], pickup:[] };
@@ -1179,8 +1177,8 @@ function mergedList(dataKey, bucket) {
 // ========= INIT =========
 window.onload = () => {
   setupMemoryBlur();
-  const today = new Date().toISOString().split('T')[0];
-  const nowTime = new Date().toTimeString().slice(0,5);
+  const today = LF.todayISO();
+  const nowTime = LF.timeNow();
   ['lost','found','pickup'].forEach(t => {
     const d = document.getElementById('d-'+t+'-date');
     const ti = document.getElementById('d-'+t+'-time');
