@@ -123,7 +123,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 }
 </style>
 </head>
-<body>
+<body style="visibility:hidden">
 
 <!-- TOP BAR -->
 <div class="top-bar">
@@ -249,6 +249,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<script src="assets/lf-data.js"></script>
 <script>
 /* =====================================================
  * Lost & Found — lostfound_admin_memory.html  v1.0.0
@@ -257,8 +258,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
  *   Mahidol University. All rights reserved.
  * ===================================================== */
 
-const GAS_URL     = 'https://script.google.com/macros/s/AKfycbxrI-qgAvb0Zy-aKWDtTaHKM3etKDeedFVpOMoECxH3-x2uGCTQG_Fw70a1JR8F4BNM/exec';
-const ADMIN_NAME  = 'admin01';
+const GAS_URL     = LF.API_URL;
 const BUCKET_LABELS = {
   dept_th: 'คณะ/หน่วยงาน (ไทย)',
   dept_en: 'Dept (EN)',
@@ -266,11 +266,8 @@ const BUCKET_LABELS = {
   loc_en:  'Location (EN)'
 };
 
-// ── Auth gate ──
-if (sessionStorage.getItem('lf_auth') !== '1') {
-  window.location.href = 'dashboard.html';
-}
-function logout() { sessionStorage.removeItem('lf_auth'); window.location.href = 'dashboard.html'; }
+// ── Auth gate: ตรวจ token กับเซิร์ฟเวอร์ ──
+async function logout() { await LF.logout(); window.location.href = 'dashboard.html'; }
 
 // ── State ──
 let currentBucket  = 'dept_th';
@@ -280,7 +277,9 @@ let selectedRows   = new Set(); // rowNum of selected
 let editingRowNum  = null;
 
 // ── Init ──
-window.onload = () => {
+window.onload = async () => {
+  if (!(await LF.whoami())) { window.location.href = 'dashboard.html'; return; }
+  document.body.style.visibility = 'visible';
   document.getElementById('add-bucket').value = currentBucket;
   loadAllBadges();
   loadBucket(currentBucket);
@@ -315,13 +314,12 @@ async function loadBucket(bucket) {
   });
 
   try {
-  const r    = await fetch(GAS_URL + '?action=getMemoryByBucket&bucket=' + bucket + '&status=all&t=' + Date.now(), { credentials:'omit' });
-    const json = await r.json();
-    if (!json.success) throw new Error('GAS error');
+    const json = await LF.adminCall('adminGetMemory', { bucket: bucket, status: 'all' }, 30000);
     allEntries = json.entries || [];
     updateSummary();
     renderTable();
   } catch(e) {
+    if (e.code === 401) { window.location.href = 'dashboard.html'; return; }
     document.getElementById('table-body').innerHTML = '<div class="table-empty">❌ โหลดข้อมูลไม่ได้ — ลองรีเฟรช</div>';
     showToast('โหลดข้อมูลไม่ได้', 'error');
   }
@@ -400,7 +398,7 @@ function renderRow(r) {
       <div class="entry-value">${escHtml(r.value)}</div>
       <div style="text-align:center;" class="entry-count">${r.count}</div>
       <div style="text-align:center;"><span class="status-chip ${r.status}">${statusLabel[r.status] || r.status}</span></div>
-      <div class="col-date" style="font-size:12px;color:var(--muted);">${addedAt}</div>
+      <div class="col-date" style="font-size:12px;color:var(--muted);">${escHtml(addedAt)}</div>
       <div class="row-actions col-actions">${actions}</div>
     </div>`;
 }
@@ -463,18 +461,17 @@ async function bulkAction(newStatus) {
 // ── Post action (single or bulk) ──
 async function postAction(rowNums, newStatus) {
   let success = 0, fail = 0;
-  // serial to avoid race on sheet
-  for (const rowNum of rowNums) {
+  // ทำทีละรายการ จากแถวล่างขึ้นบน (ลบแล้วแถวด้านบนไม่เลื่อน) และส่ง bucket/value ให้เซิร์ฟเวอร์ตรวจว่าเป็นแถวเดิม
+  const sorted = rowNums.slice().sort((a, b) => b - a);
+  for (const rowNum of sorted) {
+    const entry = allEntries.find(r => r.rowNum === rowNum) || {};
     try {
-      const params = new URLSearchParams({
-        action: 'updateMemoryStatus',
-        rowNum: rowNum,
-        newStatus: newStatus,
-        adminName: ADMIN_NAME
-      });
-      const r = await fetch(GAS_URL, { method:'POST', body:params, mode:'no-cors' });
+      await LF.adminCall('updateMemoryStatus', { rowNum: rowNum, newStatus: newStatus, bucket: entry.bucket, value: entry.value }, 30000);
       success++;
-    } catch(e) { fail++; }
+    } catch(e) {
+      if (e.code === 401) { window.location.href = 'dashboard.html'; return; }
+      fail++;
+    }
   }
   showToast(
     fail === 0
@@ -507,13 +504,7 @@ async function submitAdd() {
   btn.disabled = true; btn.textContent = '⏳ กำลังเพิ่ม...';
 
   try {
-    const params = new URLSearchParams({
-      action: 'adminAddMemory',
-      bucket: bucket,
-      value: value,
-      adminName: ADMIN_NAME
-    });
-    await fetch(GAS_URL, { method:'POST', body:params, mode:'no-cors' });
+    await LF.adminCall('adminAddMemory', { bucket: bucket, value: value }, 30000);
     showToast('✅ เพิ่ม entry สำเร็จ', 'success');
     closeAddModal();
     // switch to the bucket that was added
@@ -521,7 +512,7 @@ async function submitAdd() {
     else await loadBucket(currentBucket);
     await loadAllBadges();
   } catch(e) {
-    showToast('❌ เพิ่มไม่สำเร็จ', 'error');
+    showToast('❌ เพิ่มไม่สำเร็จ: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '✅ เพิ่ม (Approved ทันที)';
   }
@@ -558,21 +549,18 @@ async function submitEdit() {
   try {
     if (valueChanged) {
       // 1) ลบ row เดิม
-      const p1 = new URLSearchParams({ action:'updateMemoryStatus', rowNum:editingRowNum, newStatus:'deleted', adminName:ADMIN_NAME });
-      await fetch(GAS_URL, { method:'POST', body:p1, mode:'no-cors' });
+      await LF.adminCall('updateMemoryStatus', { rowNum: editingRowNum, newStatus: 'deleted', bucket: entry.bucket, value: entry.value }, 30000);
       // 2) เพิ่ม row ใหม่
-      const p2 = new URLSearchParams({ action:'adminAddMemory', bucket:currentBucket, value:value, adminName:ADMIN_NAME });
-      await fetch(GAS_URL, { method:'POST', body:p2, mode:'no-cors' });
+      await LF.adminCall('adminAddMemory', { bucket: currentBucket, value: value }, 30000);
     } else {
       // แค่ note
-      const p = new URLSearchParams({ action:'updateMemoryStatus', rowNum:editingRowNum, newStatus:'approved', adminName:ADMIN_NAME, note:note });
-      await fetch(GAS_URL, { method:'POST', body:p, mode:'no-cors' });
+      await LF.adminCall('updateMemoryStatus', { rowNum: editingRowNum, newStatus: 'approved', note: note, bucket: (entry||{}).bucket, value: (entry||{}).value }, 30000);
     }
     showToast('✅ แก้ไขสำเร็จ', 'success');
     closeEditModal();
     await loadBucket(currentBucket);
   } catch(e) {
-    showToast('❌ แก้ไขไม่สำเร็จ', 'error');
+    showToast('❌ แก้ไขไม่สำเร็จ: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '💾 บันทึก';
   }

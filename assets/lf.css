@@ -1,0 +1,6 @@
+/* Lost & Found — แถบสถานะการโหลดข้อมูล (ใช้ร่วมทุกหน้า) */
+.lf-status{font-family:'Sarabun',sans-serif;font-size:13px;padding:8px 14px;border-radius:10px;margin:0 0 14px;line-height:1.5;}
+.lf-status[hidden]{display:none;}
+.lf-status-loading{background:#eef3fa;color:#2d5f8f;}
+.lf-status-ok{background:#f3f7f4;color:#4a6b55;}
+.lf-status-error{background:#fff2cc;color:#7d4a00;border:1px solid #f0c36d;font-weight:600;}
