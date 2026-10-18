@@ -1,0 +1,1056 @@
+diff --git a/index.html b/index.html
+index ea79316..8996a18 100644
+--- a/index.html
++++ b/index.html
+@@ -155,6 +155,7 @@ footer a:hover{color:white;}
+   .sort-select{width:100%;}
+ }
+ </style>
++<script src="assets/lf-data.js"></script>
+ </head>
+ <body>
+ 
+@@ -202,7 +203,7 @@ footer a:hover{color:white;}
+         🤝 รับคืนแล้ว <span class="count" id="cnt-pickup">-</span>
+       </div>
+     </div>
+-    <button class="btn-refresh" onclick="loadAll()">🔄 รีเฟรช</button>
++    <button class="btn-refresh" onclick="loadAll(true)">🔄 รีเฟรช</button>
+     <div class="info-text" id="update-time"></div>
+   </div>
+ 
+@@ -307,29 +308,11 @@ function driveThumb(raw, size='w400') {
+ function fmtDate(d) {
+   if (!d || isNaN(d)) return '-';
+   try {
+-    return d.toLocaleString('th-TH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
++    return d.toLocaleString('th-TH', { timeZone:'Asia/Bangkok', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+   } catch(e) { return '-'; }
+ }
+ 
+-function parseDate(str) {
+-  if (!str) return null;
+-  const s = String(str).trim();
+-  // ISO format: yyyy-MM-dd HH:mm:ss (จาก GAS v1.3.2+)
+-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+-  if (iso) {
+-    const d = new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3]),
+-                       parseInt(iso[4]), parseInt(iso[5]), parseInt(iso[6]||0));
+-    if (!isNaN(d)) return d;
+-  }
+-  // dd/mm/yyyy (รูปแบบเดิม — backward compat)
+-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+-  if (m) {
+-    const d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]),
+-                       parseInt(m[4]||0), parseInt(m[5]||0), parseInt(m[6]||0));
+-    if (!isNaN(d)) return d;
+-  }
+-  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e) {}
+-  return null;
++function parseDate(str) { return LFData.parseDate(str);
+ }
+ 
+ function parseOldSheetRaw(rows) {
+@@ -339,7 +322,7 @@ function parseOldSheetRaw(rows) {
+     const ts = g(0);
+     if (!ts) return null;
+     const tsObj = parseDate(ts);
+-    if (!tsObj || tsObj.getFullYear() < 2020) return null;
++    if (!tsObj || LFData.part(tsObj, 'year') < 2020) return null;
+ 
+     const colG = g(6), colH = g(7), colK = g(10), colN = g(13);
+     let type = '';
+@@ -398,19 +381,23 @@ function parseNewSheet(data) {
+   })).filter(r => r.type);
+ }
+ 
+-async function loadAll() {
+-  document.getElementById('gallery').innerHTML =
++async function loadAll(force = false) {
++  if (!allItems.length) document.getElementById('gallery').innerHTML =
+     '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
+ 
+   let oldItems = [];
+   let newItems = [];
+ 
+   try {
+-    const r = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+-    const json = await r.json();
++    const json = await LFData.getAllData(GAS_URL, force === true);
+     if (json?.newData) newItems = parseNewSheet(json.newData);
+     if (json?.oldData) oldItems = parseOldSheetRaw(json.oldData);
+-  } catch(e) { console.error('getAllData error:', e); }
++  } catch(e) {
++    LFData.showError(e);
++    if (!allItems.length) document.getElementById('gallery').textContent = 'ยังโหลดรายการไม่ได้ กรุณากดรีเฟรช';
++    return;
++  }
++  LFData.showError(null);
+ 
+   const today = new Date();
+   allItems = [...newItems, ...oldItems].filter(it => {
+@@ -422,7 +409,7 @@ async function loadAll() {
+   updateCounts();
+   applyFilters();
+   document.getElementById('update-time').textContent =
+-    'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
++    'ตรวจสอบล่าสุด: ' + new Date().toLocaleTimeString('th-TH', {timeZone:'Asia/Bangkok'});
+ }
+ 
+ function updateCounts() {
+@@ -455,7 +442,7 @@ function openPending(type) {
+     (isLost ? 'สิ่งของสูญหาย' : 'พบสิ่งของ') + ' — รายการรอดำเนินการ';
+   document.getElementById('pending-panel').classList.add('show');
+   document.getElementById('pending-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+-  const today = new Date().toISOString().split('T')[0];
++  const today = LFData.todayISO();
+   document.getElementById('pf-date-from').value = today;
+   document.getElementById('pf-date-to').value   = today;
+   renderPendingList();
+@@ -482,24 +469,24 @@ function applyCustomRange() {
+ 
+ function getPendingDateRange() {
+   const now   = new Date();
+-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
++  const today = LFData.calendar(LFData.part(now, 'year'), (LFData.part(now, 'month') - 1), LFData.part(now, 'day'));
+   if (pfMode === 'today') {
+     return { from: today, to: new Date(today.getTime() + 86400000 - 1) };
+   } else if (pfMode === 'week') {
+     return { from: new Date(today.getTime() - 6*86400000), to: new Date(today.getTime() + 86400000 - 1) };
+   } else if (pfMode === 'month') {
+-    return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59) };
++    return { from: LFData.calendar(LFData.part(now, 'year'), (LFData.part(now, 'month') - 1), 1), to: LFData.calendar(LFData.part(now, 'year'), (LFData.part(now, 'month') - 1)+1, 0, 23, 59, 59) };
+   } else if (pfMode === 'year') {
+-    return { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear(), 11, 31, 23, 59, 59) };
++    return { from: LFData.calendar(LFData.part(now, 'year'), 0, 1), to: LFData.calendar(LFData.part(now, 'year'), 11, 31, 23, 59, 59) };
+   } else if (pfMode === 'custom' && pfFrom && pfTo) {
+-    return { from: new Date(pfFrom), to: new Date(pfTo + 'T23:59:59') };
++    return { from: LFData.parseDate(pfFrom), to: LFData.parseDate(pfTo + 'T23:59:59') };
+   }
+   return null;
+ }
+ 
+ function fmtRangeLabel(range) {
+   if (!range) return 'ทุกช่วงเวลา';
+-  const opt = { year:'numeric', month:'short', day:'numeric' };
++  const opt = { timeZone:'Asia/Bangkok', year:'numeric', month:'short', day:'numeric' };
+   const f = range.from.toLocaleDateString('th-TH', opt);
+   const t = range.to.toLocaleDateString('th-TH', opt);
+   if (f === t) return f;
+@@ -619,7 +606,7 @@ function renderCard(it, idx) {
+       <div class="card-body">
+         <div class="card-title" title="${it.title}">${it.title}</div>
+         <div class="card-loc">📍 ${it.location}</div>
+-        <div class="card-date">🕐 ${fmtDate(it.dateObj)}</div>
++        <div class="card-date">🕐 แจ้งเมื่อ ${fmtDate(it.dateObj)}</div>
+         ${stHtml}
+       </div>
+     </div>`;
+@@ -667,7 +654,7 @@ function openModal(idx) {
+     it.title      ? ['📝 รายละเอียด', it.title]                             : null,
+     it.location && it.location !== '-' ? ['📍 สถานที่', it.location]         : null,
+     it.time       ? ['🕐 เวลา',       it.time]                              : null,
+-    ['📅 วันที่',    fmtDate(it.dateObj)],
++    ['📅 วันที่แจ้ง', fmtDate(it.dateObj)],
+     it.name       ? ['👤 ผู้แจ้ง',    it.name]                              : null,
+     it.personType ? ['🏷️ ประเภทบุคคล', it.personType.split(' ')[0]]         : null,
+     it.dept       ? ['🏢 คณะ/หน่วยงาน',it.dept]                             : null,
+diff --git a/dashboard.html b/dashboard.html
+index 3a6158e..40805f4 100644
+--- a/dashboard.html
++++ b/dashboard.html
+@@ -133,6 +133,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
+   .quick-cards{flex-direction:column;}
+ }
+ </style>
++<script src="assets/lf-data.js"></script>
+ </head>
+ <body>
+ 
+@@ -422,24 +423,7 @@ const THAI_MONTHS      = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ
+ const THAI_MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+ const EN_MONTHS        = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+ 
+-function parseAnyDate(str) {
+-  if (!str) return null;
+-  const s = String(str).trim();
+-  // ISO format: yyyy-MM-dd HH:mm:ss (จาก GAS v1.3.2+)
+-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+-  if (iso) {
+-    const d = new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3]),
+-                       parseInt(iso[4]), parseInt(iso[5]), parseInt(iso[6]||0));
+-    if (!isNaN(d)) return d;
+-  }
+-  // dd/mm/yyyy (backward compat)
+-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+-  if (m) {
+-    const d = new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0));
+-    if (!isNaN(d)) return d;
+-  }
+-  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e) {}
+-  return null;
++function parseAnyDate(str) { return LFData.parseDate(str);
+ }
+ 
+ let allData = [], filteredData = [], charts = {}, customRangeActive = false;
+@@ -447,7 +431,7 @@ let allData = [], filteredData = [], charts = {}, customRangeActive = false;
+ function doLogin() {
+   const u = document.getElementById('login-user').value.trim();
+   const p = document.getElementById('login-pass').value.trim();
+-  if (u === CREDENTIALS.user && p === CREDENTIALS.pass) {
++  if (u.toLowerCase() === CREDENTIALS.user.toLowerCase() && p === CREDENTIALS.pass) {
+     sessionStorage.setItem('lf_auth','1');
+     document.getElementById('login-wrap').style.display = 'none';
+     document.getElementById('dashboard').style.display = 'block';
+@@ -464,15 +448,15 @@ window.onload = () => {
+     document.getElementById('dashboard').style.display = 'block';
+     loadDashboard(); startAutoRefresh();
+   }
+-  const yr = new Date().getFullYear();
++  const yr = LFData.parts().year;
+   ['p-monthly-year','p-yearly-year'].forEach(id => {
+     const sel = document.getElementById(id);
+     for (let y = yr; y >= yr-5; y--) sel.innerHTML += `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`;
+   });
+-  document.getElementById('p-daily-date').value  = new Date().toISOString().split('T')[0];
+-  document.getElementById('p-custom-from').value = new Date().toISOString().split('T')[0];
+-  document.getElementById('p-custom-to').value   = new Date().toISOString().split('T')[0];
+-  document.getElementById('p-monthly-month').value = new Date().getMonth()+1;
++  document.getElementById('p-daily-date').value  = LFData.todayISO();
++  document.getElementById('p-custom-from').value = LFData.todayISO();
++  document.getElementById('p-custom-to').value   = LFData.todayISO();
++  document.getElementById('p-monthly-month').value = (LFData.parts().month - 1)+1;
+ };
+ 
+ // v1.3.1: วัตถุประสงค์ อื่นๆ
+@@ -541,12 +525,12 @@ function openMemoryAdmin() {
+ }  
+ let refreshInterval = null;
+ function startAutoRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(loadDashboard, 300000); }
+-async function manualRefresh() { await loadDashboard(); }
++async function manualRefresh() { await loadDashboard(true); }
+ 
+-async function loadDashboard() {
++async function loadDashboard(force = false) {
+   try {
+-    const r    = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+-    const json = await r.json();
++    const json = await LFData.getAllData(GAS_URL, force === true);
++    LFData.showError(null);
+     let newItems = [], oldItems = [];
+     if (json?.newData) {
+       newItems = json.newData.map(r => ({
+@@ -565,7 +549,7 @@ async function loadDashboard() {
+     buildYearFilter(); applyDashFilter();
+   if (document.getElementById('staff-stats-list').style.display !== 'none') renderStaffStats();
+     loadMemoryStats();
+-  } catch(e) { console.error(e); }
++  } catch(e) { console.error(e); LFData.showError(e); }
+ }
+ 
+ function parseOldSheetRaw(rows) {
+@@ -573,7 +557,7 @@ function parseOldSheetRaw(rows) {
+   return rows.slice(1).map(row => {
+     const g = i => String(row[i]||'').trim();
+     const d = parseAnyDate(g(0));
+-    if (!d || d.getFullYear() < 2020) return null;
++    if (!d || LFData.part(d, 'year') < 2020) return null;
+     const cG=g(6),cH=g(7),cK=g(10),cN=g(13);
+     let type='';
+     if(cG.includes('สูญหาย')||cG.includes('หาย'))type='สิ่งของสูญหาย';
+@@ -593,7 +577,7 @@ function parseOldSheetRaw(rows) {
+ }
+ 
+ function buildYearFilter() {
+-  const years = [...new Set(allData.map(d=>d.dateObj?.getFullYear()).filter(Boolean))].sort((a,b)=>b-a);
++  const years = [...new Set(allData.map(d=>LFData.part(d.dateObj, 'year')).filter(Boolean))].sort((a,b)=>b-a);
+   const sel = document.getElementById('filter-year');
+   const cur = sel.value;
+   sel.innerHTML = '<option value="all">ทุกปี</option>' + years.map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
+@@ -645,7 +629,7 @@ function applyDashFilter() {
+     const mt=parseInt(document.getElementById('filter-month-to').value)||12;
+     filteredData=allData.filter(d=>{
+       if(!d.dateObj)return false;
+-      const y=d.dateObj.getFullYear(); const m=d.dateObj.getMonth()+1;
++      const y=LFData.part(d.dateObj, 'year'); const m=(LFData.part(d.dateObj, 'month') - 1)+1;
+       if(yf&&yt&&yf===yt)return y===yf&&m>=mf&&m<=mt;
+       if(yf&&yt){if(y<yf||y>yt)return false;if(y===yf&&m<mf)return false;if(y===yt&&m>mt)return false;return true;}
+       if(yf)return y>=yf; if(yt)return y<=yt; return m>=mf&&m<=mt;
+@@ -655,7 +639,7 @@ function applyDashFilter() {
+   } else {
+     filteredData=allData.filter(d=>{
+       if(!d.dateObj)return yr==='all';
+-      const y=d.dateObj.getFullYear().toString(); const m=d.dateObj.getMonth()+1;
++      const y=LFData.part(d.dateObj, 'year').toString(); const m=(LFData.part(d.dateObj, 'month') - 1)+1;
+       return(yr==='all'||y===yr)&&(mo==='all'||m===parseInt(mo))&&(q==='all'||(qm[q]||[]).includes(m));
+     });
+     document.getElementById('filter-active-label').textContent='';
+@@ -721,7 +705,7 @@ function drawMonthlyChart(){
+   const mm={};
+   filteredData.forEach(d=>{
+     if(!d.dateObj)return;
+-    const k=`${d.dateObj.getFullYear()}-${String(d.dateObj.getMonth()+1).padStart(2,'0')}`;
++    const k=`${LFData.part(d.dateObj, 'year')}-${String((LFData.part(d.dateObj, 'month') - 1)+1).padStart(2,'0')}`;
+     if(!mm[k])mm[k]={lost:0,found:0,pickup:0};
+     if(d.type==='สิ่งของสูญหาย')mm[k].lost++;else if(d.type==='พบสิ่งของ')mm[k].found++;else mm[k].pickup++;
+   });
+@@ -831,19 +815,19 @@ function fmtDateTimeTH_pdf(d) {
+   if (!d) return "-";
+   const M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+              "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+-    return d.getDate() + " " + M[d.getMonth()] + " "
+-       + (d.getFullYear()+543) + " "
+-       + String(d.getHours()).padStart(2,"0") + ":"
+-       + String(d.getMinutes()).padStart(2,"0") + " น.";
++    return LFData.part(d, 'day') + " " + M[(LFData.part(d, 'month') - 1)] + " "
++       + (LFData.part(d, 'year')+543) + " "
++       + String(LFData.part(d, 'hour')).padStart(2,"0") + ":"
++       + String(LFData.part(d, 'minute')).padStart(2,"0") + " น.";
+ }
+   
+ function fmtDateForPDFCol(d) {
+   if (!d) return "-";
+   const M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+              "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+-  const hh = String(d.getHours()).padStart(2,"0");
+-  const mm = String(d.getMinutes()).padStart(2,"0");
+-  return d.getDate() + " " + M[d.getMonth()] + "\n" + (d.getFullYear()+543) + " " + hh + ":" + mm + " น.";
++  const hh = String(LFData.part(d, 'hour')).padStart(2,"0");
++  const mm = String(LFData.part(d, 'minute')).padStart(2,"0");
++  return LFData.part(d, 'day') + " " + M[(LFData.part(d, 'month') - 1)] + "\n" + (LFData.part(d, 'year')+543) + " " + hh + ":" + mm + " น.";
+ }
+ async function runPdfExport() {
+   const btn = document.getElementById("pdf-btn-gen");
+@@ -868,27 +852,27 @@ async function runPdfExport() {
+     const PW = 210, PH = 297, ML = 14, MR = 14;
+ 
+     if (pdfType === "daily") {
+-      const d = new Date(document.getElementById("p-daily-date").value);
+-      fromDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+-      toDate   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+-      periodTH = "วันที่ " + d.getDate() + " " + THAI_MONTHS_FULL[d.getMonth()] + " พ.ศ. " + (d.getFullYear()+543);
++      const d = LFData.parseDate(document.getElementById("p-daily-date").value);
++      fromDate = LFData.calendar(LFData.part(d, 'year'), (LFData.part(d, 'month') - 1), LFData.part(d, 'day'));
++      toDate   = LFData.calendar(LFData.part(d, 'year'), (LFData.part(d, 'month') - 1), LFData.part(d, 'day'), 23, 59, 59);
++      periodTH = "วันที่ " + LFData.part(d, 'day') + " " + THAI_MONTHS_FULL[(LFData.part(d, 'month') - 1)] + " พ.ศ. " + (LFData.part(d, 'year')+543);
+       reportLabel = "รายงานรายวัน";
+     } else if (pdfType === "monthly") {
+       const y = parseInt(document.getElementById("p-monthly-year").value);
+       const m = parseInt(document.getElementById("p-monthly-month").value) - 1;
+-      fromDate = new Date(y, m, 1);
+-      toDate   = new Date(y, m+1, 0, 23, 59, 59);
++      fromDate = LFData.calendar(y, m, 1);
++      toDate   = LFData.calendar(y, m+1, 0, 23, 59, 59);
+       periodTH = "เดือน" + THAI_MONTHS_FULL[m] + " พ.ศ. " + (y+543);
+       reportLabel = "รายงานรายเดือน";
+     } else if (pdfType === "yearly") {
+       const y = parseInt(document.getElementById("p-yearly-year").value);
+-      fromDate = new Date(y, 0, 1);
+-      toDate   = new Date(y, 11, 31, 23, 59, 59);
++      fromDate = LFData.calendar(y, 0, 1);
++      toDate   = LFData.calendar(y, 11, 31, 23, 59, 59);
+       periodTH = "ประจำปี พ.ศ. " + (y+543);
+       reportLabel = "รายงานประจำปี";
+     } else {
+-      fromDate = new Date(document.getElementById("p-custom-from").value);
+-      toDate   = new Date(document.getElementById("p-custom-to").value + "T23:59:59");
++      fromDate = LFData.parseDate(document.getElementById("p-custom-from").value);
++      toDate   = LFData.parseDate(document.getElementById("p-custom-to").value + "T23:59:59");
+       periodTH = document.getElementById("p-custom-from").value + " ถึง " + document.getElementById("p-custom-to").value;
+       reportLabel = "รายงานช่วงที่กำหนด";
+     }
+@@ -902,13 +886,13 @@ async function runPdfExport() {
+ 
+     const items = allData.filter(it => {
+       if (!it.dateObj) return false;
+-      const d = new Date(it.dateObj.getFullYear(), it.dateObj.getMonth(), it.dateObj.getDate());
++      const d = LFData.calendar(LFData.part(it.dateObj, 'year'), (LFData.part(it.dateObj, 'month') - 1), LFData.part(it.dateObj, 'day'));
+       return d >= fromDate && d <= toDate;
+     });
+ 
+     const now = new Date();
+     const docCode = "LF-" + pdfType.toUpperCase().substring(0,3) + "-"
+-      + now.getFullYear() + String(now.getMonth()+1).padStart(2,"0") + String(now.getDate()).padStart(2,"0")
++      + LFData.part(now, 'year') + String((LFData.part(now, 'month') - 1)+1).padStart(2,"0") + String(LFData.part(now, 'day')).padStart(2,"0")
+       + "-" + String(Math.floor(Math.random()*900)+100);
+ 
+        let curY = 15, pageNum = 1;
+@@ -1073,7 +1057,7 @@ async function runPdfExport() {
+     } else if (pdfType==="monthly") {
+       const byDay={};
+       items.forEach(it=>{
+-        const d=it.dateObj.getDate();
++        const d=LFData.part(it.dateObj, 'day');
+         if(!byDay[d])byDay[d]={lost:0,found:0,pickup:0};
+         if(it.type==="สิ่งของสูญหาย")byDay[d].lost++;
+         else if(it.type==="พบสิ่งของ")byDay[d].found++;
+@@ -1100,7 +1084,7 @@ async function runPdfExport() {
+       const byMonth={};
+       for(let m=0;m<12;m++)byMonth[m]={lost:0,found:0,pickup:0,returned:0};
+       items.forEach(it=>{
+-        const m=it.dateObj.getMonth();
++        const m=(LFData.part(it.dateObj, 'month') - 1);
+         if(it.type==="สิ่งของสูญหาย")byMonth[m].lost++;
+         else if(it.type==="พบสิ่งของ")byMonth[m].found++;
+         else byMonth[m].pickup++;
+diff --git a/lostfound_list.html b/lostfound_list.html
+index 6f098c1..fe090cc 100644
+--- a/lostfound_list.html
++++ b/lostfound_list.html
+@@ -124,6 +124,7 @@ tr.row-overdue td:first-child{border-left:3px solid #c0392b;}
+ .title-link{cursor:pointer;color:var(--primary);font-weight:600;}
+ .title-link:hover{text-decoration:underline;}
+ </style>
++<script src="assets/lf-data.js"></script>
+ </head>
+ <body>
+ 
+@@ -303,41 +304,28 @@ function driveThumb(raw,size='w400'){
+   return m?`https://drive.google.com/thumbnail?id=${m[1]}&sz=${size}`:'';
+ }
+ 
+-function parseAnyDate(str){
+-  if(!str)return null;
+-  const s=String(str).trim();
+-  const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+-  if(iso){const d=new Date(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]),parseInt(iso[4]),parseInt(iso[5]),parseInt(iso[6]||0));if(!isNaN(d))return d;}
+-const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+-  if(m){
+-    const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0),parseInt(m[6]||0));
+-    if(!isNaN(d)){
+-      if(d.getFullYear()>2400)d.setFullYear(d.getFullYear()-543); // ป้องกัน Buddhist year input
+-      return d;
+-    }
+-  }
+-  try{const d=new Date(s);if(!isNaN(d)&&d.getFullYear()>2000)return d;}catch(e){}
+-  return null;
++function parseAnyDate(str) { return LFData.parseDate(str);
+ }
+ 
+ function fmtDate(d){
+   if(!d)return'-';
+-  try{return d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'});}catch(e){return'-';}
++  try{return d.toLocaleString('th-TH',{timeZone:'Asia/Bangkok', year:'numeric', month:'short', day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return'-';}
+ }
+ 
+-async function loadData(){
++async function loadData(force = false){
+   let oldItems=[],newItems=[];
+   try{
+-    const r=await fetch(GAS_URL+'?action=getAllData&t='+Date.now());
+-    const json=await r.json();
++    const json = await LFData.getAllData(GAS_URL, force === true);
+     if(json?.newData)newItems=parseNewSheet(json.newData);
+     if(json?.oldData)oldItems=parseOldSheetRaw(json.oldData);
+-  }catch(e){}
++  }catch(e){LFData.showError(e);return false;}
++  LFData.showError(null);
+   const todayFilter=new Date();
+   allData=[...newItems,...oldItems].filter(it=>!it.dateObj||it.dateObj<=todayFilter);
+   allData.sort((a,b)=>(a.dateObj||0)-(b.dateObj||0));
+   updateYearCounts();
+   applyFilters();
++  return true;
+ }
+ 
+ function parseNewSheet(data){
+@@ -357,7 +345,7 @@ function parseOldSheetRaw(rows){
+   return rows.slice(1).map(row=>{
+     const g=i=>String(row[i]||'').trim();
+     const ts=g(0);if(!ts)return null;
+-    const tsObj=parseAnyDate(ts);if(!tsObj||tsObj.getFullYear()<2020)return null;
++    const tsObj=parseAnyDate(ts);if(!tsObj||LFData.part(tsObj, 'year')<2020)return null;
+     const cG=g(6),cH=g(7),cK=g(10),cN=g(13);
+     let type='';
+     if(cG.includes('สูญหาย')||cG.includes('หาย'))type='สิ่งของสูญหาย';
+@@ -378,9 +366,9 @@ function parseOldSheetRaw(rows){
+ }
+ 
+ function updateYearCounts(){
+-  const c2569=allData.filter(d=>d.dateObj?.getFullYear()===2026).length;
+-  const c2568=allData.filter(d=>d.dateObj?.getFullYear()===2025).length;
+-  const c2567=allData.filter(d=>d.dateObj?.getFullYear()===2024).length;
++  const c2569=allData.filter(d=>LFData.part(d.dateObj, 'year')===2026).length;
++  const c2568=allData.filter(d=>LFData.part(d.dateObj, 'year')===2025).length;
++  const c2567=allData.filter(d=>LFData.part(d.dateObj, 'year')===2024).length;
+   document.getElementById('cnt-2569').textContent=c2569;
+   document.getElementById('cnt-2568').textContent=c2568;
+   document.getElementById('cnt-2567').textContent=c2567;
+@@ -414,10 +402,10 @@ function applyFilters(){
+   const dateTo=document.getElementById('filter-date-to').value;
+ 
+   filtered=allData.filter(d=>{
+-    if(selectedYear!=='all'){if(!d.dateObj||d.dateObj.getFullYear()!==selectedYear)return false;}
++    if(selectedYear!=='all'){if(!d.dateObj||LFData.part(d.dateObj, 'year')!==selectedYear)return false;}
+     if(type!=='all'&&d.type!==type)return false;
+     if(status!=='all'&&!(d.status||'').includes(status))return false;
+-    if(month!=='all'&&d.dateObj&&String(d.dateObj.getMonth()+1)!==month)return false;
++    if(month!=='all'&&d.dateObj&&String((LFData.part(d.dateObj, 'month') - 1)+1)!==month)return false;
+     if(q){const txt=`${d.title} ${d.name} ${d.dept} ${d.refCode} ${d.location}`.toLowerCase();if(!txt.includes(q))return false;}
+     return true;
+   });
+@@ -428,7 +416,7 @@ function applyFilters(){
+   if(dateFrom||dateTo){
+     filtered=filtered.filter(d=>{
+       if(!d.dateObj)return false;
+-      const dStr=d.dateObj.toISOString().split('T')[0];
++      const dStr=LFData.todayISO(d.dateObj);
+       if(dateFrom&&dStr<dateFrom)return false;
+       if(dateTo&&dStr>dateTo)return false;
+       return true;
+@@ -579,12 +567,12 @@ async function saveStatus(){
+       const _n=new Date();
+       item.status=status;
+       item.actionText=actionText;
+-      item.updatedAt=_n.getFullYear()+'-'+
+-        String(_n.getMonth()+1).padStart(2,'0')+'-'+
+-        String(_n.getDate()).padStart(2,'0')+' '+
+-        String(_n.getHours()).padStart(2,'0')+':'+
+-        String(_n.getMinutes()).padStart(2,'0')+':'+
+-        String(_n.getSeconds()).padStart(2,'0');
++      item.updatedAt=LFData.part(_n, 'year')+'-'+
++        String((LFData.part(_n, 'month') - 1)+1).padStart(2,'0')+'-'+
++        String(LFData.part(_n, 'day')).padStart(2,'0')+' '+
++        String(LFData.part(_n, 'hour')).padStart(2,'0')+':'+
++        String(LFData.part(_n, 'minute')).padStart(2,'0')+':'+
++        String(LFData.part(_n, 'second')).padStart(2,'0');
+     }
+   closeStatusModal(); applyFilters();
+     setTimeout(loadData,4000);
+@@ -619,10 +607,10 @@ function startAutoRefresh(){
+ async function manualRefresh(){
+   const btn=document.getElementById('btn-refresh-main');
+   btn.classList.add('spinning');btn.disabled=true;
+-  await loadData();
++  const loaded = await loadData(true);
+   secondsLeft=REFRESH_SEC;
+   btn.classList.remove('spinning');btn.disabled=false;
+-  showToast('🔄 โหลดข้อมูลใหม่แล้ว');
++  if (loaded) showToast('🔄 โหลดข้อมูลใหม่แล้ว');
+ }
+ 
+ // STAFF LIST
+@@ -678,7 +666,7 @@ function startTimestamp(){
+ }
+ function updateTimestamp(){
+   const now=new Date();
+-  const fmt=now.toLocaleString('th-TH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
++  const fmt=now.toLocaleString('th-TH',{timeZone:'Asia/Bangkok', year:'numeric', month:'short', day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+   const el=document.getElementById('timestamp-display');
+   if(el)el.textContent=fmt;
+ }
+diff --git a/lf_report_export.html b/lf_report_export.html
+index 518ad15..a522bd4 100644
+--- a/lf_report_export.html
++++ b/lf_report_export.html
+@@ -89,6 +89,7 @@ select:focus,input:focus{border-color:var(--primary-mid);background:white;}
+   .kpi-preview{grid-template-columns:repeat(2,1fr);}
+ }
+ </style>
++<script src="assets/lf-data.js"></script>
+ </head>
+ <body>
+ 
+@@ -270,20 +271,20 @@ let reportType = 'daily';
+ // ── Init ──
+ window.onload = () => {
+   const now = new Date();
+-  const today = now.toISOString().split('T')[0];
++  const today = LFData.todayISO();
+   document.getElementById('daily-date').value = today;
+   document.getElementById('custom-from').value = today;
+   document.getElementById('custom-to').value = today;
+ 
+   // fill year dropdowns
+-  const yr = now.getFullYear();
++  const yr = LFData.part(now, 'year');
+   ['monthly-year','yearly-year'].forEach(id => {
+     const sel = document.getElementById(id);
+     for (let y = yr; y >= yr-5; y--) {
+       sel.innerHTML += `<option value="${y}">${y} (พ.ศ. ${y+543})</option>`;
+     }
+   });
+-  document.getElementById('monthly-month').value = now.getMonth() + 1;
++  document.getElementById('monthly-month').value = (LFData.part(now, 'month') - 1) + 1;
+   autoDocCode();
+ };
+ 
+@@ -299,9 +300,9 @@ function setReportType(t) {
+ 
+ function autoDocCode() {
+   const now = new Date();
+-  const yy = now.getFullYear();
+-  const mm = String(now.getMonth()+1).padStart(2,'0');
+-  const dd = String(now.getDate()).padStart(2,'0');
++  const yy = LFData.part(now, 'year');
++  const mm = String((LFData.part(now, 'month') - 1)+1).padStart(2,'0');
++  const dd = String(LFData.part(now, 'day')).padStart(2,'0');
+   const rnd = String(Math.floor(Math.random()*900)+100);
+   const prefix = { daily:'LF-DAY', monthly:'LF-MON', yearly:'LF-YR', custom:'LF-CUS' }[reportType];
+   document.getElementById('doc-code').value = `${prefix}-${yy}${mm}${dd}-${rnd}`;
+@@ -311,15 +312,15 @@ function updatePreview() {
+   // Simple structural preview
+   const type = reportType;
+   const now = new Date();
+-  const yr = now.getFullYear();
+-  const mo = now.getMonth();
++  const yr = LFData.part(now, 'year');
++  const mo = (LFData.part(now, 'month') - 1);
+   let periodTH = '', periodEN = '';
+   if (type === 'daily') {
+     const d = document.getElementById('daily-date').value;
+     if (d) {
+-      const dObj = new Date(d);
+-      periodTH = `วันที่ ${dObj.getDate()} ${THAI_MONTHS_FULL[dObj.getMonth()]} พ.ศ. ${dObj.getFullYear()+543}`;
+-      periodEN = `${dObj.getDate()} ${EN_MONTHS[dObj.getMonth()]} ${dObj.getFullYear()}`;
++      const dObj = LFData.parseDate(d);
++      periodTH = `วันที่ ${LFData.part(dObj, 'day')} ${THAI_MONTHS_FULL[(LFData.part(dObj, 'month') - 1)]} พ.ศ. ${LFData.part(dObj, 'year')+543}`;
++      periodEN = `${LFData.part(dObj, 'day')} ${EN_MONTHS[(LFData.part(dObj, 'month') - 1)]} ${LFData.part(dObj, 'year')}`;
+     }
+   } else if (type === 'monthly') {
+     const y = document.getElementById('monthly-year').value || yr;
+@@ -382,38 +383,28 @@ function updatePreview() {
+       <div style="background:#f0f3f8;padding:10px 22px;font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;">
+         <span>จัดทำโดย: ${document.getElementById('doc-preparer').value || '—'}</span>
+         <span>วัตถุประสงค์: ${document.getElementById('doc-purpose').selectedOptions[0]?.text || '—'}</span>
+-        <span>วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}</span>
++        <span>วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok', year:'numeric', month:'short', day:'numeric'})}</span>
+       </div>
+     </div>`;
+ }
+ 
+ // ── Parse helpers ──
+-function parseAnyDate(str) {
+-  if (!str) return null;
+-  const s = String(str).trim();
+-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+-  if (m) {
+-    const d = new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0));
+-    if (!isNaN(d)) return d;
+-  }
+-  try { const d = new Date(s); if (!isNaN(d) && d.getFullYear() > 2000) return d; } catch(e) {}
+-  return null;
++function parseAnyDate(str) { return LFData.parseDate(str);
+ }
+ 
+ function fmtDateTH(d) {
+   if (!d) return '-';
+-  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()+543} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
++  return `${LFData.part(d, 'day')} ${THAI_MONTHS_SHORT[(LFData.part(d, 'month') - 1)]} ${LFData.part(d, 'year')+543} ${String(LFData.part(d, 'hour')).padStart(2,'0')}:${String(LFData.part(d, 'minute')).padStart(2,'0')}`;
+ }
+ 
+ function fmtDateShortTH(d) {
+   if (!d) return '-';
+-  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()+543}`;
++  return `${LFData.part(d, 'day')} ${THAI_MONTHS_SHORT[(LFData.part(d, 'month') - 1)]} ${LFData.part(d, 'year')+543}`;
+ }
+ 
+ // ── Load GAS data ──
+ async function loadAllData() {
+-  const r = await fetch(GAS_URL + '?action=getAllData&t=' + Date.now());
+-  const json = await r.json();
++  const json = await LFData.getAllData(GAS_URL, true);
+   let items = [];
+ 
+   if (json?.newData) {
+@@ -442,7 +433,7 @@ async function loadAllData() {
+     json.oldData.slice(1).forEach(row => {
+       const g = i => String(row[i]||'').trim();
+       const d = parseAnyDate(g(0));
+-      if (!d || d.getFullYear() < 2020) return;
++      if (!d || LFData.part(d, 'year') < 2020) return;
+       const colG=g(6),colH=g(7),colK=g(10),colN=g(13);
+       let type='';
+       if(colG.includes('สูญหาย')||colG.includes('หาย')) type='สิ่งของสูญหาย';
+@@ -477,7 +468,7 @@ async function loadAllData() {
+ function filterData(items, from, to) {
+   return items.filter(it => {
+     if (!it.dateObj) return false;
+-    const d = new Date(it.dateObj.getFullYear(), it.dateObj.getMonth(), it.dateObj.getDate());
++    const d = LFData.calendar(LFData.part(it.dateObj, 'year'), (LFData.part(it.dateObj, 'month') - 1), LFData.part(it.dateObj, 'day'));
+     return d >= from && d <= to;
+   });
+ }
+@@ -494,30 +485,30 @@ async function generatePDF() {
+     let fromDate, toDate, periodLabel, periodEN, reportLabel;
+ 
+     if (reportType === 'daily') {
+-      const d = new Date(document.getElementById('daily-date').value);
+-      fromDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+-      toDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+-      periodLabel = `วันที่ ${d.getDate()} ${THAI_MONTHS_FULL[d.getMonth()]} พ.ศ. ${d.getFullYear()+543}`;
+-      periodEN = `${d.getDate()} ${EN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
++      const d = LFData.parseDate(document.getElementById('daily-date').value);
++      fromDate = LFData.calendar(LFData.part(d, 'year'), (LFData.part(d, 'month') - 1), LFData.part(d, 'day'));
++      toDate = LFData.calendar(LFData.part(d, 'year'), (LFData.part(d, 'month') - 1), LFData.part(d, 'day'), 23, 59, 59);
++      periodLabel = `วันที่ ${LFData.part(d, 'day')} ${THAI_MONTHS_FULL[(LFData.part(d, 'month') - 1)]} พ.ศ. ${LFData.part(d, 'year')+543}`;
++      periodEN = `${LFData.part(d, 'day')} ${EN_MONTHS[(LFData.part(d, 'month') - 1)]} ${LFData.part(d, 'year')}`;
+       reportLabel = 'รายวัน (Daily Report)';
+     } else if (reportType === 'monthly') {
+       const y = parseInt(document.getElementById('monthly-year').value);
+       const m = parseInt(document.getElementById('monthly-month').value) - 1;
+-      fromDate = new Date(y, m, 1);
+-      toDate = new Date(y, m+1, 0, 23, 59, 59);
++      fromDate = LFData.calendar(y, m, 1);
++      toDate = LFData.calendar(y, m+1, 0, 23, 59, 59);
+       periodLabel = `เดือน${THAI_MONTHS_FULL[m]} พ.ศ. ${y+543}`;
+       periodEN = `${EN_MONTHS[m]} ${y}`;
+       reportLabel = 'รายเดือน (Monthly Report)';
+     } else if (reportType === 'yearly') {
+       const y = parseInt(document.getElementById('yearly-year').value);
+-      fromDate = new Date(y, 0, 1);
+-      toDate = new Date(y, 11, 31, 23, 59, 59);
++      fromDate = LFData.calendar(y, 0, 1);
++      toDate = LFData.calendar(y, 11, 31, 23, 59, 59);
+       periodLabel = `ประจำปี พ.ศ. ${y+543}`;
+       periodEN = `Year ${y}`;
+       reportLabel = 'รายปี (Annual Report)';
+     } else {
+-      fromDate = new Date(document.getElementById('custom-from').value);
+-      toDate = new Date(document.getElementById('custom-to').value + 'T23:59:59');
++      fromDate = LFData.parseDate(document.getElementById('custom-from').value);
++      toDate = LFData.parseDate(document.getElementById('custom-to').value + 'T23:59:59');
+       periodLabel = `${fmtDateShortTH(fromDate)} ถึง ${fmtDateShortTH(toDate)}`;
+       periodEN = `${document.getElementById('custom-from').value} to ${document.getElementById('custom-to').value}`;
+       reportLabel = 'กำหนดเอง (Custom Period)';
+@@ -731,7 +722,7 @@ async function generatePDF() {
+         const byMonth = {};
+         for (let m=0; m<12; m++) byMonth[m] = { lost:0, found:0, pickup:0, returned:0 };
+         items.forEach(it => {
+-          const m = it.dateObj.getMonth();
++          const m = (LFData.part(it.dateObj, 'month') - 1);
+           if(it.type==='สิ่งของสูญหาย') byMonth[m].lost++;
+           else if(it.type==='พบสิ่งของ') byMonth[m].found++;
+           else byMonth[m].pickup++;
+@@ -770,7 +761,7 @@ async function generatePDF() {
+         // by day of month
+         const byDay = {};
+         items.forEach(it => {
+-          const d = it.dateObj.getDate();
++          const d = LFData.part(it.dateObj, 'day');
+           if (!byDay[d]) byDay[d] = { lost:0, found:0, pickup:0, returned:0 };
+           if(it.type==='สิ่งของสูญหาย') byDay[d].lost++;
+           else if(it.type==='พบสิ่งของ') byDay[d].found++;
+@@ -928,8 +919,8 @@ async function generatePDF() {
+     });
+ 
+     // ─── Save ───
+-    const fromStr = fromDate.toISOString().split('T')[0].replace(/-/g,'');
+-    const toStr = toDate.toISOString().split('T')[0].replace(/-/g,'');
++    const fromStr = LFData.todayISO(fromDate).replace(/-/g,'');
++    const toStr = LFData.todayISO(toDate).replace(/-/g,'');
+     const fname = reportType === 'daily'
+       ? `LF_Report_${fromStr}_${docCode}.pdf`
+       : `LF_Report_${fromStr}_${toStr}_${docCode}.pdf`;
+diff --git a/lostfound_form.html b/lostfound_form.html
+index 66e19db..3d240ff 100644
+--- a/lostfound_form.html
++++ b/lostfound_form.html
+@@ -276,6 +276,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+   .type-icon { width: 44px; height: 44px; font-size: 22px; }
+ }
+ </style>
++<script src="assets/lf-data.js"></script>
+ </head>
+ <body>
+ 
+@@ -1179,8 +1180,8 @@ function mergedList(dataKey, bucket) {
+ // ========= INIT =========
+ window.onload = () => {
+   setupMemoryBlur();
+-  const today = new Date().toISOString().split('T')[0];
+-  const nowTime = new Date().toTimeString().slice(0,5);
++  const today = LFData.todayISO();
++  const nowTime = LFData.timeNow();
+   ['lost','found','pickup'].forEach(t => {
+     const d = document.getElementById('d-'+t+'-date');
+     const ti = document.getElementById('d-'+t+'-time');
+diff --git a/lostfound_form_en.html b/lostfound_form_en.html
+index 08e8669..dc467e6 100644
+--- a/lostfound_form_en.html
++++ b/lostfound_form_en.html
+@@ -222,6 +222,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+   .type-icon { width: 44px; height: 44px; font-size: 22px; }
+ }
+ </style>
++<script src="assets/lf-data.js"></script>
+ </head>
+ <body>
+ 
+@@ -994,8 +995,8 @@ function mergedList(dataKey, bucket) {
+   return [...staticArr, ...extras];
+ }
+ window.onload = () => {
+-  const today = new Date().toISOString().split('T')[0];
+-  const nowTime = new Date().toTimeString().slice(0,5);
++  const today = LFData.todayISO();
++  const nowTime = LFData.timeNow();
+   ['lost','found','pickup'].forEach(t => {
+     const d = document.getElementById('d-'+t+'-date');
+     const ti = document.getElementById('d-'+t+'-time');
+diff --git a/assets/lf-data.js b/assets/lf-data.js
+new file mode 100644
+--- /dev/null
++++ b/assets/lf-data.js
+@@ -0,0 +1,86 @@
++(function (root) {
++  'use strict';
++  const ZONE = 'Asia/Bangkok';
++  const requests = new Map();
++  const bangkokParts = new Intl.DateTimeFormat('en-GB', {
++    timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
++    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
++  });
++  function parts(date = new Date()) {
++    return Object.fromEntries(bangkokParts.formatToParts(date)
++      .filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
++  }
++  function localDate(y, m, d, h = 0, min = 0, sec = 0) {
++    if (y > 2400) y -= 543;
++    const result = new Date(Date.UTC(y, m - 1, d, h - 7, min, sec));
++    const p = parts(result);
++    return p.year === y && p.month === m && p.day === d &&
++      p.hour === h && p.minute === min && p.second === sec ? result : null;
++  }
++  function parseDate(value) {
++    if (value instanceof Date) return isNaN(value) ? null : new Date(value);
++    if (value == null || value === '') return null;
++    const s = String(value).trim();
++    // Offset-bearing ISO is an instant. Never discard Z or an explicit offset.
++    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
++      const d = new Date(s);
++      return isNaN(d) ? null : d;
++    }
++    // Unzoned historical strings belong to the spreadsheet's Bangkok timezone.
++    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
++    if (m) return localDate(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
++    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
++    return m ? localDate(+m[3], +m[2], +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)) : null;
++  }
++  function todayISO(date = new Date()) {
++    const p = parts(date);
++    return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
++  }
++  function timeNow() {
++    const p = parts();
++    return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
++  }
++  function format(date, options = {}) {
++    if (!date || isNaN(date)) return '-';
++    return date.toLocaleString('th-TH', {...options, timeZone: ZONE});
++  }
++  function showError(error, targetId = 'lf-load-status') {
++    let el = document.getElementById(targetId);
++    if (!el) {
++      el = document.createElement('div');
++      el.id = targetId;
++      el.setAttribute('role', 'status');
++      el.style.cssText = 'padding:12px 20px;background:#fff2cc;color:#7d6608;text-align:center;';
++      document.body.prepend(el);
++    }
++    el.textContent = error ? 'โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณากดรีเฟรชอีกครั้ง ข้อมูลที่แสดงอาจยังไม่เป็นปัจจุบัน' : '';
++    el.hidden = !error;
++  }
++  function getAllData(url, force = false) {
++    if (requests.has(url)) return requests.get(url);
++    const request = (async () => {
++      const controller = new AbortController();
++      const timeout = setTimeout(() => controller.abort(), 45000);
++      try {
++        const response = await fetch(url + '?action=getAllData' + (force ? '&force=1' : ''), {
++          signal: controller.signal, credentials: 'omit', cache: 'no-store'
++        });
++        if (!response.ok) throw new Error('HTTP ' + response.status);
++        const json = await response.json();
++        if (json.success !== true || !Array.isArray(json.newData) || !Array.isArray(json.oldData)) {
++          throw new Error('Invalid getAllData response');
++        }
++        return json;
++      } finally { clearTimeout(timeout); }
++    })();
++    requests.set(url, request);
++    request.then(() => requests.delete(url), () => requests.delete(url));
++    return request;
++  }
++  function part(date, field) { return date ? parts(date)[field] : undefined; }
++  function calendar(y, month, day = 1, hour = 0, minute = 0, second = 0, ms = 0) {
++    return new Date(Date.UTC(y, month, day, hour - 7, minute, second, ms));
++  }
++  root.LFData = {parseDate, localDate, calendar, parts, part, todayISO, timeNow, format, getAllData, showError, ZONE};
++  if (typeof module !== 'undefined') module.exports = root.LFData;
++})(typeof window !== 'undefined' ? window : globalThis);
+diff --git a/apps-script/get-all-data-cache.gs b/apps-script/get-all-data-cache.gs
+new file mode 100644
+--- /dev/null
++++ b/apps-script/get-all-data-cache.gs
+@@ -0,0 +1,61 @@
++// Replace the existing getAllData function with this implementation.
++// Keep the existing jsonResponse, getOrCreateSheet and notification functions.
++// Cache stays inside Apps Script. Manual refresh with force=1 bypasses it.
++function getAllData(e) {
++  const force = e && e.parameter && e.parameter.force === '1';
++  const cacheKey = 'lf_all_v2_' + Math.floor(Date.now() / 30000);
++  if (!force) {
++    const cached = lfReadDataCache_(cacheKey);
++    if (cached) return jsonResponse(cached);
++  }
++  const ss = SpreadsheetApp.getActiveSpreadsheet();
++  const newSheet = getOrCreateSheet(ss);
++  const newRows = newSheet.getDataRange().getValues();
++  const headers = newRows[0];
++  const newData = newRows.slice(1).map(function(row) {
++    const obj = {};
++    headers.forEach(function(h, i) { obj[h] = row[i] == null ? '' : row[i]; });
++    return obj;
++  }).filter(function(r) { return r['ประเภท']; }).reverse();
++  const oldSheet = ss.getSheetByName('Form Responses');
++  const data = {
++    success: true,
++    generatedAt: new Date().toISOString(),
++    newData: newData,
++    oldData: oldSheet ? oldSheet.getDataRange().getValues() : []
++  };
++  lfWriteDataCache_(cacheKey, data);
++  return jsonResponse(data);
++}
++
++function lfReadDataCache_(key) {
++  try {
++    const cache = CacheService.getScriptCache();
++    const manifest = JSON.parse(cache.get(key) || 'null');
++    if (!manifest || manifest.count < 1 || manifest.count > 20) return null;
++    const keys = Array.from({length:manifest.count}, function(_, i) { return manifest.id + ':' + i; });
++    const chunks = cache.getAll(keys);
++    if (keys.some(function(k) { return !chunks[k]; })) return null;
++    const bytes = Utilities.base64Decode(keys.map(function(k) { return chunks[k]; }).join(''));
++    return JSON.parse(Utilities.ungzip(Utilities.newBlob(bytes, 'application/gzip')).getDataAsString('UTF-8'));
++  } catch (err) {
++    return null; // Eviction or cache errors fall back to the spreadsheet.
++  }
++}
++
++function lfWriteDataCache_(key, data) {
++  try {
++    const encoded = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(data), 'application/json')).getBytes());
++    const count = Math.ceil(encoded.length / 80000);
++    if (count > 20) return;
++    const id = key + ':' + Utilities.getUuid();
++    const chunks = {};
++    for (let i = 0; i < count; i++) chunks[id + ':' + i] = encoded.slice(i * 80000, (i + 1) * 80000);
++    const cache = CacheService.getScriptCache();
++    cache.putAll(chunks, 35);
++    // Publish the manifest last. Concurrent writers cannot mix chunk sets.
++    cache.put(key, JSON.stringify({id:id, count:count}), 35);
++  } catch (err) {
++    // Caching is optional and must never prevent reading live data.
++  }
++}
+diff --git a/tests/data.test.cjs b/tests/data.test.cjs
+new file mode 100644
+--- /dev/null
++++ b/tests/data.test.cjs
+@@ -0,0 +1,57 @@
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const vm = require('node:vm');
++const path = require('node:path');
++const base = path.resolve(__dirname, '..');
++const LF = require('../assets/lf-data.js');
++const iso = LF.parseDate('2026-10-18T11:27:46.000Z');
++assert.equal(LF.parts(iso).hour,18);
++assert.equal(iso.toISOString(), '2026-10-18T11:27:46.000Z');
++for (const value of ['2026-10-18 18:27:46','18/10/2026 18:27:46','18/10/2569 18:27:46','2026-10-18T18:27:46+07:00']) {
++  assert.equal(LF.parseDate(value).getTime(), iso.getTime(), value);
++}
++assert.equal(LF.parts(LF.parseDate('2026-10-18 3:54:12')).hour,3);
++assert.equal(LF.parseDate('31/02/2026'), null);
++assert.equal(LF.parseDate('garbage'), null);
++assert.equal(LF.parseDate(''), null);
++assert.equal(LF.todayISO(LF.parseDate('2026-10-17T17:01:00Z')), '2026-10-18');
++assert.equal(LF.calendar(2026,9,1).toISOString(), '2026-09-30T17:00:00.000Z');
++assert.equal(LF.calendar(2026,10,0,23,59,59).toISOString(), '2026-10-31T16:59:59.000Z');
++for (const file of fs.readdirSync(base).filter(x=>x.endsWith('.html'))) {
++  const html = fs.readFileSync(path.join(base,file),'utf8');
++  for (const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) new vm.Script(m[1], {filename:file});
++}
++function context(file) {
++  const html=fs.readFileSync(path.join(base,file),'utf8');
++  const el={addEventListener(){},style:{},classList:{add(){},remove(){}},value:''};
++  const ctx=vm.createContext({LFData:LF,window:{},document:{addEventListener(){},getElementById(){return el;},querySelectorAll(){return [];}},console,setTimeout(){},clearTimeout(){},setInterval(){},clearInterval(){}});
++  for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) vm.runInContext(m[1],ctx);
++  return ctx;
++}
++for (const file of ['index.html','dashboard.html','lostfound_list.html','lf_report_export.html']) {
++  const ctx=context(file);
++  const parser=file==='index.html'?'parseDate':'parseAnyDate';
++  assert.equal(vm.runInContext(`${parser}('2026-10-18T11:27:46.000Z').getTime()`,ctx),iso.getTime(),file);
++}
++if (process.env.LF_API_FIXTURE && fs.existsSync(process.env.LF_API_FIXTURE)) {
++  const gallery=context('index.html');
++  gallery.raw=JSON.parse(fs.readFileSync(process.env.LF_API_FIXTURE,'utf8'));
++  const summary=vm.runInContext(`(()=>{const items=[...parseNewSheet(raw.newData),...parseOldSheetRaw(raw.oldData)];return {total:items.length,latest:fmtDate(items[0].dateObj),valid:items.filter(x=>x.dateObj).length};})()`,gallery);
++  assert.match(summary.latest,/18:27/);
++  assert.equal(summary.valid,summary.total);
++  console.log(JSON.stringify({timezone:process.env.TZ||'system',...summary}));
++}
++(async()=>{
++  let calls=0,resolveFetch;
++  const original=global.fetch;
++  global.fetch=()=>{calls++;return new Promise(resolve=>resolveFetch=resolve);};
++  const one=LF.getAllData('https://test.invalid');
++  const two=LF.getAllData('https://test.invalid');
++  assert.equal(one,two);
++  resolveFetch({ok:true,json:async()=>({success:true,newData:[],oldData:[]})});
++  await one; assert.equal(calls,1);
++  global.fetch=async()=>({ok:true,json:async()=>({success:false,error:'test'})});
++  await assert.rejects(LF.getAllData('https://test.invalid'));
++  global.fetch=original;
++  console.log('Date, page syntax, actual API rows, request deduplication and error validation passed.');
++})().catch(e=>{console.error(e);process.exitCode=1;});
+diff --git a/README.md b/README.md
+new file mode 100644
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,42 @@
++# Lost & Found — Mahidol University
++
++Static pages hosted on GitHub Pages, backed by a Google Apps Script web app and Google Sheets.
++
++## Data flow
++
++The Thai and English forms submit to Apps Script, which saves new records in `LF_New`, uploads images to Drive and calls existing LINE/email notification code. Legacy Google Form records remain in `Form Responses`. Gallery, admin list, Dashboard and PDF export read the combined `getAllData` response.
++
++## October 2026 fixes
++
++- Shared `assets/lf-data.js` parses UTC/offset ISO timestamps as instants and historical unzoned strings as Bangkok time. Calendar filters, report grouping and visible dates use `Asia/Bangkok`.
++- All six consuming pages load the shared script. Form date/time defaults follow Bangkok, including before 07:00.
++- Concurrent reads in one page share one request; failed, invalid and timed-out responses surface an error while existing records remain visible. Gallery background refresh preserves its existing content.
++- Gallery labels the timestamp as the submission time. The incident date/time remains a separate field in the Sheet.
++- No raw report or contact data is persisted to browser storage by the shared data module.
++
++Run regression checks with Node.js 22 or later:
++
++```text
++node tests/data.test.cjs
++```
++
++Repeat under `Asia/Bangkok`, `UTC`, and `America/Los_Angeles` using the `TZ` environment variable. Optional `LF_API_FIXTURE` points to a private local `getAllData` response; never commit that fixture.
++
++## Apps Script cache proposal — separate deployment
++
++`apps-script/get-all-data-cache.gs` is a replacement for the existing `getAllData` function, with internal helpers. It has not been installed in the live Apps Script project by this frontend change. Remove the existing function before inserting the replacement; do not add a duplicate function definition.
++
++It caches compressed JSON in ASCII chunks smaller than the Apps Script per-entry limit. Cache entries are scoped to a 30-second time bucket; missing chunks or service errors fall back to the Sheet. Manual refresh sends `force=1` to bypass the cache. This is not pagination and does not reduce response payload size. Benchmark after deploying and check the deployed source against current project code before creating a new version.
++
++## Priority follow-up work
++
++1. Replace browser-side shared-password checks with server-side authentication and authorization. Existing mutation actions must validate the authenticated user. Do not place new secrets in this public repository.
++2. Split public item data from staff contact/details endpoints. The current public API sends names, phone numbers and internal fields.
++3. Escape untrusted fields before inserting HTML; render user text with `textContent` and validate image URLs.
++4. Use one reporting dataset for old and new forms. Generate the previous month's final report on the first day of the next month; prevent duplicate report/notification delivery.
++5. Confirm successful persistence before showing form success. Add idempotency keys, a server-generated case ID, input validation and upload limits.
++6. Protect append-and-follow-up row updates against concurrent submissions using a lock or stable-ID row lookup.
++7. Queue LINE/email delivery, record attempts/results, and retry independently of the form response. Existing best-effort code still runs synchronously.
++8. Add server-side filters/pagination and a summary endpoint; consider a database only when measured load and workflow justify migration.
++
++Current account trigger review found legacy handlers assigned to spreadsheet-open events. Review with their owners before removal. No notification test was sent during the audit.
