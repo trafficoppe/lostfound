@@ -190,16 +190,34 @@ function lfFmt_(d, pattern) {
   return d ? Utilities.formatDate(d, LF_TZ, pattern) : '';
 }
 
+function lfPad2_(n) { return (n < 10 ? '0' : '') + n; }
+
+/** yyyy-MM-dd ของ Date ในเวลาไทย (UTC+7 คงที่ตั้งแต่ปี 1920) — คำนวณด้วย JS ล้วน เร็วกว่า Utilities.formatDate มาก */
+function lfBkkYmd_(d) {
+  const s = new Date(d.getTime() + 7 * 3600000);
+  return s.getUTCFullYear() + '-' + lfPad2_(s.getUTCMonth() + 1) + '-' + lfPad2_(s.getUTCDate());
+}
+
+/** เขตเวลาของ Sheet เป็น UTC+7 แบบคงที่หรือไม่ (Etc/GMT-7) — ใช้ตัดสินว่าแปลงเวลาเซลล์ด้วย JS ได้ */
+function lfFixedPlus7_(tz) { return /^(Etc\/GMT-7|GMT\+0?7(:?00)?)$/.test(String(tz)); }
+
 /** วันที่จากเซลล์ (Date หรือข้อความ) → yyyy-MM-dd ตามเขตเวลาของ Sheet */
 function lfCellDate_(v, tz) {
-  if (v instanceof Date) return isNaN(v.getTime()) ? '' : Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return '';
+    return (lfFixedPlus7_(tz) || (tz === LF_TZ && v.getFullYear() > 1920)) ? lfBkkYmd_(v) : Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+  }
   const d = lfToDate_(v);
-  return d ? lfFmt_(d, 'yyyy-MM-dd') : lfStr_(v);
+  return d ? lfBkkYmd_(d) : lfStr_(v);
 }
 
 /** เวลาจากเซลล์ (Date ของปี 1899 หรือข้อความ) → HH:mm */
 function lfCellTime_(v, tz) {
-  if (v instanceof Date) return isNaN(v.getTime()) ? '' : Utilities.formatDate(v, tz, 'HH:mm');
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return '';
+    if (lfFixedPlus7_(tz)) { const s = new Date(v.getTime() + 7 * 3600000); return lfPad2_(s.getUTCHours()) + ':' + lfPad2_(s.getUTCMinutes()); }
+    return Utilities.formatDate(v, tz, 'HH:mm');   // เช่น Asia/Bangkok ปี 1899 ใช้ LMT ต้องให้ Google คำนวณ
+  }
   const s = lfStr_(v);
   const m = s.match(/^(\d{1,2})[:.](\d{2})/);
   return m ? (('0' + m[1]).slice(-2) + ':' + m[2]) : s;
@@ -413,11 +431,14 @@ function lfGetDataset_(force) {
     cached.serverMs = Date.now() - t0;
     return cached;
   }
+  const t1 = Date.now();
   const records = lfBuildRecords_();
   const ds = { generatedAt: new Date().toISOString(), records: records };
+  const t2 = Date.now();
   lfCacheWrite_(cache, key, ds, LF_CACHE_TTL_SEC);
   ds.cache = force ? 'bypass' : 'miss';
   ds.serverMs = Date.now() - t0;
+  ds.timing = { cacheRead: t1 - t0, build: t2 - t1, cacheWrite: Date.now() - t2 };
   return ds;
 }
 
@@ -426,7 +447,7 @@ function getPublicData(e) {
   const ds = lfGetDataset_(force);
   return jsonResponse({
     success: true, version: LF_VERSION,
-    generatedAt: ds.generatedAt, cache: ds.cache, serverMs: ds.serverMs,
+    generatedAt: ds.generatedAt, cache: ds.cache, serverMs: ds.serverMs, timing: ds.timing,
     records: ds.records.map(lfPublicRecord_)
   });
 }
