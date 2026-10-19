@@ -589,12 +589,24 @@ function lfWithAdmin_(payload, fn) {
 
 function lfClip_(v, n) { return lfStr_(v).slice(0, n); }
 
-function lfNewRefCode_(type, sheet) {
-  const prefix = LF_REF_PREFIX[type] || 'LF';
-  const day = Utilities.formatDate(new Date(), LF_TZ, 'yyMMdd');
+function lfUsedRefs_(sheet) {
   const last = sheet.getLastRow();
   const used = {};
   if (last > 1) sheet.getRange(2, 2, last - 1, 1).getValues().forEach(r => used[lfStr_(r[0])] = true);
+  return used;
+}
+
+/**
+ * รหัสเคสใหม่ (เรียกภายใต้ lock) — ฟอร์มรุ่นใหม่ไม่ส่งรหัสมา เซิร์ฟเวอร์สร้างเอง
+ * ช่วงเปลี่ยนผ่าน (legacy on) หน้าเว็บรุ่นเก่าที่ยังเปิดค้างจะส่งรหัสที่แสดงให้ผู้ใช้ไปแล้ว
+ * จึงใช้รหัสนั้นถ้ารูปแบบถูกต้องและยังไม่ซ้ำ เพื่อให้รหัสบนหน้าจอตรงกับใน Sheet
+ */
+function lfNewRefCode_(type, sheet, requested) {
+  const prefix = LF_REF_PREFIX[type] || 'LF';
+  const day = Utilities.formatDate(new Date(), LF_TZ, 'yyMMdd');
+  const used = lfUsedRefs_(sheet);
+  const want = lfStr_(requested);
+  if (want && lfLegacyEnabled_() && new RegExp('^' + prefix + '-\\d{6}-\\d{4}$').test(want) && !used[want]) return want;
   for (let i = 0; i < 50; i++) {
     const code = prefix + '-' + day + '-' + String(1000 + Math.floor(Math.random() * 9000));
     if (!used[code]) return code;
@@ -638,7 +650,7 @@ function handleSubmit(payload) {
       const prev = cache.get(reqKey);
       if (prev) { const o = JSON.parse(prev); o.duplicate = true; return jsonResponse(o); }
     }
-    refCode = lfNewRefCode_(type, sheet);
+    refCode = lfNewRefCode_(type, sheet, payload.refCode);
     timestamp = Utilities.formatDate(new Date(), LF_TZ, 'yyyy-MM-dd HH:mm:ss');
     const phone = lfClip_(payload.phone, 30);
     sheet.appendRow([

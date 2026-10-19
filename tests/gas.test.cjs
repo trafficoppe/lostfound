@@ -128,6 +128,21 @@ test('submit: เซิร์ฟเวอร์สร้างรหัส, ส�
   assert.equal(codes.size, 200);
 });
 
+test('ช่วงเปลี่ยนผ่าน: ฟอร์มรุ่นเก่า (URL-encoded + refCode จากหน้าเว็บ) ยังบันทึกได้และใช้รหัสเดิมถ้าไม่ซ้ำ', () => {
+  const r = rt();
+  const form = { action: 'submit', refCode: 'FND-261019-4321', type: 'พบสิ่งของ', name: 'เก่า', itemDesc: 'ของ', phone: '0812345678', files: '[]' };
+  const res = r.json(r.call('doPost', { postData: { contents: new URLSearchParams(form).toString() }, parameter: form }));
+  assert.equal(res.success, true);
+  assert.equal(res.refCode, 'FND-261019-4321');
+  const again = r.json(r.call('doPost', { postData: { contents: 'x' }, parameter: form }));
+  assert.notEqual(again.refCode, 'FND-261019-4321');            // ซ้ำแล้ว → สร้างใหม่
+  const bad = post(r, { action: 'submit', refCode: 'LOS-261019-4321', type: 'พบสิ่งของ', name: 'x', itemDesc: 'y', clientRequestId: 'pfx' });
+  assert.match(bad.refCode, /^FND-/);                              // prefix ต้องตรงประเภท
+  r.props.set('LF_LEGACY_API', 'off');
+  const off = post(r, { action: 'submit', refCode: 'FND-261019-5555', type: 'พบสิ่งของ', name: 'x', itemDesc: 'y', clientRequestId: 'off1' });
+  assert.notEqual(off.refCode, 'FND-261019-5555');                // ปิด legacy แล้วเซิร์ฟเวอร์สร้างเองเสมอ
+});
+
 test('submit: แถวที่มีคนเขียนแทรกระหว่างอัปโหลดรูป → URL รูปไปถูกแถวตาม refCode', () => {
   const r = rt();
   const sheet = r.sheets.LF_New;
