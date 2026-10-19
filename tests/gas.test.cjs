@@ -96,8 +96,8 @@ test('แคช: ครั้งที่สอง hit, force อ่านให
   now += 6000;
   assert.equal(get(r, { action: 'getPublicData', force: '1' }).cache, 'bypass');
   assert.equal(get(r, { action: 'getPublicData', force: '1' }).cache, 'hit');   // force ถี่เกิน 5 วิ ใช้แคชที่เพิ่งอ่าน
-  now += 61000;
-  assert.equal(get(r, { action: 'getPublicData' }).cache, 'miss');              // หมดอายุ
+  now += 181000;
+  assert.equal(get(r, { action: 'getPublicData' }).cache, 'miss');              // หมดอายุ (180 วินาที)
   // ลบชิ้นส่วนแคช → ต้องอ่าน Sheet ได้ตามปกติ
   for (const k of [...r.cacheStore.keys()]) if (/:\d+$/.test(k)) r.cacheStore.delete(k);
   const res = get(r, { action: 'getPublicData' });
