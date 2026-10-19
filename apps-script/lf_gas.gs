@@ -34,7 +34,7 @@ const LF_TYPES    = ['สิ่งของสูญหาย', 'พบสิ่
 const LF_STATUSES = ['รอดำเนินการ', 'ช่วยหาแล้วยังไม่พบ', 'รับของคืนแล้ว', 'เจ้าของยังไม่มารับคืน'];
 const LF_REF_PREFIX = { 'สิ่งของสูญหาย': 'LOS', 'พบสิ่งของ': 'FND', 'รับของคืน': 'PKP' };
 
-const LF_CACHE_TTL_SEC      = 60;     // อายุแคชข้อมูลรายการ
+const LF_CACHE_TTL_SEC      = 180;    // อายุแคชข้อมูลรายการ (ทุกการเขียนผ่านระบบ/แก้ใน Sheet จะล้างแคชทันที)
 const LF_FORCE_MIN_AGE_MS   = 5000;   // force=1 จะอ่าน Sheet ใหม่เมื่อแคชเก่ากว่านี้
 const LF_SESSION_TTL_SEC    = 21600;  // 6 ชั่วโมง (ค่าสูงสุดของ CacheService)
 const LF_LOGIN_MAX_FAIL     = 5;
