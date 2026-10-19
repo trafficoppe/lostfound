@@ -45,6 +45,17 @@ function adminCfg() {
 function rt(opts = {}) { return makeRuntime(fixture(), Object.assign({ configSource: adminCfg() }, opts)); }
 const post = (r, body) => r.json(r.call('doPost', { postData: { contents: JSON.stringify(body) }, parameter: {} }));
 const get = (r, params) => r.json(r.call('doGet', { parameter: params }));
+// stub ส่วนที่สร้างเอกสาร/PDF ใน Drive สำหรับรายงานรายเดือน — นับจำนวน PDF ที่สร้าง
+function stubReportDrive(r) {
+  r.pdfCount = 0;
+  r.ctx.DocumentApp = { create: () => ({ getId: () => 'doc', getBody: () => new Proxy({}, { get: () => () => new Proxy({}, { get: () => () => ({ setAlignment() {} }) }) }), saveAndClose() {} }), ParagraphHeading: {}, HorizontalAlignment: {} };
+  r.ctx.MimeType = { PDF: 'pdf' };
+  const pdfs = {};
+  const folder = { getFoldersByName: () => ({ hasNext: () => true, next: () => folder }), createFolder: () => folder,
+    createFile: () => { const id = 'pdf' + (++r.pdfCount); return (pdfs[id] = { getId: () => id, getUrl: () => 'https://drive/' + id, getAs: () => ({}), isTrashed: () => false }); } };
+  r.ctx.DriveApp.getRootFolder = () => folder;
+  r.ctx.DriveApp.getFileById = id => pdfs[id] || ({ moveTo() {}, getName: () => 'x', getAs: () => ({ setName() {} }) });
+}
 function login(r) { const res = post(r, { action: 'adminLogin', username: 'admin01', password: TEST_PW }); assert.equal(res.success, true); return res.token; }
 
 test('เวลา: ข้อความไม่มี timezone = เวลาไทย, Date คง instant เดิม, ISO Z ไม่ถูกตัดทิ้ง', () => {
@@ -129,7 +140,7 @@ test('submit: เซิร์ฟเวอร์สร้างรหัส, ส�
 });
 
 test('ช่วงเปลี่ยนผ่าน: ฟอร์มรุ่นเก่า (URL-encoded + refCode จากหน้าเว็บ) ยังบันทึกได้และใช้รหัสเดิมถ้าไม่ซ้ำ', () => {
-  const r = rt();
+  const r = rt({ props: { LF_LEGACY_API: 'on' } });
   const form = { action: 'submit', refCode: 'FND-261019-4321', type: 'พบสิ่งของ', name: 'เก่า', itemDesc: 'ของ', phone: '0811111111', files: '[]' };
   const res = r.json(r.call('doPost', { postData: { contents: new URLSearchParams(form).toString() }, parameter: form }));
   assert.equal(res.success, true);
@@ -224,7 +235,7 @@ test('สิทธิ์ผู้ดูแล: ไม่มี token แก้�
 });
 
 test('ช่วงเปลี่ยนผ่าน (legacy on): API เดิมยังใช้ได้ ปิดได้ด้วยคำสั่งผู้ดูแล', () => {
-  const r = rt();
+  const r = rt({ props: { LF_LEGACY_API: 'on' } });
   assert.equal(get(r, { action: 'getAllData' }).success, true);
   const token = login(r);
   assert.equal(post(r, { action: 'adminSetLegacy', token, value: 'off' }).legacy, 'off');
@@ -259,10 +270,7 @@ test('รายงานรายเดือน: ใช้ข้อมูลท
   // stub ส่วนที่สร้างไฟล์ใน Drive
   r.ctx.DocumentApp = { create: () => ({ getId: () => 'doc', getBody: () => new Proxy({}, { get: () => () => new Proxy({}, { get: () => () => ({ setAlignment() {} }) }) }), saveAndClose() {} }), ParagraphHeading: {}, HorizontalAlignment: {} };
   r.ctx.MimeType = { PDF: 'pdf' };
-  const pdf = { getUrl: () => 'https://drive/pdf', getAs: () => ({}) };
-  const folder = { getFoldersByName: () => ({ hasNext: () => true, next: () => folder }), createFile: () => pdf, createFolder: () => folder };
-  r.ctx.DriveApp.getRootFolder = () => folder;
-  r.ctx.DriveApp.getFileById = () => ({ moveTo() {}, getName: () => 'x', getAs: () => ({ setName() {} }) });
+  stubReportDrive(r);
   const st = r.call('lfMonthlyStats_', 2026, 10, null);
   assert.equal(st.totalItems, 2);                    // 18 ต.ค. + 31 ต.ค. 23:30 (ไม่รวม 1 พ.ย. 00:10)
   assert.equal(st.pickupItems, 1);
@@ -275,7 +283,9 @@ test('รายงานรายเดือน: ใช้ข้อมูลท
   now += 86400000;
   r.call('checkAndGenerateLostFoundReport');
   assert.equal(r.sent.mail.length, 1);
-  assert.match(r.props.get('LF_MONTHLY_REPORT_2026-10'), /^done /);
+  const st2 = JSON.parse(r.props.get('LF_MONTHLY_REPORT_2026-10'));
+  assert.equal(st2.state, 'done'); assert.equal(st2.line.state, 'sent'); assert.equal(st2.email.state, 'sent');
+  assert.equal(r.sent.fetch.length, 1);
   now = Date.parse('2026-11-15T09:05:00+07:00');
   r.call('checkAndGenerateLostFoundReport');
   assert.equal(r.sent.mail.length, 1);
@@ -285,4 +295,184 @@ test('getStats ใช้นิยามเดียวกับหน้าเ�
   const r = rt({ now: () => Date.parse('2026-11-02T00:00:00+07:00') });
   const s = get(r, { action: 'getStats' }).stats;
   assert.deepEqual([s.total, s.lost, s.found, s.pickup, s.returned], [6, 2, 3, 1, 2]);
+});
+
+// ───────────── การแก้ไขรอบ 19 ต.ค. 2569 (บ่าย) ─────────────
+
+test('legacy API: ไม่มี Script Property = ปิด (เปิดเฉพาะค่า on)', () => {
+  assert.equal(get(rt(), { action: 'getAllData' }).code, 410);
+  assert.equal(get(rt({ props: { LF_LEGACY_API: 'yes' } }), { action: 'getAllData' }).code, 410);
+  assert.equal(get(rt({ props: { LF_LEGACY_API: 'on' } }), { action: 'getAllData' }).success, true);
+  const r = rt();
+  assert.equal(post(r, { action: 'updateStatus', refCode: 'PKP-261018-5403', newStatus: 'รับของคืนแล้ว' }).code, 401);
+});
+
+test('session: เปลี่ยน salt/hash ของบัญชีแล้ว token เดิมใช้ไม่ได้ทันที', () => {
+  const r = rt();
+  const token = login(r);
+  assert.equal(post(r, { action: 'adminGetData', token }).success, true);
+  const acct = r.ctx.__exports.LF_PRIVATE_CONFIG.admins.admin01;
+  const oldSalt = acct.salt;
+  acct.salt = 'ffff' + oldSalt.slice(4);             // จำลองการตั้งรหัสใหม่ใน config.private.gs
+  assert.equal(post(r, { action: 'adminGetData', token }).code, 401);
+  acct.salt = oldSalt;                               // ย้อนกลับเป็นค่าเดิม → token เดิมกลับมาใช้ได้ (ยังไม่หมดอายุ)
+  assert.equal(post(r, { action: 'adminGetData', token }).success, true);
+});
+
+test('PII สาธารณะ: ซ่อนเลขบัตร 13 หลัก, เลขยาว, เบอร์, อีเมล และย่อชื่อหลังคำนำหน้า', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  assert.equal(m('บัตรประชาชน 1-1020-12345-67-8 สีฟ้า'), 'บัตรประชาชน [ซ่อนเลขบัตร] สีฟ้า');
+  assert.equal(m('เลขบัญชี 123-4-56789-0'), 'เลขบัญชี [ซ่อนตัวเลข]');
+  assert.equal(m('โทร 081-111-1111 หรือ a.b@example.com'), 'โทร [ซ่อนเบอร์] หรือ [ซ่อนอีเมล]');
+  assert.equal(m('บัตรนักศึกษา นายสมชาย ใจดี'), 'บัตรนักศึกษา นายส*** ใ***');
+  assert.equal(m('กระเป๋าของ นางสาว มาลี'), 'กระเป๋าของ นางสาว ม***');
+  assert.equal(m('wallet of Mr. John Smith'), 'wallet of Mr. J*** S***');
+  assert.equal(m('Mrs. Jane Doe card'), 'Mrs. J*** D*** card');
+  assert.equal(m('Missing wallet, black'), 'Missing wallet, black');
+  assert.equal(m('Ms Anna'), 'Ms A***');
+  assert.equal(m('ร่มสีฟ้า ประตู 1 รถเมล์สาย 515'), 'ร่มสีฟ้า ประตู 1 รถเมล์สาย 515');   // ข้อความทั่วไปไม่ถูกแตะ
+  assert.equal(m('กุญแจรถ 2 ดอก ลานจอด P1'), 'กุญแจรถ 2 ดอก ลานจอด P1');
+});
+
+test('autofill สาธารณะ: ค่า pending ที่ดูเป็นข้อมูลส่วนบุคคลไม่ถูกส่งออก แต่ค่าที่อนุมัติแล้วยังอยู่', () => {
+  const r = rt();
+  const mem = r.sheets.LF_Memory;
+  mem.appendRow(['loc_th', 'อาคารเรียนรวม', 1, 'pending', '', '', '', '', '']);
+  mem.appendRow(['loc_th', 'บ้านเลขที่ 99/123456', 1, 'pending', '', '', '', '', '']);
+  mem.appendRow(['loc_th', 'ติดต่อ a@example.com', 1, 'pending', '', '', '', '', '']);
+  mem.appendRow(['loc_th', 'หน้าห้อง นายสมชาย', 1, 'pending', '', '', '', '', '']);
+  mem.appendRow(['loc_th', 'ศาลายา'.repeat(20), 1, 'pending', '', '', '', '', '']);
+  mem.appendRow(['loc_th', 'ประตู 4', 3, 'approved', '', '', '', '', '']);
+  const vals = r.call('getMemoryEntries', 'loc_th').map(x => x.value || x);
+  const flat = JSON.stringify(vals);
+  assert.ok(flat.includes('อาคารเรียนรวม')); assert.ok(flat.includes('ประตู 4'));
+  assert.ok(!flat.includes('123456')); assert.ok(!flat.includes('@')); assert.ok(!flat.includes('สมชาย')); assert.ok(!flat.includes('ศาลายาศาลายาศาลายา'));
+});
+
+test('payload แจ้งเตือน: คง timestamp เดิม และเพิ่ม timestampUtc / timestampBangkok ที่ถูกต้อง', () => {
+  const r = rt({ now: () => Date.parse('2026-10-19T18:27:46.123+07:00') });
+  const p = r.call('lfBuildNewFormNotifyPayload_', { name: 'ก', itemDesc: 'ข' }, 'LOS-261019-1234', 'สิ่งของสูญหาย', '');
+  assert.equal(p.timestamp, '2026-10-19T18:27:46.123Z');          // รูปแบบเดิม (คงไว้เพื่อความเข้ากันได้)
+  assert.equal(p.timestampUtc, '2026-10-19T11:27:46.123Z');
+  assert.equal(p.timestampBangkok, '2026-10-19T18:27:46.123+07:00');
+  assert.equal(Date.parse(p.timestampUtc), Date.parse(p.timestampBangkok));
+});
+
+test('submit มีรูป: เข้าคิวทันทีหลังบันทึกแถว (รอรูป) แล้วส่งพร้อม URL รูปเมื่ออัปโหลดเสร็จ', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  const img = Buffer.from('fakejpeg').toString('base64');
+  let seenDuringUpload = null;
+  const orig = r.ctx.DriveApp.getFoldersByName;
+  r.ctx.DriveApp.getFoldersByName = (...a) => {
+    const k = [...r.props.keys()].find(x => x.startsWith('lfq_'));
+    seenDuringUpload = k ? JSON.parse(r.props.get(k)) : null;
+    r.call('lfProcessNotifyQueue');                  // trigger ทำงานระหว่างอัปโหลด → ต้องไม่ส่งก่อนได้ URL รูป
+    return orig(...a);
+  };
+  const res = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ข', itemDesc: 'ของ', clientRequestId: 'q-img', files: [{ name: 'a.jpg', mime: 'image/jpeg', data: img }] });
+  assert.equal(res.notify, 'queued');
+  assert.ok(seenDuringUpload && seenDuringUpload.imagesPending === true);
+  assert.equal(r.sent.fetch.length, 0);
+  const item = JSON.parse(r.props.get('lfq_' + res.refCode));
+  assert.equal(item.imagesPending, false);
+  assert.match(item.payload.imageUrl, /drive\.google\.com\/uc\?id=/);
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1);
+  assert.match(JSON.parse(r.sent.fetch[0].body).imageUrl, /uc\?id=/);
+  assert.equal(r.sent.mail.length, 1);
+});
+
+test('submit มีรูปแต่ execution หยุดระหว่างอัปโหลด: คิวยังอยู่ และส่งโดยไม่มีรูปหลังรอ 10 นาที', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  r.ctx.DriveApp.getFoldersByName = () => { throw Object.assign(new Error('Exceeded maximum execution time'), { fatal: true }); };
+  // จำลอง execution ตาย: ทำให้ขั้นเติมรูปในคิวไม่ถูกเรียก
+  r.ctx.lfQueueAttachImages_ = () => { throw new Error('killed'); };
+  const res = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ข', itemDesc: 'ของ', clientRequestId: 'q-dead', files: [{ name: 'a.jpg', mime: 'image/jpeg', data: 'AAAA' }] });
+  assert.equal(res.success, true);
+  assert.equal(JSON.parse(r.props.get('lfq_' + res.refCode)).imagesPending, true);
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 0);              // ยังรอรูป
+  now += 11 * 60000;
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1);
+  assert.equal(r.sent.mail.length, 1);
+  assert.ok(!r.props.has('lfq_' + res.refCode));
+});
+
+test('sweeper: แถวที่บันทึกแล้วแต่ไม่เคยเข้าคิว ถูกใส่คิวย้อนหลังครั้งเดียว และไม่แตะรายการเก่าก่อนเริ่มใช้', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  r.call('lfProcessNotifyQueue');                    // ครั้งแรก: เริ่มนับ (since) ไม่ส่งรายการเก่าใน fixture
+  assert.equal(r.sent.fetch.length + r.sent.mail.length, 0);
+  assert.ok(r.props.get('LF_NOTIFY_ENQUEUED'));
+  now += 60000;
+  const res = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ข', itemDesc: 'ของ', phone: '0811111111', clientRequestId: 'sw1' });
+  // จำลอง execution ตายก่อนใส่คิว: ลบคิวและเครื่องหมายทิ้ง
+  r.props.delete('lfq_' + res.refCode);
+  const m = JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED')); delete m.refs[res.refCode]; r.props.set('LF_NOTIFY_ENQUEUED', JSON.stringify(m));
+  now += 60000;
+  r.call('lfProcessNotifyQueue');                    // ยังไม่ถึงรอบ sweep / แถวยังใหม่เกินไป
+  assert.equal(r.sent.fetch.length, 0);
+  now += 16 * 60000;
+  r.call('lfProcessNotifyQueue');                    // sweep → ใส่คิว → ส่งในรอบเดียวกัน
+  assert.equal(r.sent.fetch.length, 1);
+  const body = JSON.parse(r.sent.fetch[0].body);
+  assert.equal(body.refCode, res.refCode); assert.equal(body.recovered, true); assert.equal(body.phone, '0811111111');
+  assert.equal(r.sent.mail.length, 1);
+  now += 16 * 60000;
+  r.call('lfProcessNotifyQueue');                    // ไม่ส่งซ้ำ
+  assert.equal(r.sent.fetch.length, 1);
+  assert.ok(r.sheets.LF_NotifyLog.rows.some(x => x[3] === 'recovered'));
+});
+
+test('รายงานรายเดือน: LINE ได้ HTTP 500 = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  let lineCode = 500;
+  const r = rt({ now: () => now, lineCode: () => lineCode });
+  stubReportDrive(r);
+  r.call('checkAndGenerateLostFoundReport');
+  let st = JSON.parse(r.props.get('LF_MONTHLY_REPORT_2026-10'));
+  assert.equal(st.state, 'partial'); assert.equal(st.line.state, 'failed'); assert.equal(st.line.code, 500);
+  assert.equal(st.email.state, 'sent'); assert.equal(r.sent.mail.length, 1); assert.equal(r.pdfCount, 1);
+  now += 86400000; lineCode = 200;
+  r.call('checkAndGenerateLostFoundReport');
+  st = JSON.parse(r.props.get('LF_MONTHLY_REPORT_2026-10'));
+  assert.equal(st.state, 'done'); assert.equal(st.line.state, 'sent'); assert.equal(st.line.attempts, 2);
+  assert.equal(r.sent.mail.length, 1);               // อีเมลไม่ซ้ำ
+  assert.equal(r.pdfCount, 1);                       // ใช้ PDF เดิม
+  assert.equal(r.sent.fetch.length, 2);
+  assert.equal(JSON.parse(r.sent.fetch[1].body).pdfUrl, 'https://drive/pdf1');
+  now += 86400000;
+  r.call('checkAndGenerateLostFoundReport');
+  assert.equal(r.sent.fetch.length, 2); assert.equal(r.sent.mail.length, 1);
+});
+
+test('รายงานรายเดือน: ไม่มี URL LINE = ล้มเหลว (ไม่นับว่าสำเร็จ), อีเมลล้มเหลวลองใหม่โดยไม่ส่ง LINE ซ้ำ, ค่าเดิม done … ยังกันส่งซ้ำ', () => {
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  const r = rt({ now: () => now, configSource: adminCfg().replace("monthlyLineWebhookUrl: 'https://line.invalid/monthly',", '') });
+  stubReportDrive(r);
+  r.call('checkAndGenerateLostFoundReport');
+  let st = JSON.parse(r.props.get('LF_MONTHLY_REPORT_2026-10'));
+  assert.equal(st.state, 'partial'); assert.equal(st.line.state, 'failed'); assert.match(st.line.err, /not configured/);
+
+  let failMail = true;
+  const r2 = rt({ now: () => now });
+  stubReportDrive(r2);
+  const send = r2.ctx.MailApp.sendEmail;
+  r2.ctx.MailApp.sendEmail = m => { if (failMail) throw new Error('mail quota'); return send(m); };
+  r2.call('checkAndGenerateLostFoundReport');
+  st = JSON.parse(r2.props.get('LF_MONTHLY_REPORT_2026-10'));
+  assert.equal(st.line.state, 'sent'); assert.equal(st.email.state, 'failed');
+  failMail = false; now += 86400000;
+  r2.call('checkAndGenerateLostFoundReport');
+  st = JSON.parse(r2.props.get('LF_MONTHLY_REPORT_2026-10'));
+  assert.equal(st.state, 'done'); assert.equal(r2.sent.fetch.length, 1); assert.equal(r2.sent.mail.length, 1); assert.equal(r2.pdfCount, 1);
+
+  const r3 = rt({ now: () => now, props: { 'LF_MONTHLY_REPORT_2026-10': 'done 2026-11-01T02:05:00.000Z total=2 line=200' } });
+  stubReportDrive(r3);
+  r3.call('checkAndGenerateLostFoundReport');
+  assert.equal(r3.sent.fetch.length + r3.sent.mail.length, 0);
 });

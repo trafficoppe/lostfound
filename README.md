@@ -23,7 +23,7 @@ Google Form เดิม ───────────▶ Sheet Form Respons
 | `apps-script/lf_gas.gs` | เนื้อหาไฟล์ `lf_gas.gs.gs` ใน Apps Script |
 | `apps-script/MonthlyReport.gs` | เนื้อหาไฟล์ `MonthlyReport.gs` ใน Apps Script |
 | `apps-script/config.example.gs` | ตัวอย่าง `config.private.gs` (ไฟล์จริงอยู่ใน Apps Script เท่านั้น) |
-| `tools/make-admin-hash.py` | สร้าง salt/hash รหัสผ่านผู้ดูแล (ไม่เก็บรหัสผ่านจริง) |
+| `tools/make-admin-hash.py` | สร้าง salt/hash รหัสผ่านผู้ดูแล (ไม่เก็บรหัสผ่านจริง; `--allow-short` ยอมรับ 8–11 ตัวพร้อมคำเตือน — ไม่แนะนำ) |
 | `tests/` | ทดสอบอัตโนมัติ (`npm test`) — รันโค้ด .gs จริงด้วย runtime จำลอง + ตรวจเวลาในหลายเขตเวลา |
 
 ## นิยามตัวเลข
@@ -46,7 +46,21 @@ Google Form เดิม ───────────▶ Sheet Form Respons
 - หน้าเว็บ: `git revert <merge commit>` แล้ว push `main`
 - Apps Script: Deploy › Manage deployments › แก้ไข › เลือก Version 25 (เวอร์ชันก่อนแก้) › Deploy
   และ Project history › Version 25 › คัดลอกโค้ดกลับเป็น Head ถ้าต้องการให้ trigger ใช้โค้ดเดิม
-- ตั้ง `LF_LEGACY_API` = `on` หากต้องเปิด API เดิมชั่วคราว
+- ตั้ง `LF_LEGACY_API` = `on` หากต้องเปิด API เดิมชั่วคราว (ตั้งแต่ v2.1 ถ้าไม่มี property นี้ = ปิด)
+
+## v2.1 (สรุปการเปลี่ยนแปลง)
+- คิวแจ้งเตือน: ใส่คิวทันทีหลังบันทึกแถว (ภายใน lock) แล้วค่อยเติม URL รูป; ถ้ารูปไม่มาภายใน 10 นาทีจะส่งโดยไม่มีรูป
+  และทุก ~15 นาที trigger คิวเดิมจะตามเก็บแถวใน LF_New ที่ไม่เคยเข้าคิว (ย้อนหลังไม่เกิน 6 ชม. และเฉพาะหลังเริ่มใช้ v2.1)
+  ใช้ Script Property `LF_NOTIFY_ENQUEUED` (ลบได้ — ระบบจะเริ่มนับใหม่โดยไม่แจ้งรายการเก่า)
+- payload LINE เพิ่ม `timestampUtc` (ISO UTC) และ `timestampBangkok` (+07:00); `timestamp` เดิมคงรูปแบบเดิม
+- รายงานรายเดือน: `LF_MONTHLY_REPORT_yyyy-MM` เป็น JSON แยกสถานะ LINE / Email; LINE ที่ไม่มี URL หรือ HTTP ไม่ใช่ 2xx = ล้มเหลว
+  วันที่ 2–3 จะลองเฉพาะช่องทางที่ยังไม่สำเร็จด้วย PDF เดิม; ค่าข้อความเดิม `done …` ยังถือว่าส่งแล้ว
+- session ผู้ดูแลผูกกับ salt/hash ของบัญชี: เปลี่ยนรหัสใน `config.private.gs` แล้ว session เดิมใช้ไม่ได้ทันที
+  (หลังเผยแพร่ v2.1 ครั้งแรก ผู้ดูแลที่ล็อกอินค้างไว้ต้องล็อกอินใหม่ 1 ครั้ง)
+- API สาธารณะซ่อนเลขบัตร 13 หลัก/ตัวเลขยาว ≥ 9 หลัก และย่อชื่อหลังคำนำหน้า (นาย/นาง/นางสาว/น.ส./Mr./Ms. …);
+  autofill สาธารณะไม่ส่งค่า pending ที่มีตัวเลขยาว อีเมล คำนำหน้าชื่อ หรือยาวเกิน 80 ตัว
+- หน้า index: เปิดซ้ำจะแสดงข้อมูลสาธารณะที่โหลดไว้ (localStorage `lf_pub_v1`, ไม่เกิน 24 ชม.) ทันทีพร้อมป้ายเวลา แล้วโหลดใหม่เสมอ
+  — ไม่เก็บข้อมูลผู้ดูแลในเครื่อง
 
 ## ความปลอดภัย
 - รหัสผ่านผู้ดูแลตรวจที่เซิร์ฟเวอร์ (salt + SHA-256 วนซ้ำ) ล็อก 15 นาทีเมื่อผิด 5 ครั้ง, session 6 ชั่วโมงใน CacheService

@@ -924,7 +924,8 @@ const _overlay     = document.getElementById('sending-overlay');
     sessionStorage.removeItem('lf_mem_dept_en');
     sessionStorage.removeItem('lf_mem_loc_en');
   } catch(e) {}
-  const imgWarn = result.imagesFailed > 0 ? '<br><br>⚠️ Your report was saved, but ' + result.imagesFailed + ' image(s) could not be attached — please send them to staff with your reference number.' : '';
+  const imgWarn = (result.imagesFailed > 0 ? '<br><br>⚠️ Your report was saved, but ' + result.imagesFailed + ' image(s) could not be attached — please send them to staff with your reference number.' : '') +
+    (result.notify === 'queue_failed' ? '<br><br>⚠️ Your report was saved, but staff have not been notified automatically yet (the system will retry within 30 minutes). If urgent, please call with your reference number.' : '');
 
   const icons = { lost:'📋', found:'✅', pickup:'🎉' };
   const titles = { lost:'Report Submitted Successfully!', found:'Found Item Reported — Thank You! 🙏', pickup:'Claim Recorded Successfully!' };

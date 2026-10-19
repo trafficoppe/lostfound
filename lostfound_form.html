@@ -1093,7 +1093,8 @@ async function _submitFormInner() {
     sessionStorage.removeItem('lf_mem_dept_th');
     sessionStorage.removeItem('lf_mem_loc_th');
   } catch(e) {}
-  const imgWarn = result.imagesFailed > 0 ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่แนบรูปไม่สำเร็จ ' + result.imagesFailed + ' ไฟล์ — กรุณาส่งรูปให้เจ้าหน้าที่พร้อมแจ้งเลขอ้างอิง' : '';
+  const imgWarn = (result.imagesFailed > 0 ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่แนบรูปไม่สำเร็จ ' + result.imagesFailed + ' ไฟล์ — กรุณาส่งรูปให้เจ้าหน้าที่พร้อมแจ้งเลขอ้างอิง' : '') +
+    (result.notify === 'queue_failed' ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่ระบบยังแจ้งเจ้าหน้าที่อัตโนมัติไม่สำเร็จ (ระบบจะลองใหม่ภายใน 30 นาที) — หากเร่งด่วนกรุณาโทรแจ้งพร้อมเลขอ้างอิง' : '');
 
   const icons = { lost:'📋', found:'✅', pickup:'🎉' };
   const titles = { lost:'แจ้งของหายสำเร็จ', found:'แจ้งพบของสำเร็จ ขอบคุณ! 🙏', pickup:'บันทึกการรับของคืนแล้ว' };

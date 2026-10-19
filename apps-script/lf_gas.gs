@@ -23,7 +23,7 @@
 // ============================================================
 // CONFIG (ค่าไม่ลับ) — ค่าลับอยู่ใน LF_PRIVATE_CONFIG (config.private.gs)
 // ============================================================
-const LF_VERSION        = '2.0.0';
+const LF_VERSION        = '2.1.0';
 const LF_TZ             = 'Asia/Bangkok';
 const SHEET_NAME        = 'LF_New';
 const OLD_SHEET_NAME    = 'Form Responses';
@@ -141,8 +141,9 @@ function jsonResponse(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/** API เดิม (ไม่ต้องล็อกอิน) เปิดเฉพาะเมื่อ Script Property LF_LEGACY_API = 'on' — ถ้า property หาย ถือว่าปิด */
 function lfLegacyEnabled_() {
-  return PropertiesService.getScriptProperties().getProperty('LF_LEGACY_API') !== 'off';
+  return PropertiesService.getScriptProperties().getProperty('LF_LEGACY_API') === 'on';
 }
 
 function lfSetLegacy_(payload, session) {
@@ -240,11 +241,25 @@ function lfDriveIds_(raw) {
   return out;
 }
 
-/** ปิดบังเบอร์โทร/อีเมล ในข้อความที่จะแสดงสาธารณะ */
+/** ย่อชื่อบุคคลที่ตามหลังคำนำหน้า เช่น "นายสมชาย ใจดี" → "นายส*** ใ***" (ยังพอให้เจ้าของจำได้) */
+function lfMaskNames_(s) {
+  const mask = function (w) { return w ? w.charAt(0) + '***' : ''; };
+  return s
+    // คำนำหน้าไทย (อาจติดชื่อหรือเว้นวรรค)
+    .replace(/(^|[\s(:\[])(นางสาว|นาง|นาย|น\.ส\.|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง)(\s?)([ก-๙A-Za-z]+)(?:\s+([ก-๙A-Za-z]+))?/g,
+      function (m, pre, title, sp, first, last) { return pre + title + sp + mask(first) + (last ? ' ' + mask(last) : ''); })
+    // คำนำหน้าอังกฤษ (ต้องตามด้วย . หรือเว้นวรรค เพื่อไม่ชนคำอย่าง Missing)
+    .replace(/(^|[\s(:\[])(Mrs|Mr|Ms|Miss)(\.\s?|\s)([A-Za-z]+)(?:\s+([A-Za-z]+))?/g,
+      function (m, pre, title, sp, first, last) { return pre + title + sp + mask(first) + (last ? ' ' + mask(last) : ''); });
+}
+
+/** ปิดบังเบอร์โทร/อีเมล/เลขบัตร/ชื่อบุคคล ในข้อความที่จะแสดงสาธารณะ */
 function lfMaskPII_(s) {
-  return lfStr_(s)
+  return lfMaskNames_(lfStr_(s)
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[ซ่อนอีเมล]')
-    .replace(/(?:\+?66|0)(?:[\s-]?\d){8,9}(?!\d)/g, '[ซ่อนเบอร์]');
+    .replace(/(^|\D)\d(?:[\s-]?\d){12}(?!\d)/g, '$1[ซ่อนเลขบัตร]')
+    .replace(/(?:\+?66|0)(?:[\s-]?\d){8,9}(?!\d)/g, '[ซ่อนเบอร์]')
+    .replace(/(^|\D)\d(?:[\s-]?\d){8,}(?!\d)/g, '$1[ซ่อนตัวเลข]'));
 }
 
 /** ชื่อย่อประเภทบุคคล (ส่วนแรกก่อนช่องว่าง) */
@@ -533,6 +548,12 @@ function lfConstEq_(a, b) {
   return diff === 0;
 }
 
+/** ลายนิ้วมือของบัญชี: เปลี่ยน salt/hash/iterations แล้ว session เดิมทั้งหมดใช้ไม่ได้ทันที */
+function lfAcctFingerprint_(acct) {
+  return lfHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    [acct.salt, acct.hash, acct.iterations].join('|'), Utilities.Charset.UTF_8)).slice(0, 16);
+}
+
 function lfSessionKey_(token) {
   return 'lf_sess_' + lfHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(token), Utilities.Charset.UTF_8));
 }
@@ -557,7 +578,7 @@ function lfAdminLogin_(p) {
   cache.remove(failKey);
   const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
   const exp = Date.now() + LF_SESSION_TTL_SEC * 1000;
-  cache.put(lfSessionKey_(token), JSON.stringify({ u: user, exp: exp }), LF_SESSION_TTL_SEC);
+  cache.put(lfSessionKey_(token), JSON.stringify({ u: user, exp: exp, v: lfAcctFingerprint_(acct) }), LF_SESSION_TTL_SEC);
   Logger.log('adminLogin ok: ' + user);
   return jsonResponse({ success: true, token: token, user: user, expiresAt: new Date(exp).toISOString() });
 }
@@ -572,7 +593,8 @@ function lfCheckSession_(token) {
   try {
     const s = JSON.parse(CacheService.getScriptCache().get(lfSessionKey_(token)) || 'null');
     if (!s || !s.u || !(s.exp > Date.now())) return null;
-    if (!lfCfg_().admins[s.u]) return null;  // บัญชีถูกลบ/เปลี่ยน → session ใช้ไม่ได้
+    const acct = lfCfg_().admins[s.u];
+    if (!acct || s.v !== lfAcctFingerprint_(acct)) return null;  // บัญชีถูกลบหรือเปลี่ยนรหัส → session เดิมใช้ไม่ได้
     return s;
   } catch (e) { return null; }
 }
@@ -644,7 +666,11 @@ function handleSubmit(payload) {
   const lock  = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return jsonResponse({ success: false, error: 'busy', message: 'ระบบมีผู้ใช้งานพร้อมกันจำนวนมาก กรุณาลองอีกครั้ง' });
 
-  let refCode, savedRow, timestamp;
+  let files = payload.files || [];
+  if (typeof files === 'string') { try { files = JSON.parse(files); } catch (e) { files = []; } }
+  if (!Array.isArray(files)) files = [];
+  const hasFiles = files.length > 0;
+  let refCode, savedRow, timestamp, notify = 'queued';
   try {
     if (reqKey) {
       const prev = cache.get(reqKey);
@@ -667,7 +693,14 @@ function handleSubmit(payload) {
     if (savedRow < 2) throw new Error('saved row not found for ' + refCode);
     sheet.getRange(savedRow, 7).setValues([["'" + phone]]);
     SpreadsheetApp.flush();
-    if (reqKey) cache.put(reqKey, JSON.stringify({ success: true, refCode: refCode, savedAt: timestamp, images: 0 }), 21600);
+    // ใส่คิวแจ้งเตือนทันทีหลังบันทึกแถว (ยังถือ lock) — ถ้าอัปโหลดรูปค้าง/หมดเวลา เจ้าหน้าที่ยังได้รับแจ้ง
+    try {
+      lfEnqueueNotify_(refCode, lfBuildNewFormNotifyPayload_(payload, refCode, type, ''), hasFiles);
+    } catch (qErr) {
+      notify = 'queue_failed';
+      Logger.log('⚠️ enqueue failed (sweeper will retry): ' + qErr);
+    }
+    if (reqKey) cache.put(reqKey, JSON.stringify({ success: true, refCode: refCode, savedAt: timestamp, images: 0, imagesPending: hasFiles, notify: notify }), 21600);
   } finally {
     lock.releaseLock();
   }
@@ -676,9 +709,7 @@ function handleSubmit(payload) {
 
   // ── รูปภาพ (ทำนอก lock; ล้มเหลวไม่กระทบข้อมูลที่บันทึกแล้ว) ──
   let imgUrl = '', imgSaved = 0, imgFailed = 0;
-  let files = payload.files || [];
-  if (typeof files === 'string') { try { files = JSON.parse(files); } catch (e) { files = []; } }
-  if (Array.isArray(files) && files.length) {
+  if (hasFiles) {
     try {
       const folder = getOrCreateDriveFolder();
       const urls = [];
@@ -708,15 +739,12 @@ function handleSubmit(payload) {
     }
   }
 
-  // ── แจ้งเตือน: ใส่คิว (ส่งโดย trigger ทุก 1 นาที) ──
-  let notify = 'queued';
-  try {
-    lfEnqueueNotify_(refCode, lfBuildNewFormNotifyPayload_(payload, refCode, type, imgUrl));
-    lfEnsureNotifyTrigger_();
-  } catch (qErr) {
-    notify = 'queue_failed';
-    Logger.log('⚠️ enqueue failed: ' + qErr);
+  // ── แจ้งเตือน: เติม URL รูปให้รายการในคิว แล้วปลดสถานะรอรูป (ส่งโดย trigger ทุก 1 นาที) ──
+  if (notify === 'queued' && hasFiles) {
+    try { lfQueueAttachImages_(refCode, imgUrl); }
+    catch (aErr) { Logger.log('⚠️ attach images to queue failed (will send without images after timeout): ' + aErr); }
   }
+  try { lfEnsureNotifyTrigger_(); } catch (tErr) { Logger.log('⚠️ ensure trigger: ' + tErr); }
 
   const result = { success: true, refCode: refCode, savedAt: timestamp, images: imgSaved, imagesFailed: imgFailed, notify: notify };
   if (reqKey) cache.put(reqKey, JSON.stringify(result), 21600);
@@ -1068,10 +1096,21 @@ function touchMemoryEntry(bucket, rawValue, refCode) {
   }
 }
 
+/** ค่าที่ผู้ใช้พิมพ์เอง (pending) ซึ่งดูเหมือนข้อมูลส่วนบุคคล จะไม่ถูกส่งให้ฟอร์มสาธารณะ */
+function lfMemoryLooksPersonal_(v) {
+  v = lfStr_(v);
+  return v.length > 80 || /\d(?:[\s-]?\d){5,}/.test(v) || /@/.test(v) ||
+    /(^|\s)(นางสาว|นาง|นาย|น\.ส\.)\s?[ก-๙]/.test(v) || /(^|\s)(Mrs|Mr|Ms|Miss)(\.|\s)\s*[A-Za-z]/.test(v);
+}
+
 function getMemoryEntries(bucket) {
   const rows = readMemoryRows();
   return rows
-    .filter(function(r) { return r.bucket === bucket && (r.status === 'approved' || r.status === 'pending'); })
+    .filter(function(r) {
+      if (r.bucket !== bucket) return false;
+      if (r.status === 'approved') return true;
+      return r.status === 'pending' && !lfMemoryLooksPersonal_(r.value);
+    })
     .sort(function(a,b) { return b.count - a.count; })
     .slice(0, MEMORY_MAX_RETURN)
     .map(function(r) { return { value: r.value, count: r.count, status: r.status }; });
@@ -1230,11 +1269,14 @@ function lfTypeStyle_(subject) {
   return { emoji: '📋', headerColor: '#2196F3', footerBg: '#E3F2FD', headerText: '📋 ' + subject };
 }
 
-function lfBuildNewFormNotifyPayload_(payload, refCode, type, imgUrl) {
-  const now = new Date();
+function lfBuildNewFormNotifyPayload_(payload, refCode, type, imgUrl, at) {
+  const now = at instanceof Date && !isNaN(at) ? at : new Date();
   const st = lfTypeStyle_(type);
   return {
+    // timestamp: รูปแบบเดิม (เวลาไทยแต่ลงท้าย Z) — คงไว้เพราะยังไม่ได้ยืนยันว่า Cloud Function ใช้ค่านี้อย่างไร
     timestamp: Utilities.formatDate(now, LF_TZ, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
+    timestampUtc: now.toISOString(),
+    timestampBangkok: Utilities.formatDate(now, LF_TZ, "yyyy-MM-dd'T'HH:mm:ss.SSS") + '+07:00',
     displayTimestamp: Utilities.formatDate(now, LF_TZ, 'dd/MM/yyyy HH:mm น.'),
     dateLostFound: lfClip_(payload.itemDate, 20) || '-',
     submitter: lfClip_(payload.name, 200) || '-',
@@ -1254,9 +1296,34 @@ function lfBuildNewFormNotifyPayload_(payload, refCode, type, imgUrl) {
 }
 
 // ── คิวแจ้งเตือน (Script Properties: lfq_<refCode>) ──
-function lfEnqueueNotify_(refCode, notifyPayload) {
+const LF_NOTIFY_IMG_WAIT_MS   = 10 * 60000;    // รอรูปได้นานสุด 10 นาที จากนั้นส่งโดยไม่มีรูป
+const LF_NOTIFY_MARK_KEY      = 'LF_NOTIFY_ENQUEUED';   // {since, refs:{ref: ms}} — รายการที่ใส่คิวแล้ว (เก็บ 7 วัน)
+const LF_NOTIFY_MARK_KEEP_MS  = 7 * 86400000;
+const LF_SWEEP_EVERY_SEC      = 900;           // ตรวจรายการที่ตกหล่นทุก ~15 นาที (ภายใน trigger คิวเดิม)
+const LF_SWEEP_MIN_AGE_MS     = 3 * 60000;     // ไม่แตะแถวที่เพิ่งบันทึก (อาจกำลังใส่คิว)
+const LF_SWEEP_MAX_AGE_MS     = 6 * 3600000;   // ตามเก็บย้อนหลังไม่เกิน 6 ชั่วโมง
+
+function lfReadMarks_(props) {
+  let m = null;
+  try { m = JSON.parse(props.getProperty(LF_NOTIFY_MARK_KEY) || 'null'); } catch (e) { m = null; }
+  if (!m || typeof m !== 'object' || !m.refs) m = { since: Date.now(), refs: {} };
+  return m;
+}
+
+function lfMarkEnqueued_(props, refCode) {
+  const m = lfReadMarks_(props), now = Date.now();
+  m.refs[refCode] = now;
+  const keys = Object.keys(m.refs).filter(k => now - m.refs[k] < LF_NOTIFY_MARK_KEEP_MS)
+    .sort((a, b) => m.refs[b] - m.refs[a]).slice(0, 250);
+  const refs = {}; keys.forEach(k => { refs[k] = m.refs[k]; });
+  m.refs = refs;
+  props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(m));
+}
+
+function lfEnqueueNotify_(refCode, notifyPayload, imagesPending) {
+  const props = PropertiesService.getScriptProperties();
   const item = {
-    refCode: refCode, createdAt: Date.now(), payload: notifyPayload,
+    refCode: refCode, createdAt: Date.now(), payload: notifyPayload, imagesPending: !!imagesPending,
     line:  { state: 'pending', attempts: 0, nextAt: 0, lastError: '' },
     email: { state: 'pending', attempts: 0, nextAt: 0, lastError: '' }
   };
@@ -1265,7 +1332,63 @@ function lfEnqueueNotify_(refCode, notifyPayload) {
     item.payload.itemDescription = String(item.payload.itemDescription).slice(0, 1500);
     s = JSON.stringify(item);
   }
-  PropertiesService.getScriptProperties().setProperty('lfq_' + refCode, s);
+  props.setProperty('lfq_' + refCode, s);
+  try { lfMarkEnqueued_(props, refCode); } catch (e) { Logger.log('mark enqueued: ' + e); }
+}
+
+/** หลังอัปโหลดรูป: ใส่ URL รูปในรายการคิวแล้วปลดสถานะรอรูป */
+function lfQueueAttachImages_(refCode, imgUrl) {
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) throw new Error('lock busy');
+  try {
+    const key = 'lfq_' + refCode;
+    const raw = props.getProperty(key);
+    if (!raw) return;
+    const item = JSON.parse(raw);
+    item.payload.imageUrl = imgUrl || '-';
+    item.imagesPending = false;
+    props.setProperty(key, JSON.stringify(item));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ตามเก็บแถวใน LF_New ที่บันทึกแล้วแต่ไม่เคยเข้าคิวแจ้งเตือน (เช่น execution หยุดก่อนใส่คิว)
+ * ทำเฉพาะแถวที่บันทึกหลังจากเริ่มใช้ระบบเครื่องหมาย (marks.since) เพื่อไม่ให้แจ้งรายการเก่าซ้ำ
+ * เรียกจาก lfProcessNotifyQueue ขณะถือ lock แล้ว
+ */
+function lfSweepMissedNotifications_(props) {
+  const marks = lfReadMarks_(props);
+  if (!props.getProperty(LF_NOTIFY_MARK_KEY)) { props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(marks)); return 0; }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return 0;
+  const last = sheet.getLastRow();
+  if (last < 2) return 0;
+  const n = Math.min(60, last - 1);
+  const rows = sheet.getRange(last - n + 1, 1, n, 12).getValues();
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+  const now = Date.now();
+  const from = Math.max(marks.since, now - LF_SWEEP_MAX_AGE_MS);
+  let count = 0;
+  rows.forEach(function (r) {
+    const ref = lfStr_(r[1]);
+    if (!/^(LOS|FND|PKP)-\d{6}-\d{4}$/.test(ref)) return;
+    if (marks.refs[ref] || props.getProperty('lfq_' + ref)) return;
+    const ts = lfToDate_(r[0]);
+    if (!ts || ts.getTime() < from || now - ts.getTime() < LF_SWEEP_MIN_AGE_MS) return;
+    const type = lfStr_(r[2]);
+    if (LF_TYPES.indexOf(type) < 0) return;
+    const p = { name: lfStr_(r[3]), personType: lfStr_(r[4]), department: lfStr_(r[5]), phone: lfPhone_(r[6]),
+                itemDate: lfCellDate_(r[7], tz), itemDesc: lfStr_(r[9]), itemLoc: lfStr_(r[10]) };
+    const pl = lfBuildNewFormNotifyPayload_(p, ref, type, lfStr_(r[11]), ts);
+    pl.recovered = true;
+    lfEnqueueNotify_(ref, pl, false);
+    lfNotifyLog_(ref, 'queue', 'recovered', 0, 'แถวถูกบันทึกแต่ไม่ได้เข้าคิว — ใส่คิวย้อนหลัง');
+    count++;
+  });
+  return count;
 }
 
 function lfEnsureNotifyTrigger_() {
@@ -1314,11 +1437,21 @@ function lfSendLine_(url, payload) {
 function lfProcessNotifyQueue() {
   const props = PropertiesService.getScriptProperties();
   const all = props.getProperties();
-  const keys = Object.keys(all).filter(k => k.indexOf('lfq_') === 0);
-  if (!keys.length) return;
+  const cache = CacheService.getScriptCache();
+  const sweepDue = !cache.get('lf_sweep_ok');
+  let keys = Object.keys(all).filter(k => k.indexOf('lfq_') === 0);
+  if (!keys.length && !sweepDue) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;
   try {
+    if (sweepDue) {
+      cache.put('lf_sweep_ok', '1', LF_SWEEP_EVERY_SEC);
+      try {
+        if (lfSweepMissedNotifications_(props) > 0)
+          keys = Object.keys(props.getProperties()).filter(k => k.indexOf('lfq_') === 0);
+      } catch (sErr) { Logger.log('⚠️ sweep failed: ' + sErr); }
+    }
+    if (!keys.length) return;
     const cfg = lfCfg_();
     const started = Date.now();
     keys.sort().forEach(function (key) {
@@ -1326,6 +1459,7 @@ function lfProcessNotifyQueue() {
       let item;
       try { item = JSON.parse(props.getProperty(key) || 'null'); } catch (e) { item = null; }
       if (!item) { props.deleteProperty(key); return; }
+      if (item.imagesPending && Date.now() - item.createdAt < LF_NOTIFY_IMG_WAIT_MS) return;  // รอ URL รูป
       ['line', 'email'].forEach(function (ch) {
         const st = item[ch];
         if (st.state === 'sent' || st.state === 'gave_up' || st.nextAt > Date.now()) return;
@@ -1346,7 +1480,10 @@ function lfProcessNotifyQueue() {
         props.setProperty(key, JSON.stringify(item));
       });
       const done = ['line', 'email'].every(ch => item[ch].state === 'sent' || item[ch].state === 'gave_up');
-      if (done) props.deleteProperty(key);
+      if (done) {
+        try { if (!lfReadMarks_(props).refs[item.refCode]) lfMarkEnqueued_(props, item.refCode); } catch (e) {}  // กัน sweeper ใส่คิวซ้ำ
+        props.deleteProperty(key);
+      }
     });
   } finally {
     lock.releaseLock();
@@ -1356,7 +1493,7 @@ function lfProcessNotifyQueue() {
 function lfNotifyStatus_() {
   const all = PropertiesService.getScriptProperties().getProperties();
   const queue = Object.keys(all).filter(k => k.indexOf('lfq_') === 0).map(k => {
-    try { const it = JSON.parse(all[k]); return { refCode: it.refCode, line: it.line, email: it.email, createdAt: new Date(it.createdAt).toISOString() }; }
+    try { const it = JSON.parse(all[k]); return { refCode: it.refCode, line: it.line, email: it.email, imagesPending: !!it.imagesPending, createdAt: new Date(it.createdAt).toISOString() }; }
     catch (e) { return { key: k, error: 'unreadable' }; }
   });
   const hasTrigger = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'lfProcessNotifyQueue');
