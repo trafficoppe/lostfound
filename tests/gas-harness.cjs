@@ -107,14 +107,17 @@ class Sheet {
 }
 
 function makeRuntime(fixture, opts = {}) {
-  const sheets = {};
-  Object.keys(fixture).forEach(n => sheets[n] = new Sheet(n, fixture[n]));
+  // opts.shareWith = runtime อื่น → ใช้ชีท/Script Properties/แคช/lock/ผลการส่งชุดเดียวกัน
+  // (จำลอง web app รุ่นหนึ่ง กับ trigger ที่รันโค้ดอีกรุ่น ในโปรเจกต์เดียวกัน)
+  const sh = opts.shareWith ? opts.shareWith.shared : null;
+  const sheets = sh ? sh.sheets : {};
+  if (!sh) Object.keys(fixture).forEach(n => sheets[n] = new Sheet(n, fixture[n]));
   const log = [];
-  const sent = { mail: [], fetch: [] };
-  const cacheStore = new Map();
-  const props = new Map(Object.entries(opts.props || {}));
-  const triggers = [];
-  let lockHeld = false;
+  const sent = sh ? sh.sent : { mail: [], fetch: [] };
+  const cacheStore = sh ? sh.cacheStore : new Map();
+  const props = sh ? sh.props : new Map(Object.entries(opts.props || {}));
+  const triggers = sh ? sh.triggers : [];
+  const lockState = sh ? sh.lockState : { held: false };
   const now = () => (opts.now ? new Date(opts.now()) : new Date());
   const RealDate = Date;
   class FakeDate extends RealDate {
@@ -168,8 +171,8 @@ function makeRuntime(fixture, opts = {}) {
     },
     LockService: {
       getScriptLock: () => ({
-        tryLock: () => { if (lockHeld && !opts.reentrantLock) return false; lockHeld = true; return true; },
-        releaseLock: () => { lockHeld = false; }
+        tryLock: () => { if (lockState.held && !opts.reentrantLock) return false; lockState.held = true; return true; },
+        releaseLock: () => { lockState.held = false; }
       })
     },
     Utilities: {
@@ -200,22 +203,24 @@ function makeRuntime(fixture, opts = {}) {
     Session: { getActiveUser: () => ({ getEmail: () => 'tester@example.com' }) }
   };
   vm.createContext(ctx);
-  const dir = path.join(__dirname, '..', 'apps-script');
+  const dir = opts.sourceDir || path.join(__dirname, '..', 'apps-script');
   const order = opts.files || ['lf_gas.gs', 'MonthlyReport.gs'];
   let code = order.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n;\n');
   if (opts.configSource) code = opts.configSource + '\n;\n' + code;
+  if (opts.extraSource) code += '\n;\n' + opts.extraSource;   // จำลอง "โค้ดต่าง build แต่เลขรุ่นเดิม"
   // const/let ระดับบนสุดไม่อยู่บน global ของ vm จึง export ฟังก์ชัน/ค่าที่ต้องใช้ทดสอบ
   code += '\n;globalThis.__exports = { LF_PRIVATE_CONFIG: (typeof LF_PRIVATE_CONFIG!=="undefined"?LF_PRIVATE_CONFIG:undefined), LF_STATUSES, LF_TYPES };';
   // ค่าคงที่ที่การทดสอบต้องอ้างถึง — อ่านจากโค้ดจริง ไม่ใช่เขียนตัวเลขซ้ำไว้ในเทสต์
   // ใช้ typeof กันไว้ เพื่อให้ harness ยังโหลดโค้ดรุ่นเก่าที่ยังไม่มีค่าคงที่เหล่านี้ได้
-  const C = ['LF_VERSION', 'LF_CACHE_TTL_SEC', 'LF_SENDING_GRACE_MS', 'LF_WEBAPP_VER_KEY', 'LF_NOTIFY_MAX_ATTEMPT'];
+  const C = ['LF_VERSION', 'LF_CACHE_TTL_SEC', 'LF_SENDING_GRACE_MS', 'LF_WEBAPP_VER_KEY', 'LF_NOTIFY_MAX_ATTEMPT', 'LF_SWEEP_SETTLE_MS', 'LF_HOLD_UNTIL_MS'];
   code += '\n;globalThis.__consts = {' +
     C.map(n => `${n}: (typeof ${n}!=="undefined"?${n}:undefined)`).join(', ') + '};';
   vm.runInContext(code, ctx, { filename: 'gas-bundle.js' });
   const call = (fn, ...args) => ctx[fn](...args);
   const json = out => JSON.parse(out.getContent());
   return { ctx, call, json, sheets, log, sent, cacheStore, props, triggers, files,
-    consts: ctx.__consts, setLock: v => { lockHeld = v; } };
+    consts: ctx.__consts, setLock: v => { lockState.held = v; }, isLocked: () => lockState.held,
+    shared: { sheets, sent, cacheStore, props, triggers, lockState } };
 }
 
 module.exports = { makeRuntime, formatDate, Sheet };

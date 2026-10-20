@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * Lost & Found — lf_gas.gs  (v2.0.0)
+ * Lost & Found — lf_gas.gs  (v2.1.1)
  * ============================================================
  * ไฟล์นี้ใช้แทนเนื้อหาไฟล์ "lf_gas.gs.gs" ในโปรเจกต์ Apps Script
  * "Lost & Found Notification" (ผูกกับ Google Sheet "แจ้งของหาย")
@@ -23,7 +23,7 @@
 // ============================================================
 // CONFIG (ค่าไม่ลับ) — ค่าลับอยู่ใน LF_PRIVATE_CONFIG (config.private.gs)
 // ============================================================
-const LF_VERSION        = '2.1.0';
+const LF_VERSION        = '2.1.1';
 const LF_TZ             = 'Asia/Bangkok';
 const SHEET_NAME        = 'LF_New';
 const OLD_SHEET_NAME    = 'Form Responses';
@@ -74,11 +74,13 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   const action = p.action || 'getData';
   try {
+    lfRecordWebAppVersion_();               // บันทึก build ของ web app (ใช้ตัดสินว่า sweeper ทำงานได้หรือยัง)
     if (action === 'getPublicData')     return getPublicData(e);
     if (action === 'getStats')          return getStats(e);
     if (action === 'getMemory')         return handleGetMemory(e);
     if (action === 'getMemoryStats')    return handleGetMemoryStats();
-    if (action === 'health')            return jsonResponse({ success: true, version: LF_VERSION, now: new Date().toISOString() });
+    // version = เลขรุ่นแอป, build = ลายนิ้วมือโค้ดที่ deploy (ไม่ใช่หมายเลข deployment ของ Apps Script)
+    if (action === 'health')            return jsonResponse({ success: true, version: LF_VERSION, build: lfBuildId_(), now: new Date().toISOString() });
     // ── API เดิม (เปิดชั่วคราวระหว่างย้ายหน้าเว็บ ปิดได้ด้วย Script Property LF_LEGACY_API=off) ──
     if (lfLegacyEnabled_()) {
       if (action === 'getData')           return getData(e);
@@ -116,6 +118,8 @@ function doPost(e) {
     if (action === 'adminGetData')         return lfWithAdmin_(payload, s => lfAdminGetData_(payload, s));
     if (action === 'adminGetMemory')       return lfWithAdmin_(payload, s => handleGetMemoryByBucket({ parameter: { bucket: payload.bucket || '', status: payload.status || 'all' } }));
     if (action === 'adminNotifyStatus')    return lfWithAdmin_(payload, s => lfNotifyStatus_());
+    if (action === 'adminResolveNotify')   return lfWithAdmin_(payload, s => lfResolveNotify_(payload, s));
+    if (action === 'adminResolveMonthly')  return lfWithAdmin_(payload, s => lfResolveMonthly_(payload, s));
     if (action === 'adminSetLegacy')       return lfWithAdmin_(payload, s => lfSetLegacy_(payload, s));
     if (action === 'updateStatus') {
       if (payload.token || !lfLegacyEnabled_()) return lfWithAdmin_(payload, s => handleUpdateStatus(payload, s));
@@ -798,7 +802,7 @@ function handleSubmit(payload) {
     SpreadsheetApp.flush();
     // ใส่คิวแจ้งเตือนทันทีหลังบันทึกแถว (ยังถือ lock) — ถ้าอัปโหลดรูปค้าง/หมดเวลา เจ้าหน้าที่ยังได้รับแจ้ง
     try {
-      lfEnqueueNotify_(refCode, lfBuildNewFormNotifyPayload_(payload, refCode, type, ''), hasFiles);
+      lfEnqueueNotify_(refCode, lfBuildNewFormNotifyPayload_(payload, refCode, type, ''), hasFiles, true);
     } catch (qErr) {
       notify = 'queue_failed';
       Logger.log('⚠️ enqueue failed (sweeper will retry): ' + qErr);
@@ -1403,11 +1407,15 @@ const LF_NOTIFY_IMG_WAIT_MS   = 10 * 60000;    // รอรูปได้นา
 const LF_NOTIFY_MARK_KEY      = 'LF_NOTIFY_ENQUEUED';   // {since, refs:{ref: ms}} — รายการที่ใส่คิวแล้ว (เก็บ 7 วัน)
 const LF_NOTIFY_MARK_KEEP_MS  = 7 * 86400000;
 const LF_SWEEP_EVERY_SEC      = 900;           // ตรวจรายการที่ตกหล่นทุก ~15 นาที (ภายใน trigger คิวเดิม)
-const LF_WEBAPP_VER_KEY       = 'lf_webapp_version';  // รุ่นโค้ดที่ deploy เป็น web app (เขียนจาก doPost)
+const LF_WEBAPP_VER_KEY       = 'lf_webapp_version';  // build ของโค้ดที่ deploy เป็น web app (เขียนจาก doGet/doPost)
+const LF_SWEEP_GATE_KEY       = 'lf_sweep_gate';      // เหตุผลล่าสุดที่ sweeper ทำงาน/หยุด (ไว้บันทึก log เมื่อเปลี่ยนเท่านั้น)
 const LF_SENDING_GRACE_MS     = 7 * 60000;     // execution หนึ่งรันได้ไม่เกิน 6 นาที — เผื่อไว้ 7
-const LF_UNCERTAIN_KEEP_MS    = 7 * 86400000;  // เก็บรายการที่ไม่แน่ใจไว้ให้ตรวจ 7 วัน
+const LF_SWEEP_SETTLE_MS      = 10 * 60000;    // หลังพบ build ใหม่ของ web app ต้องรอคำขอรุ่นเดิมที่ค้างอยู่ให้จบก่อน (สูงสุด 6 นาที)
 const LF_SWEEP_MIN_AGE_MS     = 3 * 60000;     // ไม่แตะแถวที่เพิ่งบันทึก (อาจกำลังใส่คิว)
 const LF_SWEEP_MAX_AGE_MS     = 6 * 3600000;   // ตามเก็บย้อนหลังไม่เกิน 6 ชั่วโมง
+const LF_HOLD_UNTIL_MS        = 4102444800000; // 1 ม.ค. 2100 — ใส่ใน nextAt ของช่องทางที่ "ห้ามส่งอัตโนมัติ"
+                                               // (กำลังส่ง/ไม่แน่ใจ/ปิดแล้ว) เพื่อให้โค้ดรุ่น 2.0.0 ข้ามด้วย หากต้องย้อนกลับ
+const LF_ATTENTION_MAX        = 50;            // จำนวนรายการ "ไม่แน่ใจ" สูงสุดที่เก็บรอเจ้าหน้าที่ (กันพื้นที่ Script Properties เต็ม)
 
 function lfReadMarks_(props) {
   let m = null;
@@ -1417,15 +1425,19 @@ function lfReadMarks_(props) {
 }
 
 /**
- * บันทึกว่ารายการนี้เข้าคิวแล้ว
- * อ่าน-แก้-เขียนบนค่าเดียวกัน จึงต้องถือ lock กันคำขอพร้อมกันเขียนทับกัน
- * (ถ้าจับ lock ไม่ได้ ยังเขียนต่อ — เสียเครื่องหมายดีกว่าทำให้ submit ล้ม
- *  และตัวประมวลผลคิวจะเติมเครื่องหมายให้อีกครั้งก่อนลบรายการ)
+ * บันทึกว่ารายการนี้เข้าคิวแล้ว (อ่าน-แก้-เขียนค่าเดียวกัน จึงต้องอยู่ภายใต้ script lock)
+ * lockHeld = true เมื่อผู้เรียกถือ script lock อยู่แล้ว (handleSubmit, sweeper, ตัวประมวลผลคิว)
+ *   → ห้ามขอ/ปล่อย lock ซ้ำ: ถ้า LockService ไม่ re-entrant จะรอเปล่า 5 วินาที
+ *     ถ้า re-entrant การปล่อยในนี้จะปล่อย lock ของผู้เรียกไปด้วย (เปิดช่องให้ส่งซ้อนกัน)
+ * ถ้าจับ lock ไม่ได้ ยังเขียนต่อ — เสียเครื่องหมายดีกว่าทำให้ submit ล้ม
+ * และตัวประมวลผลคิวจะเติมเครื่องหมายให้อีกครั้งก่อนลบรายการ
  */
-function lfMarkEnqueued_(props, refCode) {
-  const lock = LockService.getScriptLock();
-  let held = false;
-  try { held = lock.tryLock(5000); } catch (e) { held = false; }
+function lfMarkEnqueued_(props, refCode, lockHeld) {
+  let lock = null, held = false;
+  if (!lockHeld) {
+    lock = LockService.getScriptLock();
+    try { held = lock.tryLock(5000); } catch (e) { held = false; }
+  }
   try {
     const m = lfReadMarks_(props), now = Date.now();
     m.refs[refCode] = now;
@@ -1439,32 +1451,101 @@ function lfMarkEnqueued_(props, refCode) {
   }
 }
 
+// ── รุ่นของโค้ด: แยก "เลขรุ่นแอป" (LF_VERSION) กับ "build" (ลายนิ้วมือของโค้ดทั้งโปรเจกต์) ──
+let LF_BUILD_MEMO_ = '';
 /**
- * บันทึกรุ่นของโค้ดที่ "ถูก deploy เป็น web app" ไว้ใน Script Property
- * trigger รันโค้ด Head เสมอ ส่วน doPost รันโค้ดรุ่นที่ deploy ไว้
- * ค่าสองอันนี้จึงบอกได้ว่ากำลังอยู่ในช่วงเปลี่ยนรุ่นหรือไม่ โดยไม่ต้องอาศัยจังหวะเวลา
+ * build = LF_VERSION + '+' + SHA-256 (12 ตัวแรก) ของซอร์สทุกฟังก์ชันระดับบนสุดในโปรเจกต์
+ * โค้ดต่างกันแม้เลขรุ่นเดียวกัน → build ต่างกัน; แก้แค่ค่าใน config.private.gs (ไม่มีฟังก์ชัน) → build เดิม
+ * trigger รันโค้ด Head ส่วน doGet/doPost รันโค้ดที่ deploy — เทียบ build สองฝั่งจึงรู้ว่าอยู่ช่วงเปลี่ยนรุ่นหรือไม่
+ */
+function lfBuildId_() {
+  if (LF_BUILD_MEMO_) return LF_BUILD_MEMO_;
+  let src = '';
+  try {
+    const g = (typeof globalThis !== 'undefined') ? globalThis : this;
+    Object.keys(g).sort().forEach(function (k) {
+      let f;
+      try { f = g[k]; } catch (e) { return; }
+      if (typeof f !== 'function') return;
+      const s = Function.prototype.toString.call(f);
+      if (s.indexOf('[native code]') >= 0) return;
+      src += k + '\n' + s + '\n';
+    });
+  } catch (e) { src = ''; }
+  const h = src ? lfHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, src, Utilities.Charset.UTF_8)).slice(0, 12) : 'unknown';
+  LF_BUILD_MEMO_ = LF_VERSION + '+' + h;
+  return LF_BUILD_MEMO_;
+}
+
+/** อ่านเครื่องหมาย build ของ web app — null = ยังไม่เคยมี web app รุ่นที่บันทึกค่านี้ (เช่น 2.0.0 เดิม) */
+function lfReadWebAppMarker_(props) {
+  const raw = props.getProperty(LF_WEBAPP_VER_KEY);
+  if (!raw) return null;
+  if (raw.charAt(0) === '{') {
+    try { const m = JSON.parse(raw); if (m && m.b) return m; } catch (e) {}
+  }
+  return { v: String(raw), b: '', since: 0, at: 0 };   // รูปแบบเดิม (มีแต่เลขรุ่น) → ไม่ทราบ build
+}
+
+/**
+ * บันทึก build ของโค้ดที่กำลังตอบคำขอ web app (เรียกจาก doGet และ doPost)
+ * แคชแยกตาม build: deploy รุ่นใหม่จะบันทึกได้ทันทีในคำขอแรก ไม่ต้องรอแคชของรุ่นเดิมหมดอายุ
+ * since = เวลาที่เห็น build นี้ครั้งแรก (ใช้คำนวณช่วงรอให้คำขอรุ่นเดิมที่ค้างอยู่จบ)
  */
 function lfRecordWebAppVersion_() {
   try {
+    const build = lfBuildId_();
     const cache = CacheService.getScriptCache();
-    if (cache.get('lf_wv_ok')) return;
+    const ck = 'lf_wv_' + build.replace(/[^A-Za-z0-9]/g, '_');
+    if (cache.get(ck)) return;
     const props = PropertiesService.getScriptProperties();
-    if (props.getProperty(LF_WEBAPP_VER_KEY) !== LF_VERSION)
-      props.setProperty(LF_WEBAPP_VER_KEY, LF_VERSION);
-    cache.put('lf_wv_ok', '1', 300);
+    const m = lfReadWebAppMarker_(props), now = Date.now();
+    if (!m || m.b !== build) {
+      props.setProperty(LF_WEBAPP_VER_KEY, JSON.stringify({ v: LF_VERSION, b: build, since: now, at: now }));
+    } else if (now - (m.at || 0) > 3600000) {
+      m.at = now;
+      props.setProperty(LF_WEBAPP_VER_KEY, JSON.stringify(m));
+    }
+    cache.put(ck, '1', 300);
   } catch (e) { Logger.log('record webapp version: ' + e); }
 }
 
 /**
- * อยู่ในช่วงเปลี่ยนรุ่นหรือไม่ (โค้ด Head ≠ รุ่นที่ deploy)
- * ยังไม่เคยมีคำขอผ่าน web app (ค่าว่าง) = ไม่ทราบ → ถือว่าไม่ใช่ช่วงเปลี่ยนรุ่น
+ * sweeper (ตามเก็บแถวที่ไม่เคยเข้าคิว) ทำงานได้เมื่อยืนยันได้ว่าปลอดภัยเท่านั้น
+ *  - unknown : web app ยังไม่เคยบันทึก build (เช่น ยังเป็น 2.0.0 ที่ใส่คิวหลังอัปโหลดรูปเสร็จ
+ *              ซึ่งอาจนานหลายนาที) → หยุด เพราะอาจเข้าใจผิดว่าแถวนั้น "ตกหล่น" แล้วแจ้งซ้ำ
+ *  - skew    : build ของ web app ≠ build ของโค้ด Head (กำลังเปลี่ยนรุ่น หรือแก้โค้ดโดยไม่ deploy)
+ *  - settling: เพิ่งเปลี่ยนเป็น build เดียวกันไม่ถึง 10 นาที (คำขอรุ่นเดิมอาจยังทำงานอยู่)
  */
-function lfVersionSkew_() {
-  const v = PropertiesService.getScriptProperties().getProperty(LF_WEBAPP_VER_KEY);
-  return !!v && v !== LF_VERSION ? v : '';
+function lfSweepGate_(props) {
+  const head = lfBuildId_();
+  const m = lfReadWebAppMarker_(props);
+  if (!m) return { ok: false, reason: 'unknown', head: head, web: '',
+    text: 'ยังไม่มีคำขอจาก web app รุ่นที่บันทึก build ได้ — ยืนยันไม่ได้ว่า deploy รุ่น ' + head + ' แล้ว' };
+  if (m.b !== head) return { ok: false, reason: 'skew', head: head, web: m.b || m.v,
+    text: 'web app เป็น ' + (m.b || m.v) + ' แต่โค้ด Head เป็น ' + head };
+  const age = Date.now() - (m.since || 0);
+  if (age < LF_SWEEP_SETTLE_MS) return { ok: false, reason: 'settling', head: head, web: m.b,
+    text: 'web app เพิ่งเป็น ' + head + ' เมื่อ ' + Math.floor(age / 60000) + ' นาทีก่อน — รอคำขอรุ่นเดิมที่อาจค้างอยู่ให้จบ' };
+  return { ok: true, reason: 'ok', head: head, web: m.b, text: 'web app และโค้ด Head เป็น build เดียวกัน (' + head + ')' };
 }
 
-function lfEnqueueNotify_(refCode, notifyPayload, imagesPending) {
+/** ข้อความเมื่อยังไม่ปลอดภัยให้ sweeper ทำงาน ('' = ปลอดภัย) — คงชื่อเดิมไว้ */
+function lfVersionSkew_() {
+  const g = lfSweepGate_(PropertiesService.getScriptProperties());
+  return g.ok ? '' : g.text;
+}
+
+/** บันทึกลง LF_NotifyLog เฉพาะเมื่อสถานะของ sweeper เปลี่ยน (ไม่ให้ log ท่วมทุก 15 นาที) */
+function lfNoteSweepGate_(props, gate) {
+  try {
+    if (props.getProperty(LF_SWEEP_GATE_KEY) === gate.reason) return;
+    props.setProperty(LF_SWEEP_GATE_KEY, gate.reason);
+  } catch (e) { return; }
+  lfNotifyLog_('-', 'queue', gate.ok ? 'sweep_resumed' : 'sweep_paused', 0, gate.text);
+}
+
+function lfEnqueueNotify_(refCode, notifyPayload, imagesPending, lockHeld) {
   const props = PropertiesService.getScriptProperties();
   const item = {
     refCode: refCode, createdAt: Date.now(), payload: notifyPayload, imagesPending: !!imagesPending,
@@ -1477,7 +1558,28 @@ function lfEnqueueNotify_(refCode, notifyPayload, imagesPending) {
     s = JSON.stringify(item);
   }
   props.setProperty('lfq_' + refCode, s);
-  try { lfMarkEnqueued_(props, refCode); } catch (e) { Logger.log('mark enqueued: ' + e); }
+  try { lfMarkEnqueued_(props, refCode, !!lockHeld); } catch (e) { Logger.log('mark enqueued: ' + e); }
+}
+
+/** บันทึกรายการคิว — คืน false ถ้าเขียนไม่สำเร็จ (ผู้เรียกตัดสินใจต่อเอง) */
+function lfSaveQueueItem_(props, key, item) {
+  try { props.setProperty(key, JSON.stringify(item)); return true; }
+  catch (e) { Logger.log('⚠️ save queue item ' + key + ': ' + e); return false; }
+}
+
+/**
+ * ความล้มเหลวที่ "ไม่รู้ว่าปลายทางได้รับหรือยัง" (ไม่ส่งซ้ำอัตโนมัติ ให้เจ้าหน้าที่ตัดสิน)
+ *  - หมดเวลา/การเชื่อมต่อขาดหลังส่งคำขอไปแล้ว
+ *  - HTTP 504 (เกตเวย์หมดเวลารอ — ปลายทางอาจทำงานไปแล้ว)
+ * ส่วน DNS/ที่อยู่ผิด/ยังไม่ตั้งค่า/4xx/429/500/502/503 ถือว่าปลายทางยังไม่ได้ส่งต่อ → ลองใหม่ได้
+ * (HTTP 500 ถือว่าล้มเหลว เพราะฟังก์ชันปลายทางตอบ 500 เมื่อส่งไม่สำเร็จ — เป็นสมมติฐานที่ยังไม่ได้ตรวจกับโค้ดปลายทาง)
+ */
+function lfIsAmbiguousSendError_(err) {
+  const code = err && err.httpCode;
+  if (code) return code === 504;
+  const msg = String((err && err.message) || err || '');
+  if (/not configured|dns|address unavailable|unknown host|invalid argument|bad url|too many times/i.test(msg)) return false;
+  return /timeout|timed out|deadline|socket|reset|unexpected end|eof|broken pipe|connection (closed|aborted)/i.test(msg);
 }
 
 /** หลังอัปโหลดรูป: ใส่ URL รูปในรายการคิวแล้วปลดสถานะรอรูป */
@@ -1506,14 +1608,11 @@ function lfQueueAttachImages_(refCode, imgUrl) {
 function lfSweepMissedNotifications_(props) {
   const marks = lfReadMarks_(props);
   if (!props.getProperty(LF_NOTIFY_MARK_KEY)) { props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(marks)); return 0; }
-  // ช่วงเปลี่ยนรุ่น: trigger รันโค้ดใหม่ แต่ web app ยังเป็นรุ่นเดิม
-  // รุ่นเดิมอาจทำเครื่องหมายคนละแบบ sweeper จึงอาจเข้าใจผิดว่ายังไม่ได้แจ้งแล้วแจ้งซ้ำ → พักไว้ก่อน
-  const skew = lfVersionSkew_();
-  if (skew) {
-    lfNotifyLog_('-', 'queue', 'sweep_paused', 0,
-      'พักตามเก็บงานค้าง: web app รุ่น ' + skew + ' แต่โค้ด Head รุ่น ' + LF_VERSION);
-    return 0;
-  }
+  // ทำงานเฉพาะเมื่อยืนยันได้ว่า web app เป็น build เดียวกับโค้ด Head มาแล้วอย่างน้อย 10 นาที
+  // (ไม่เคยบันทึก/ต่าง build/เพิ่งเปลี่ยน = หยุด — ดู lfSweepGate_)
+  const gate = lfSweepGate_(props);
+  lfNoteSweepGate_(props, gate);
+  if (!gate.ok) return 0;
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sheet) return 0;
   const last = sheet.getLastRow();
@@ -1536,7 +1635,7 @@ function lfSweepMissedNotifications_(props) {
                 itemDate: lfCellDate_(r[7], tz), itemDesc: lfStr_(r[9]), itemLoc: lfStr_(r[10]) };
     const pl = lfBuildNewFormNotifyPayload_(p, ref, type, lfStr_(r[11]), ts);
     pl.recovered = true;
-    lfEnqueueNotify_(ref, pl, false);
+    lfEnqueueNotify_(ref, pl, false, true);              // ถือ lock ของตัวประมวลผลคิวอยู่แล้ว
     lfNotifyLog_(ref, 'queue', 'recovered', 0, 'แถวถูกบันทึกแต่ไม่ได้เข้าคิว — ใส่คิวย้อนหลัง');
     count++;
   });
@@ -1581,7 +1680,11 @@ function lfSendLine_(url, payload) {
     payload: JSON.stringify(payload), muteHttpExceptions: true
   });
   const code = res.getResponseCode();
-  if (code < 200 || code >= 300) throw new Error('HTTP ' + code + ' ' + String(res.getContentText()).slice(0, 120));
+  if (code < 200 || code >= 300) {
+    const err = new Error('HTTP ' + code + ' ' + String(res.getContentText()).slice(0, 120));
+    err.httpCode = code;
+    throw err;
+  }
   return code;
 }
 
@@ -1614,7 +1717,8 @@ function lfProcessNotifyQueue() {
       if (item.imagesPending && Date.now() - item.createdAt < LF_NOTIFY_IMG_WAIT_MS) return;  // รอ URL รูป
       ['line', 'email'].forEach(function (ch) {
         const st = item[ch];
-        if (st.state === 'sent' || st.state === 'gave_up' || st.state === 'uncertain') return;
+        // ส่งแล้ว / เลิกลองแล้ว / ไม่แน่ใจ (รอเจ้าหน้าที่) / เจ้าหน้าที่ปิดแล้ว → ไม่ส่งอัตโนมัติ
+        if (['sent', 'gave_up', 'uncertain', 'closed'].indexOf(st.state) >= 0) return;
         // 'sending' = เคยเริ่มส่งแล้วแต่ไม่มีการบันทึกผล — ข้อความอาจออกไปแล้วหรือไม่ก็ได้
         // ส่งซ้ำ = เสี่ยงข้อความซ้ำ จึงพักไว้ให้เจ้าหน้าที่ตรวจแทนการเดา
         if (st.state === 'sending') {
@@ -1622,60 +1726,170 @@ function lfProcessNotifyQueue() {
           if (Date.now() - since < LF_SENDING_GRACE_MS) return;   // อาจมี execution อื่นกำลังส่งอยู่
           st.state = 'uncertain';
           st.uncertainAt = Date.now();
+          st.nextAt = LF_HOLD_UNTIL_MS;
           st.lastError = 'ส่งไปแล้วหรือไม่ ยืนยันไม่ได้ (execution หยุดก่อนบันทึกผล)';
-          props.setProperty(key, JSON.stringify(item));
+          lfSaveQueueItem_(props, key, item);
           lfNotifyLog_(item.refCode, ch, 'uncertain', st.attempts, st.lastError);
           return;
         }
         if (st.nextAt > Date.now()) return;
+        const prev = { state: st.state, attempts: st.attempts, nextAt: st.nextAt };
         st.attempts++;
         st.state = 'sending';
         st.sendingAt = Date.now();
-        props.setProperty(key, JSON.stringify(item));      // บันทึกก่อนส่ง
+        st.nextAt = LF_HOLD_UNTIL_MS;                     // ถ้าต้องย้อนกลับเป็นรุ่น 2.0.0 กลางคัน รุ่นเดิมจะข้ามช่องทางนี้
+        if (!lfSaveQueueItem_(props, key, item)) {         // บันทึก "กำลังส่ง" ไม่ได้ → ไม่ส่ง (รอบหน้าค่อยลอง)
+          st.state = prev.state; st.attempts = prev.attempts; st.nextAt = prev.nextAt;
+          return;
+        }
+        // ผลลัพธ์ตัดสินจาก "การส่ง" อย่างเดียว — การเขียนสถานะ/log ที่ล้มเหลวภายหลัง
+        // ไม่ทำให้รายการที่ส่งสำเร็จแล้วถูกนับว่าล้มเหลวและส่งซ้ำ
+        let outcome;
         try {
           if (ch === 'line') lfSendLine_(cfg.lineWebhookUrl, item.payload);
           else sendLostFoundEmailNotification(item.payload, true);
-          st.state = 'sent'; st.lastError = '';
-          lfNotifyLog_(item.refCode, ch, 'sent', st.attempts, '');
+          outcome = { ok: true };
         } catch (err) {
-          st.lastError = String(err).slice(0, 200);
+          outcome = { ok: false, err: String((err && err.message) || err).slice(0, 200),
+                      ambiguous: ch === 'line' && lfIsAmbiguousSendError_(err) };
+        }
+        if (outcome.ok) {
+          st.state = 'sent'; st.lastError = ''; st.sentAt = Date.now();
+        } else if (outcome.ambiguous) {
+          st.state = 'uncertain'; st.uncertainAt = Date.now(); st.nextAt = LF_HOLD_UNTIL_MS;
+          st.lastError = 'ปลายทางตอบไม่ชัดเจน (อาจได้รับแล้ว): ' + outcome.err;
+        } else {
+          st.lastError = outcome.err;
           st.state = st.attempts >= LF_NOTIFY_MAX_ATTEMPT ? 'gave_up' : 'failed';
           st.nextAt = Date.now() + Math.min(60, Math.pow(2, st.attempts)) * 60000;
-          lfNotifyLog_(item.refCode, ch, st.state, st.attempts, st.lastError);
         }
-        props.setProperty(key, JSON.stringify(item));
+        // ถ้าบันทึกไม่สำเร็จ สถานะบนดิสก์ยังเป็น 'sending' → รอบหน้ากลายเป็น 'uncertain' (ไม่ส่งซ้ำ)
+        lfSaveQueueItem_(props, key, item);
+        lfNotifyLog_(item.refCode, ch, st.state, st.attempts, st.lastError);   // log ล้มเหลวได้โดยไม่กระทบสถานะ
       });
-      const settled = ch => ['sent', 'gave_up', 'uncertain'].indexOf(item[ch].state) >= 0;
+      const settled = ch => ['sent', 'gave_up', 'uncertain', 'closed'].indexOf(item[ch].state) >= 0;
       const hasUncertain = ['line', 'email'].some(ch => item[ch].state === 'uncertain');
       if (['line', 'email'].every(settled)) {
-        try { if (!lfReadMarks_(props).refs[item.refCode]) lfMarkEnqueued_(props, item.refCode); } catch (e) {}  // กัน sweeper ใส่คิวซ้ำ
-        // รายการที่ยังไม่แน่ใจ เก็บไว้ให้เห็นในสถานะคิว 7 วัน แล้วค่อยลบ
-        const unAt = Math.max(item.line.uncertainAt || 0, item.email.uncertainAt || 0);
-        if (!hasUncertain || Date.now() - unAt > LF_UNCERTAIN_KEEP_MS)
-          props.deleteProperty(key);
+        try { if (!lfReadMarks_(props).refs[item.refCode]) lfMarkEnqueued_(props, item.refCode, true); } catch (e) {}  // กัน sweeper ใส่คิวซ้ำ
+        // รายการที่ยังไม่แน่ใจ เก็บไว้จนกว่าเจ้าหน้าที่จะตัดสิน (ไม่มีวันหมดอายุเอง)
+        if (!hasUncertain) props.deleteProperty(key);
       }
     });
+    lfTrimAttention_(props);
   } finally {
     lock.releaseLock();
   }
 }
 
+/** มีรายการไม่แน่ใจเกิน LF_ATTENTION_MAX → ย้ายรายการเก่าสุดออกจากคิว (บันทึกใน LF_NotifyLog ให้ตามต่อได้) */
+function lfTrimAttention_(props) {
+  try {
+    const all = props.getProperties();
+    const att = [];
+    Object.keys(all).forEach(function (k) {
+      if (k.indexOf('lfq_') !== 0) return;
+      try {
+        const it = JSON.parse(all[k]);
+        if (['line', 'email'].some(ch => it[ch] && it[ch].state === 'uncertain'))
+          att.push({ k: k, it: it, at: Math.max(it.line.uncertainAt || 0, it.email.uncertainAt || 0) });
+      } catch (e) {}
+    });
+    if (att.length <= LF_ATTENTION_MAX) return;
+    att.sort((a, b) => a.at - b.at).slice(0, att.length - LF_ATTENTION_MAX).forEach(function (a) {
+      props.deleteProperty(a.k);
+      lfNotifyLog_(a.it.refCode, 'queue', 'attention_overflow', 0,
+        'รายการไม่แน่ใจเกิน ' + LF_ATTENTION_MAX + ' รายการ — นำออกจากคิว ต้องตรวจย้อนหลังจาก log นี้');
+    });
+  } catch (e) { Logger.log('trim attention: ' + e); }
+}
+
+/** แถวล่าสุดของ LF_NotifyLog ที่ควรให้เจ้าหน้าที่เห็น (ไม่สำเร็จ/ไม่แน่ใจ/การตัดสินของเจ้าหน้าที่/สถานะ sweeper) */
+function lfNotifyAttentionLog_(limit) {
+  try {
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTIFY_LOG_SHEET);
+    if (!sh) return [];
+    const last = sh.getLastRow();
+    if (last < 2) return [];
+    const n = Math.min(400, last - 1);
+    const rows = sh.getRange(last - n + 1, 1, n, 6).getValues();
+    const want = /^(gave_up|uncertain|staff_|attention_overflow|sweep_|monthly_)/;
+    return rows.filter(r => want.test(lfStr_(r[3]))).slice(-(limit || 40)).reverse()
+      .map(r => ({ at: lfStr_(r[0]), refCode: lfStr_(r[1]), channel: lfStr_(r[2]), result: lfStr_(r[3]), attempt: r[4], detail: lfStr_(r[5]) }));
+  } catch (e) { return []; }
+}
+
 function lfNotifyStatus_() {
-  const all = PropertiesService.getScriptProperties().getProperties();
+  const props = PropertiesService.getScriptProperties();
+  const all = props.getProperties();
   const queue = Object.keys(all).filter(k => k.indexOf('lfq_') === 0).map(k => {
-    try { const it = JSON.parse(all[k]); return { refCode: it.refCode, line: it.line, email: it.email, imagesPending: !!it.imagesPending, createdAt: new Date(it.createdAt).toISOString() }; }
-    catch (e) { return { key: k, error: 'unreadable' }; }
+    try {
+      const it = JSON.parse(all[k]), p = it.payload || {};
+      return { refCode: it.refCode, line: it.line, email: it.email, imagesPending: !!it.imagesPending,
+               createdAt: new Date(it.createdAt).toISOString(),
+               summary: lfClip_((p.subject || '') + ' — ' + (p.itemDescription || ''), 120),
+               decisions: it.decisions || [] };
+    } catch (e) { return { key: k, error: 'unreadable' }; }
   });
   const hasTrigger = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'lfProcessNotifyQueue');
   const uncertain = queue.filter(q => q.line && q.email &&
     (q.line.state === 'uncertain' || q.email.state === 'uncertain'));
+  const gate = lfSweepGate_(props);
+  const marker = lfReadWebAppMarker_(props);
   return jsonResponse({
     success: true, queue: queue, uncertain: uncertain,
     triggerInstalled: hasTrigger, legacyApi: lfLegacyEnabled_() ? 'on' : 'off',
-    headVersion: LF_VERSION,
-    webAppVersion: PropertiesService.getScriptProperties().getProperty(LF_WEBAPP_VER_KEY) || '(ยังไม่มีคำขอผ่าน web app)',
-    versionSkew: !!lfVersionSkew_()
+    headVersion: LF_VERSION, headBuild: gate.head,
+    webAppVersion: marker ? (marker.v || '') : '(ยังไม่มีคำขอจาก web app รุ่นที่บันทึก build)',
+    webAppBuild: marker ? (marker.b || '') : '', webAppSince: marker && marker.since ? new Date(marker.since).toISOString() : '',
+    versionSkew: !gate.ok, sweep: { ok: gate.ok, reason: gate.reason, text: gate.text },
+    monthly: (typeof lfMonthlyStatus_ === 'function') ? lfMonthlyStatus_(props) : [],
+    log: lfNotifyAttentionLog_(40)
   });
+}
+
+/**
+ * เจ้าหน้าที่ตัดสินรายการแจ้งเตือนที่ "ไม่แน่ใจ" หรือ "เลิกลองแล้ว" (ต้องล็อกอิน)
+ *  - resend       : ส่งอีกครั้งในรอบถัดไป (ยอมรับความเสี่ยงข้อความซ้ำ)
+ *  - confirm_sent : ตรวจแล้วว่าปลายทางได้รับแล้ว → ปิดเป็น "ส่งแล้ว"
+ *  - close        : ไม่ส่ง (เช่น แจ้งทางอื่นแล้ว) → ปิด
+ * ทุกการตัดสินบันทึกผู้ตัดสิน/เวลา/เหตุผล ในรายการคิวและใน LF_NotifyLog (staff_*)
+ */
+function lfResolveNotify_(payload, session) {
+  const ref = lfStr_(payload.refCode), ch = lfStr_(payload.channel), decision = lfStr_(payload.decision);
+  const note = lfClip_(payload.note, 300).trim();
+  if (!/^((LOS|FND|PKP)-\d{6}-\d{4}|GF-\d{12})$/.test(ref)) return jsonResponse({ success: false, error: 'invalid refCode' });
+  if (['line', 'email'].indexOf(ch) < 0) return jsonResponse({ success: false, error: 'invalid channel' });
+  if (['resend', 'confirm_sent', 'close'].indexOf(decision) < 0) return jsonResponse({ success: false, error: 'invalid decision' });
+  if (!note) return jsonResponse({ success: false, error: 'note required', message: 'กรุณาระบุเหตุผล/สิ่งที่ตรวจพบ' });
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return jsonResponse({ success: false, error: 'busy', message: 'ระบบกำลังประมวลผลคิว กรุณาลองใหม่' });
+  let st, item;
+  try {
+    const key = 'lfq_' + ref;
+    try { item = JSON.parse(props.getProperty(key) || 'null'); } catch (e) { item = null; }
+    if (!item || !item[ch]) return jsonResponse({ success: false, error: 'not found', code: 404, message: 'ไม่พบรายการนี้ในคิว (อาจมีผู้จัดการไปแล้ว)' });
+    st = item[ch];
+    if (['uncertain', 'gave_up', 'failed'].indexOf(st.state) < 0)
+      return jsonResponse({ success: false, error: 'state ' + st.state, code: 409, message: 'สถานะปัจจุบันคือ ' + st.state + ' — ไม่ต้องตัดสิน' });
+    item.decisions = (item.decisions || []).concat([{ at: new Date().toISOString(), by: session.u, channel: ch,
+      decision: decision, note: note, prev: st.state }]).slice(-10);
+    if (decision === 'resend') { st.state = 'pending'; st.attempts = 0; st.nextAt = 0; st.lastError = ''; }
+    else if (decision === 'confirm_sent') { st.state = 'sent'; st.nextAt = 0; st.lastError = ''; }
+    else { st.state = 'closed'; st.nextAt = LF_HOLD_UNTIL_MS; }
+    st.decidedBy = session.u; st.decidedAt = Date.now();
+    const done = ['line', 'email'].every(c => ['sent', 'gave_up', 'closed'].indexOf(item[c].state) >= 0);
+    if (done) {
+      props.deleteProperty(key);
+      try { lfMarkEnqueued_(props, ref, true); } catch (e) {}
+    } else if (!lfSaveQueueItem_(props, key, item)) {
+      return jsonResponse({ success: false, error: 'save failed' });
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  lfNotifyLog_(ref, ch, 'staff_' + decision, st.attempts, session.u + ': ' + note);
+  return jsonResponse({ success: true, refCode: ref, channel: ch, state: st.state });
 }
 
 // ── Google Form เดิม (Form Responses) ──

@@ -1,6 +1,6 @@
 /**
  * ========================================
- * Lost & Found - Monthly Report v7.1
+ * Lost & Found - Monthly Report v7.2
  * ========================================
  * - ใช้ชุดข้อมูลเดียวกับหน้าเว็บ (LF_New + Form Responses ผ่าน lfBuildRecords_)
  * - ช่วงเดือนคิดตามเวลาไทย (Asia/Bangkok) ตั้งแต่ 00:00 วันที่ 1 ถึงก่อน 00:00 ของเดือนถัดไป
@@ -16,7 +16,7 @@ const THAI_MONTHS = [
   'กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'
 ];
 const LOSTFOUND_REPORT_FOLDER_NAME = "รายงานของหาย/พบ";
-const LF_REPORT_VERSION = '7.1';
+const LF_REPORT_VERSION = '7.2';
 
 /** ปี/เดือน (1–12) ของวันที่ตามเวลาไทย */
 function lfBkkYM_(d) {
@@ -218,12 +218,68 @@ function lfGenerateReportFor_(year, month, cutoff) {
   return { success: true, pdfUrl: b.pdfFile.getUrl(), lineCode: lineCode, lineOk: !lineError, lineError: lineError, data: b.data };
 }
 
-/** อ่านสถานะรายงานรายเดือน (รองรับรูปแบบข้อความเดิม 'done …' / 'failed …' / 'running …') */
+/**
+ * อ่านสถานะรายงานรายเดือน
+ * รองรับ: JSON ล้วน (PR #4 รุ่นแรก), 'done {JSON}' (รุ่นนี้), และข้อความเดิม 'done …' / 'failed …' / 'running …'
+ */
 function lfReadReportState_(raw) {
   if (!raw) return { state: 'new' };
-  if (raw.charAt(0) === '{') { try { return JSON.parse(raw); } catch (e) { return { state: 'new' }; } }
-  if (raw.indexOf('done') === 0) return { state: 'done', legacy: raw };
-  return { state: 'new', legacy: raw };
+  let s = String(raw);
+  if (s.indexOf('done {') === 0) s = s.slice(5);
+  if (s.charAt(0) === '{') { try { return JSON.parse(s); } catch (e) { return { state: 'new' }; } }
+  if (s.indexOf('done') === 0) return { state: 'done', legacy: s };
+  // ค่าจากรุ่น 2.0.0 ที่ไม่ครบ: รุ่นเดิมส่ง LINE ก่อนแล้วจึงส่งอีเมล
+  //  'running …' = หยุดกลางคัน → ทั้งสองช่องทางอาจส่งไปแล้ว
+  //  'failed …'  = ผิดพลาดตอนสร้าง PDF/LINE/อีเมล → LINE อาจส่งไปแล้ว, อีเมลยังไม่ได้ส่ง
+  const unsure = { state: 'uncertain', attempts: 1, err: 'สถานะจากรุ่นเดิม: ' + s.slice(0, 80) };
+  if (s.indexOf('running') === 0) return { state: 'partial', legacy: s, line: Object.assign({}, unsure), email: Object.assign({}, unsure) };
+  if (s.indexOf('failed') === 0) return { state: 'partial', legacy: s, line: Object.assign({}, unsure), email: { state: 'pending', attempts: 0 } };
+  return { state: 'new', legacy: s };
+}
+
+/**
+ * เขียนสถานะรายงานรายเดือน
+ * ถ้ามีช่องทางใดที่ "ส่งแล้ว/อาจส่งแล้ว" ขึ้นต้นค่าด้วย 'done ' เพราะโค้ดรุ่น 2.0.0 ถือว่าค่าที่ขึ้นต้นด้วย done
+ * คือส่งครบแล้ว → ถ้าต้องย้อนกลับเป็นรุ่นเดิมในช่วงวันที่ 1–3 รุ่นเดิมจะไม่ส่งรายงานเดือนนั้นซ้ำ
+ * (แลกกับ: ช่องทางที่ยังค้าง จะไม่ถูกรุ่นเดิมส่งให้ — ต้องส่งเองตามคู่มือ)
+ */
+function lfSaveReportState_(props, key, st) {
+  const out = ['line', 'email'].some(ch => st[ch] && ['sent', 'sending', 'uncertain', 'closed'].indexOf(st[ch].state) >= 0);
+  props.setProperty(key, (out || st.state === 'done' ? 'done ' : '') + JSON.stringify(st));
+}
+
+/** ตัวเลขที่ใช้ทำ PDF — เก็บไว้ส่งรอบถัดไป ให้ข้อความ LINE/อีเมลตรงกับ PDF เดิมเสมอ */
+function lfReportSnapshot_(d) {
+  return { year: d.year, monthNum: d.monthNum, month_label: d.month_label, month: d.month,
+    periodStart: d.periodStart, periodEnd: d.periodEnd, isPartial: d.isPartial,
+    totalItems: d.totalItems, lostItems: d.lostItems, foundItems: d.foundItems, pickupItems: d.pickupItems,
+    returnedStatus: d.returnedStatus, fromNewForm: d.fromNewForm, fromOldForm: d.fromOldForm,
+    personTypes: d.personTypes, subjects: d.subjects };
+}
+
+/**
+ * ส่งรายงานช่องทางเดียว: บันทึก 'sending' ก่อนส่ง แล้วบันทึกผล
+ * ถ้า execution หยุดระหว่างนั้น รอบถัดไปจะพบ 'sending' และเปลี่ยนเป็น 'uncertain' (ไม่ส่งซ้ำอัตโนมัติ)
+ */
+function lfMonthlySendChannel_(st, ch, pdfFile, data, save) {
+  const c = st[ch];
+  c.attempts = (c.attempts || 0) + 1;
+  c.state = 'sending'; c.sendingAt = new Date().toISOString();
+  save();
+  try {
+    if (ch === 'line') c.code = sendLostFoundReportToLine(pdfFile, data);
+    else sendLostFoundReportEmail(pdfFile, data);
+    c.state = 'sent'; c.err = '';
+  } catch (e) {
+    c.err = String((e && e.message) || e).slice(0, 200);
+    if (ch === 'line') c.code = (e && e.httpCode) || 0;
+    c.state = (ch === 'line' && lfIsAmbiguousSendError_(e)) ? 'uncertain' : 'failed';
+    Logger.log('❌ ' + ch + ' รายงานรายเดือน: ' + c.state + ' ' + c.err);
+  }
+  c.at = new Date().toISOString();
+  try { save(); } catch (e) { Logger.log('⚠️ บันทึกสถานะรายงานไม่สำเร็จ (รอบหน้าจะเป็น uncertain): ' + e); }
+  lfNotifyLog_('MONTHLY-' + (data.year || '') + '-' + ('0' + (data.monthNum || '')).slice(-2), ch,
+    'monthly_' + c.state, c.attempts, c.err || '');
 }
 
 /** เมนู: รายงานเดือนปัจจุบันถึงตอนนี้ (ไม่บันทึกว่าออกรายงานแล้ว) */
@@ -262,51 +318,42 @@ function generateLostFoundReportPreviousMonth(fromTrigger) {
     delete st.legacy;
     st.line  = st.line  || { state: 'pending', attempts: 0 };
     st.email = st.email || { state: 'pending', attempts: 0 };
-    const save = function () { props.setProperty(key, JSON.stringify(st)); };
+    const save = function () { lfSaveReportState_(props, key, st); };
 
-    // 1) PDF: ใช้ไฟล์เดิมถ้าเคยสร้างแล้ว
-    const data = lfMonthlyStats_(pm.y, pm.m, null);
-    let pdfFile = null;
+    // 0) 'sending' ค้างจากรอบก่อน = execution หยุดกลางคัน (รอบนี้ถือ lock อยู่ จึงไม่มีใครกำลังส่ง)
+    //    ปลายทางอาจได้รับแล้ว → 'uncertain' รอเจ้าหน้าที่ตัดสิน ไม่ส่งซ้ำเอง
+    ['line', 'email'].forEach(function (ch) {
+      if (st[ch].state === 'sending') {
+        st[ch].state = 'uncertain'; st[ch].err = 'ส่งไปแล้วหรือไม่ ยืนยันไม่ได้ (รอบก่อนหยุดกลางคัน)';
+        save();
+        lfNotifyLog_('MONTHLY-' + key.slice(-7), ch, 'monthly_uncertain', st[ch].attempts || 0, st[ch].err);
+      }
+    });
+
+    // 1) PDF: ใช้ไฟล์เดิมถ้าเคยสร้างแล้ว และใช้ตัวเลขชุดเดียวกับ PDF นั้น
+    let pdfFile = null, data = null;
     if (st.pdfFileId) {
       try { pdfFile = DriveApp.getFileById(st.pdfFileId); if (pdfFile.isTrashed()) pdfFile = null; }
       catch (e) { pdfFile = null; Logger.log('⚠️ PDF เดิมเปิดไม่ได้ สร้างใหม่: ' + e); }
     }
+    if (pdfFile && st.snap) data = st.snap;
+    if (!data) data = lfMonthlyStats_(pm.y, pm.m, null);
     if (!pdfFile) {
       st.state = 'building'; save();
       pdfFile = lfBuildReportPdf_(pm.y, pm.m, null, data).pdfFile;
       st.pdfFileId = pdfFile.getId();
+      st.snap = lfReportSnapshot_(data);
     }
     st.pdfUrl = pdfFile.getUrl();
     st.total = data.totalItems;
     st.state = 'partial'; save();
 
-    // 2) LINE (ข้ามถ้าเคยส่งสำเร็จ)
-    if (st.line.state !== 'sent') {
-      st.line.attempts = (st.line.attempts || 0) + 1;
-      try {
-        st.line.code = sendLostFoundReportToLine(pdfFile, data);
-        st.line.state = 'sent'; st.line.err = '';
-      } catch (e) {
-        st.line.code = e.httpCode || 0; st.line.state = 'failed'; st.line.err = String(e.message || e).slice(0, 200);
-        Logger.log('❌ LINE รายงานรายเดือนล้มเหลว: ' + e);
-      }
-      st.line.at = new Date().toISOString(); save();
-    }
+    // 2) ส่งเฉพาะช่องทางที่ยังไม่สำเร็จและไม่อยู่ระหว่างรอเจ้าหน้าที่ตัดสิน
+    ['line', 'email'].forEach(function (ch) {
+      if (['pending', 'failed'].indexOf(st[ch].state) >= 0) lfMonthlySendChannel_(st, ch, pdfFile, data, save);
+    });
 
-    // 3) Email (ข้ามถ้าเคยส่งสำเร็จ)
-    if (st.email.state !== 'sent') {
-      st.email.attempts = (st.email.attempts || 0) + 1;
-      try {
-        sendLostFoundReportEmail(pdfFile, data);
-        st.email.state = 'sent'; st.email.err = '';
-      } catch (e) {
-        st.email.state = 'failed'; st.email.err = String(e.message || e).slice(0, 200);
-        Logger.log('❌ Email รายงานรายเดือนล้มเหลว: ' + e);
-      }
-      st.email.at = new Date().toISOString(); save();
-    }
-
-    const ok = st.line.state === 'sent' && st.email.state === 'sent';
+    const ok = ['line', 'email'].every(ch => st[ch].state === 'sent' || st[ch].state === 'closed');
     st.state = ok ? 'done' : 'partial'; save();
     Logger.log((ok ? '🎉 ส่งรายงานครบ ' : '⚠️ ส่งรายงานไม่ครบ ') + key + ' LINE=' + st.line.state + ' Email=' + st.email.state);
     ui((ok ? '✅ ส่งรายงาน ' : '⚠️ ส่งรายงานไม่ครบ ') + data.month_label + '\nLINE: ' + st.line.state + (st.line.err ? ' (' + st.line.err + ')' : '') +
@@ -317,10 +364,67 @@ function generateLostFoundReportPreviousMonth(fromTrigger) {
       const st2 = lfReadReportState_(props.getProperty(key));
       st2.state = st2.state === 'done' ? 'done' : 'partial';
       st2.error = new Date().toISOString() + ' ' + String(error).slice(0, 200);
-      props.setProperty(key, JSON.stringify(st2));
+      lfSaveReportState_(props, key, st2);
     } catch (e2) {}
     Logger.log('❌ รายงานล้มเหลว: ' + error);
     return { success: false, error: String(error) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** สถานะรายงานรายเดือน 3 เดือนล่าสุด (สำหรับหน้าตรวจของผู้ดูแล) */
+function lfMonthlyStatus_(props) {
+  const out = [];
+  let d = new Date();
+  for (let i = 0; i < 3; i++) {
+    const pm = lfPrevMonth_(d);
+    const key = 'LF_MONTHLY_REPORT_' + pm.y + '-' + ('0' + pm.m).slice(-2);
+    const raw = props.getProperty(key);
+    const st = lfReadReportState_(raw);
+    out.push({ month: key.slice(-7), state: raw ? st.state : 'none', legacy: st.legacy || '',
+      line: st.line || null, email: st.email || null, total: st.total, pdfUrl: st.pdfUrl || '', error: st.error || '' });
+    d = lfBkkDate_(pm.y, pm.m, 15, 12, 0, 0);
+  }
+  return out;
+}
+
+/**
+ * เจ้าหน้าที่ตัดสินช่องทางรายงานรายเดือนที่ไม่สำเร็จ/ไม่แน่ใจ (ต้องล็อกอิน)
+ *  resend = ส่งทันทีด้วย PDF และตัวเลขเดิม | confirm_sent = ตรวจแล้วว่าได้รับ | close = ไม่ส่ง
+ */
+function lfResolveMonthly_(payload, session) {
+  const month = lfStr_(payload.month), ch = lfStr_(payload.channel), decision = lfStr_(payload.decision);
+  const note = lfClip_(payload.note, 300).trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) return jsonResponse({ success: false, error: 'invalid month' });
+  if (['line', 'email'].indexOf(ch) < 0) return jsonResponse({ success: false, error: 'invalid channel' });
+  if (['resend', 'confirm_sent', 'close'].indexOf(decision) < 0) return jsonResponse({ success: false, error: 'invalid decision' });
+  if (!note) return jsonResponse({ success: false, error: 'note required', message: 'กรุณาระบุเหตุผล/สิ่งที่ตรวจพบ' });
+  const key = 'LF_MONTHLY_REPORT_' + month;
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return jsonResponse({ success: false, error: 'busy' });
+  try {
+    const st = lfReadReportState_(props.getProperty(key));
+    const c = st[ch];
+    if (!c || ['uncertain', 'failed', 'pending'].indexOf(c.state) < 0)
+      return jsonResponse({ success: false, error: 'state ' + (c ? c.state : st.state), code: 409, message: 'ช่องทางนี้ไม่อยู่ในสถานะที่ต้องตัดสิน' });
+    const save = function () { lfSaveReportState_(props, key, st); };
+    st.decisions = (st.decisions || []).concat([{ at: new Date().toISOString(), by: session.u, channel: ch, decision: decision, note: note, prev: c.state }]).slice(-10);
+    if (decision === 'resend') {
+      let pdfFile = null;
+      try { pdfFile = st.pdfFileId ? DriveApp.getFileById(st.pdfFileId) : null; if (pdfFile && pdfFile.isTrashed()) pdfFile = null; } catch (e) { pdfFile = null; }
+      if (!pdfFile || !st.snap) return jsonResponse({ success: false, error: 'pdf missing', message: 'ไม่พบ PDF/ตัวเลขเดิม — ให้รัน "รายงานเดือนก่อน" จากเมนูแทน' });
+      lfMonthlySendChannel_(st, ch, pdfFile, st.snap, save);
+    } else {
+      c.state = decision === 'confirm_sent' ? 'sent' : 'closed';
+      c.at = new Date().toISOString();
+    }
+    c.decidedBy = session.u;
+    if (['line', 'email'].every(x => st[x] && (st[x].state === 'sent' || st[x].state === 'closed'))) st.state = 'done';
+    save();
+    lfNotifyLog_('MONTHLY-' + month, ch, 'staff_' + decision, c.attempts || 0, session.u + ': ' + note + ' → ' + c.state);
+    return jsonResponse({ success: true, month: month, channel: ch, state: c.state, report: st.state });
   } finally {
     lock.releaseLock();
   }
