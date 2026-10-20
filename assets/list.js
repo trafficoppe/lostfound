@@ -348,10 +348,16 @@ async function loadNotifyBadge() {
   } catch (e) { /* ไม่ขวางการใช้งานหน้ารายการ */ }
 }
 
-window.onload = async () => {
-  if (!(await checkAuth())) return;
+// เริ่มทันที (ไม่รอ window.onload) และตรวจสิทธิ์พร้อมกับโหลดข้อมูล — adminGetData ตรวจ token เองอยู่แล้ว
+// ถ้า token หมดอายุ ทั้งสองทางจะพาไปหน้าล็อกอิน (ลดการรอเซิร์ฟเวอร์ 1 รอบ)
+async function lfListInit() {
+  if (lfListInit.done) return;
+  lfListInit.done = true;
   if (selectedYear !== 2026) setYear('all');
-  await loadData(false);
+  const [ok] = await Promise.all([checkAuth(), loadData(false)]);
+  if (!ok) return;
   startAutoRefresh();
   loadNotifyBadge();
-};
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lfListInit);
+else lfListInit();

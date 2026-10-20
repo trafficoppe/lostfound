@@ -309,7 +309,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.card[data-idx]')) openModal(Number(e.target.dataset.idx));
 });
 
-window.onload = () => {
+// เริ่มโหลดข้อมูลทันทีที่สคริปต์ทำงาน (สคริปต์อยู่ท้าย body — องค์ประกอบในหน้าพร้อมแล้ว)
+// ไม่รอ window.onload ซึ่งรอฟอนต์/รูปภาพโหลดครบก่อน (วัดจริง: API เริ่มช้าไป ~2.5 วินาที)
+function lfStart() {
+  if (lfStart.done) return;
+  lfStart.done = true;
   loadAll(false);
   setInterval(() => loadAll(false), 5 * 60 * 1000);
-};
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lfStart);
+else lfStart();
