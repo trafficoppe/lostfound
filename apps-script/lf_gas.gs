@@ -1862,7 +1862,7 @@ function lfNotifyStatus_() {
 function lfResolveNotify_(payload, session) {
   const ref = lfStr_(payload.refCode), ch = lfStr_(payload.channel), decision = lfStr_(payload.decision);
   const note = lfClip_(payload.note, 300).trim();
-  if (!/^((LOS|FND|PKP)-\d{6}-\d{4}|GF-\d{12})$/.test(ref)) return jsonResponse({ success: false, error: 'invalid refCode' });
+  if (!/^((LOS|FND|PKP)-\d{6}-\d{4}|GF-\d{12}|TEST-\d{6,16})$/.test(ref)) return jsonResponse({ success: false, error: 'invalid refCode' });
   if (['line', 'email'].indexOf(ch) < 0) return jsonResponse({ success: false, error: 'invalid channel' });
   if (['resend', 'confirm_sent', 'close'].indexOf(decision) < 0) return jsonResponse({ success: false, error: 'invalid decision' });
   if (!note) return jsonResponse({ success: false, error: 'note required', message: 'กรุณาระบุเหตุผล/สิ่งที่ตรวจพบ' });
@@ -2049,9 +2049,11 @@ function testLostFoundEmailOnly() {
 }
 
 function testNewFormNotification() {
-  const p = { type: 'พบสิ่งของ', name: 'Mr. Test New Form', personType: 'นักศึกษา มหาวิทยาลัยมหิดล Student Of Mahidol University',
-    department: 'คณะวิทยาศาสตร์', phone: '0000000000', itemDate: Utilities.formatDate(new Date(), LF_TZ, 'yyyy-MM-dd'),
-    itemTime: '10:30', itemDesc: 'ทดสอบฟอร์มใหม่', itemLoc: 'ลานจอดรถ P1' };
+  // ทดสอบเส้นทางจริง (คิว → LINE + อีเมลตาม config) โดยไม่เพิ่มแถวในชีท — ส่งถึงกลุ่ม/ผู้รับจริง ใช้เมื่อได้รับอนุมัติเท่านั้น
+  const p = { type: 'พบสิ่งของ', name: 'ทดสอบระบบ (ไม่ใช่ผู้แจ้งจริง)', personType: 'บุคลากรมหาวิทยาลัยมหิดล Staff Of Mahidol University',
+    department: 'งานจราจรและความปลอดภัย (ทดสอบ)', phone: '-', itemDate: Utilities.formatDate(new Date(), LF_TZ, 'yyyy-MM-dd'),
+    itemTime: Utilities.formatDate(new Date(), LF_TZ, 'HH:mm'),
+    itemDesc: '[ทดสอบระบบหลังปรับปรุง v' + LF_VERSION + '] ไม่ต้องดำเนินการ', itemLoc: 'ทดสอบ' };
   lfEnqueueNotify_('TEST-' + Date.now(), lfBuildNewFormNotifyPayload_(p, 'TEST', p.type, ''));
   lfProcessNotifyQueue();
   try { SpreadsheetApp.getUi().alert('✅ ส่งผ่านคิวแล้ว ดูผลในแท็บ ' + NOTIFY_LOG_SHEET); } catch(e) {}
