@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>ตรวจการแจ้งเตือน | Lost & Found มหาวิทยาลัยมหิดล</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1a3a5c;--bg:#f4f6f9;--card:#fff;--line:#dde3ea;--muted:#5d6b7a;--warn:#7d4a00;--warn-bg:#fff2cc;--ok:#1e7e44;--bad:#c0392b;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);font-family:'Sarabun',sans-serif;color:#1f2d3a;font-size:14.5px;}
+.top-bar{background:var(--primary);color:#fff;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 16px;}
+.top-bar h1{font-size:18px;margin:0;}
+.top-bar a,.top-bar button{color:#fff;background:rgba(255,255,255,.14);border:0;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;text-decoration:none;cursor:pointer;}
+.content{max-width:1100px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+.card h2{font-size:16px;margin:0 0 10px;}
+.muted{color:var(--muted);font-size:13px;}
+.kv{display:grid;grid-template-columns:minmax(140px,220px) 1fr;gap:6px 12px;font-size:13.5px;}
+.kv div:nth-child(odd){color:var(--muted);}
+.pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#eef1f5;}
+.pill.sent,.pill.ok,.pill.done{background:#e3f4e9;color:var(--ok);}
+.pill.uncertain,.pill.partial,.pill.settling,.pill.unknown,.pill.skew{background:var(--warn-bg);color:var(--warn);}
+.pill.failed,.pill.gave_up{background:#fde8e6;color:var(--bad);}
+.item{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;}
+.item .head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between;}
+.ch{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
+.decide{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;}
+.decide select,.decide input{font:inherit;font-size:13.5px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;}
+.decide input{flex:1 1 260px;min-width:0;}
+.decide button{font:inherit;font-size:13.5px;padding:6px 14px;border:0;border-radius:8px;background:var(--primary);color:#fff;cursor:pointer;}
+.decide button:disabled{opacity:.5;cursor:default;}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+th{color:var(--muted);font-weight:600;}
+.scroll{overflow-x:auto;}
+.empty{color:var(--muted);padding:6px 0;}
+.lf-status{font-size:13px;padding:8px 14px;border-radius:10px;margin:0 0 14px;}
+.lf-status[hidden]{display:none;}
+.lf-status-loading{background:#eef3fa;color:#2d5f8f;}
+.lf-status-ok{background:#f3f7f4;color:#4a6b55;}
+.lf-status-error{background:#fff2cc;color:#7d4a00;border:1px solid #f0c36d;font-weight:600;}
+</style>
+</head>
+<body style="visibility:hidden">
+<div class="top-bar">
+  <h1>🔔 ตรวจการแจ้งเตือนและรายงานรายเดือน</h1>
+  <div>
+    <a href="lostfound_list.html">📋 รายการทั้งหมด</a>
+    <a href="dashboard.html">📊 Dashboard</a>
+    <span id="admin-user" style="font-size:12px;opacity:.85;margin:0 6px;"></span>
+    <button type="button" id="btn-logout">ออกจากระบบ</button>
+  </div>
+</div>
+<div class="content">
+  <div class="lf-status" id="st" role="status" aria-live="polite" hidden></div>
+
+  <div class="card">
+    <h2>แจ้งเตือนที่ต้องตรวจ (ไม่แน่ใจว่าปลายทางได้รับหรือยัง)</h2>
+    <p class="muted">ระบบจะไม่ส่งรายการเหล่านี้ซ้ำเอง เพื่อกันข้อความซ้ำ — ตรวจกลุ่ม LINE / กล่องอีเมลก่อน แล้วเลือกการตัดสินพร้อมเหตุผล ทุกการตัดสินบันทึกชื่อผู้ใช้และเวลา</p>
+    <div id="uncertain"></div>
+  </div>
+
+  <div class="card">
+    <h2>รายงานรายเดือน</h2>
+    <p class="muted">ใช้ PDF และตัวเลขชุดเดิมเมื่อส่งใหม่ · "ส่งใหม่" จะส่งทันทีเฉพาะช่องทางที่เลือก</p>
+    <div id="monthly"></div>
+  </div>
+
+  <div class="card">
+    <h2>สถานะระบบ</h2>
+    <div class="kv" id="sys"></div>
+  </div>
+
+  <div class="card">
+    <h2>คิวที่ยังรอส่ง/รอลองใหม่</h2>
+    <div class="scroll" id="queue"></div>
+  </div>
+
+  <div class="card">
+    <h2>บันทึกล่าสุดที่ควรรู้</h2>
+    <p class="muted">ส่งไม่สำเร็จจนเลิกลอง, ไม่แน่ใจ, การตัดสินของเจ้าหน้าที่, สถานะตัวตามเก็บงานค้าง และรายงานรายเดือน (ล่าสุดอยู่บน)</p>
+    <div class="scroll" id="log"></div>
+  </div>
+</div>
+<script src="assets/lf-data.js"></script>
+<script src="assets/notify-admin.js"></script>
+</body>
+</html>

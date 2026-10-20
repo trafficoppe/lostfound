@@ -337,9 +337,21 @@ document.addEventListener('click', e => {
   if (pb && !pb.disabled) goPage(Number(pb.dataset.page));
 });
 
+/** จำนวนเรื่องที่ต้องตรวจ (แจ้งเตือนไม่แน่ใจ + รายงานรายเดือนที่ไม่แน่ใจ/ล้มเหลว) — แสดงเป็นตัวเลขบนปุ่ม */
+async function loadNotifyBadge() {
+  try {
+    const r = await LF.adminCall('adminNotifyStatus', {}, 30000);
+    const monthly = (r.monthly || []).reduce((n, m) => n + ['line', 'email'].filter(c => m[c] && ['uncertain', 'failed'].indexOf(m[c].state) >= 0).length, 0);
+    const n = (r.uncertain || []).length + monthly;
+    const b = $('notify-badge');
+    if (b) { b.textContent = n; b.style.display = n ? 'inline-block' : 'none'; }
+  } catch (e) { /* ไม่ขวางการใช้งานหน้ารายการ */ }
+}
+
 window.onload = async () => {
   if (!(await checkAuth())) return;
   if (selectedYear !== 2026) setYear('all');
   await loadData(false);
   startAutoRefresh();
+  loadNotifyBadge();
 };
