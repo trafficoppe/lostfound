@@ -98,6 +98,7 @@ function doGet(e) {
 function doPost(e) {
   let payload = {};
   try {
+    lfRecordWebAppVersion_();
     try {
       payload = JSON.parse((e && e.postData && e.postData.contents) || '{}') || {};
     } catch (err) {
@@ -241,25 +242,127 @@ function lfDriveIds_(raw) {
   return out;
 }
 
-/** ย่อชื่อบุคคลที่ตามหลังคำนำหน้า เช่น "นายสมชาย ใจดี" → "นายส*** ใ***" (ยังพอให้เจ้าของจำได้) */
-function lfMaskNames_(s) {
-  const mask = function (w) { return w ? w.charAt(0) + '***' : ''; };
-  return s
-    // คำนำหน้าไทย (อาจติดชื่อหรือเว้นวรรค)
-    .replace(/(^|[\s(:\[])(นางสาว|นาง|นาย|น\.ส\.|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง)(\s?)([ก-๙A-Za-z]+)(?:\s+([ก-๙A-Za-z]+))?/g,
-      function (m, pre, title, sp, first, last) { return pre + title + sp + mask(first) + (last ? ' ' + mask(last) : ''); })
-    // คำนำหน้าอังกฤษ (ต้องตามด้วย . หรือเว้นวรรค เพื่อไม่ชนคำอย่าง Missing)
-    .replace(/(^|[\s(:\[])(Mrs|Mr|Ms|Miss)(\.\s?|\s)([A-Za-z]+)(?:\s+([A-Za-z]+))?/g,
-      function (m, pre, title, sp, first, last) { return pre + title + sp + mask(first) + (last ? ' ' + mask(last) : ''); });
+/* ────────────────────────────────────────────────────────────────────────
+ * การปิดบังชื่อบุคคลในข้อความสาธารณะ — ทำสองชั้น
+ *
+ *   ชั้นที่ 1  lfRedactKnownName_  ปิดบัง "ชื่อที่อยู่ในระเบียนนั้นเอง" แบบตรงตัว
+ *              ไม่ต้องเดาจากคำนำหน้า จึงจับได้แม้ผู้แจ้งพิมพ์ชื่อติดกับข้อความอื่น
+ *   ชั้นที่ 2  lfMaskNames_        ปิดบังชื่อ "บุคคลที่สาม" ที่ตามหลังคำนำหน้า
+ *              (เช่น ชื่อบนบัตรที่เก็บได้) โดยมีบัญชียกเว้นคำประสม
+ *
+ * ขอบเขตที่วิธีนี้ยังตรวจไม่ได้ — ดู README หัวข้อ "ขอบเขตการปิดบังข้อมูล"
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * คำประสมที่ขึ้นต้นเหมือนคำนำหน้าชื่อ แต่ไม่ใช่ชื่อคน
+ * กติกา: ตรงทั้งคำ → ยกเว้นเสมอ | เป็นคำขึ้นต้นและยาว ≥ 3 ตัว → ยกเว้น
+ * (คำสั้นอย่าง "พล" "วง" จึงยกเว้นเฉพาะเมื่อตรงทั้งคำ ไม่ไปชน "พลอย" "วงศกร")
+ */
+const LF_TITLE_EXCEPT = {
+  'นาย': ['ก', 'กฯ', 'กรัฐมนตรี', 'กสภา', 'กสมาคม', 'กเทศมนตรี', 'กสโมสร', 'กองค์การ',
+    'กอบต', 'กอบจ', 'จ้าง', 'หน้า', 'ทุน', 'ทะเบียน', 'ช่าง', 'อำเภอ', 'ตรวจ', 'ประกัน',
+    'สถานี', 'สนาม', 'ท่า', 'เรือ', 'สิบ', 'ร้อย', 'พล', 'พลตรี', 'พลโท', 'พลเอก',
+    'ด่าน', 'วง', 'ห้าง', 'งาน', 'เวร', 'ภาษา', 'ขมัง', 'ทวาร', 'แบบ'],
+  'นาง': ['เลิ้ง', 'รอง', 'พญา', 'ฟ้า', 'แบบ', 'งาม', 'เอก', 'สนม', 'กวัก', 'ใน', 'รำ',
+    'ผี', 'ไม้', 'บำเรอ', 'สงเคราะห์', 'เงือก', 'มาร', 'ยักษ์', 'ครวญ', 'ละคร', 'กำนัล',
+    'ทาส', 'พยาบาล', 'เลี้ยง'],
+  'นางสาว': ['ไทย']
+};
+
+/** คำที่ไม่ควรถูกนับเป็น "นามสกุล" เมื่ออยู่ถัดจากชื่อ (กันไม่ให้กินคำถัดไปของประโยค) */
+const LF_NOT_SURNAME = ['โทร', 'แจ้ง', 'มา', 'ได้', 'ว่า', 'ที่', 'และ', 'หรือ', 'ของ',
+  'ให้', 'ไป', 'มี', 'เป็น', 'คือ', 'ไม่', 'จาก', 'ถึง', 'ใน', 'บน', 'ล่าง', 'ชั้น',
+  'ห้อง', 'อาคาร', 'ตึก', 'ถนน', 'ประตู', 'รถ', 'เวลา', 'วันที่', 'เบอร์', 'โทรศัพท์',
+  'ครับ', 'ค่ะ', 'คะ', 'นะ', 'ด้วย', 'แล้ว', 'ยัง', 'ต้อง', 'จะ', 'ก็', 'แต่', 'เพราะ',
+  'ซึ่ง', 'โดย', 'ตาม', 'พบ', 'หาย', 'เก็บ', 'คืน', 'รับ', 'ส่ง', 'นำ', 'ติดต่อ', 'ขอ',
+  'ช่วย', 'ฝาก', 'ไว้', 'อยู่', 'กับ', 'แก่', 'ต่อ', 'ผู้', 'คน', 'นักศึกษา', 'บุคลากร',
+  'อาจารย์', 'เจ้าหน้าที่', 'คณะ', 'สี', 'ยี่ห้อ', 'รุ่น', 'จำนวน', 'บาท', 'ใบ', 'อัน',
+  'ชิ้น', 'คัน', 'เครื่อง', 'สูญหาย', 'สิ่งของ'];
+
+/** คำที่พบว่าถูกกรอกในช่องชื่อ แต่ไม่ใช่ชื่อคน — ไม่นำไปปิดบังในข้อความ */
+const LF_NAME_FIELD_NOISE = ['สถานี', 'รถบัส', 'สถานีรถบัส', 'นานาชาติ', 'ส่วนกลาง',
+  'เจ้าหน้าที่', 'นักศึกษา', 'ต่างชาติ', 'บุคลากร', 'อาจารย์', 'ผู้ปกครอง', 'ไม่ระบุ',
+  'ไม่ทราบ', 'แจ้งข้อมูล', 'อาคาร', 'หอพัก', 'ตลาด', 'โรงอาหาร', 'ห้องสมุด', 'คณะ',
+  'ภาควิชา', 'สำนักงาน', 'มหาวิทยาลัย', 'มหิดล', 'ศาลายา', 'รปภ.', 'รปภ'];
+
+// ขอบซ้าย: ต้นข้อความ ช่องว่าง วงเล็บ เครื่องหมายวรรคตอน หรือจุด (รองรับ "ปชช.นายสมชาย")
+// ตั้งใจไม่รวมอักษรไทย เพื่อไม่ให้คำอย่าง "ทำนาย" ถูกตีความว่าเป็นคำนำหน้า
+const LF_TITLE_RE_TH = /(^|[\s(:\[\]{},.\/\-"'|ฯ])(นางสาว|เด็กชาย|เด็กหญิง|น\.ส\.|ด\.ช\.|ด\.ญ\.|นาย|นาง)(\s?)([ก-๙A-Za-z]+)(?:(\s+)([ก-๙A-Za-z]+))?/g;
+const LF_TITLE_RE_EN = /(^|[\s(:\[\]{},.\/\-"'|])(Mrs|Mr|Ms|Miss)(\.\s?|\s)([A-Za-z]+)(?:(\s+)([A-Za-z]+))?/g;
+
+/** คำที่ตามคำนำหน้าเป็นคำประสมที่ไม่ใช่ชื่อหรือไม่ */
+function lfIsTitleException_(title, word) {
+  const list = LF_TITLE_EXCEPT[title];
+  if (!list) return false;
+  for (let i = 0; i < list.length; i++) {
+    const stem = list[i];
+    if (word === stem) return true;
+    if (stem.length >= 3 && word.indexOf(stem) === 0) return true;
+  }
+  return false;
 }
 
-/** ปิดบังเบอร์โทร/อีเมล/เลขบัตร/ชื่อบุคคล ในข้อความที่จะแสดงสาธารณะ */
-function lfMaskPII_(s) {
-  return lfMaskNames_(lfStr_(s)
+/**
+ * คำถัดจากชื่อเป็น "นามสกุล" หรือเป็นคำต่อของประโยค
+ * ภาษาไทยไม่เว้นวรรคระหว่างคำ คำต่อประโยคจึงมักมาเป็นก้อน เช่น "คืนแล้ว" "โทรมาแจ้ง"
+ * จึงตัดทิ้งทั้งแบบตรงทั้งคำ และแบบขึ้นต้นด้วยคำทั่วไปที่ยาว ≥ 3 ตัว
+ */
+function lfLooksLikeSurname_(w) {
+  if (!w || /^\d+$/.test(w) || w.length > 25) return false;
+  for (let i = 0; i < LF_NOT_SURNAME.length; i++) {
+    const sw = LF_NOT_SURNAME[i];
+    if (w === sw) return false;
+    if (sw.length >= 3 && w.indexOf(sw) === 0) return false;
+  }
+  return true;
+}
+
+/** ย่อชื่อบุคคลที่ตามหลังคำนำหน้า เช่น "นายสมชาย ใจดี" → "นายส*** ใ***" (ยังพอให้เจ้าของจำได้) */
+function lfMaskNames_(s) {
+  const mask = w => (w ? w.charAt(0) + '***' : '');
+  const apply = (m, pre, title, sp, first, spL, last) => {
+    if (lfIsTitleException_(title, first)) return m;        // คำประสม ไม่ใช่ชื่อ → คงไว้
+    let out = pre + title + sp + mask(first);
+    if (last) out += spL + (lfLooksLikeSurname_(last) ? mask(last) : last);
+    return out;
+  };
+  return String(s == null ? '' : s).replace(LF_TITLE_RE_TH, apply).replace(LF_TITLE_RE_EN, apply)
+    .replace(/\*{4,}/g, '***');                              // กันเครื่องหมายซ้อนกันเมื่อปิดบังสองชั้น
+}
+
+/**
+ * ปิดบังชื่อที่อยู่ในระเบียนนั้นเอง โดยไม่ต้องอาศัยคำนำหน้า
+ * ใช้เกณฑ์ ≥ 4 ตัวอักษร และข้ามคำที่ไม่ใช่ชื่อคน เพื่อไม่ให้ไปปิดบังคำทั่วไป
+ */
+function lfRedactKnownName_(text, fullName) {
+  let t = String(text == null ? '' : text);
+  let n = String(fullName == null ? '' : fullName).trim();
+  if (!t || !n) return t;
+  n = n.replace(/^(นางสาว|นาย|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง|คุณ|Mrs\.?|Mr\.?|Ms\.?|Miss)\s*/i, '');
+  const parts = n.split(/[\s,]+/);
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.length < 4) continue;                                   // สั้นเกินไป เสี่ยงชนคำทั่วไป
+    if (LF_NAME_FIELD_NOISE.indexOf(p) >= 0) continue;            // ไม่ใช่ชื่อคน
+    if (t.indexOf(p) >= 0) t = t.split(p).join(p.charAt(0) + '***');
+  }
+  return t;
+}
+
+/**
+ * ปิดบังเบอร์โทร/อีเมล/เลขบัตร/ชื่อบุคคล ในข้อความที่จะแสดงสาธารณะ
+ * @param {string} s        ข้อความ
+ * @param {string} [known]  ชื่อเจ้าของระเบียน (ถ้ามี) เพื่อปิดบังแบบตรงตัวด้วย
+ */
+function lfMaskPII_(s, known) {
+  const base = lfStr_(s)
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[ซ่อนอีเมล]')
     .replace(/(^|\D)\d(?:[\s-]?\d){12}(?!\d)/g, '$1[ซ่อนเลขบัตร]')
     .replace(/(?:\+?66|0)(?:[\s-]?\d){8,9}(?!\d)/g, '[ซ่อนเบอร์]')
-    .replace(/(^|\D)\d(?:[\s-]?\d){8,}(?!\d)/g, '$1[ซ่อนตัวเลข]'));
+    .replace(/(^|\D)\d(?:[\s-]?\d){8,}(?!\d)/g, '$1[ซ่อนตัวเลข]');
+  // ลำดับสำคัญ: ปิดบังตามคำนำหน้าก่อน แล้วค่อยกวาดชื่อในระเบียนที่ยังเหลือ
+  // (ถ้าสลับลำดับ ชื่อที่ถูกย่อแล้วจะถูกย่อซ้ำกลายเป็น "อ******")
+  return lfRedactKnownName_(lfMaskNames_(base), known);
 }
 
 /** ชื่อย่อประเภทบุคคล (ส่วนแรกก่อนช่องว่าง) */
@@ -371,15 +474,15 @@ function lfPublicRecord_(r) {
     source: r.source,
     refCode: r.refCode,
     type: r.type,
-    title: r.titleFromName ? label + ' ไม่ระบุรายละเอียด' : lfMaskPII_(r.title),
-    location: lfMaskPII_(r.location),
+    title: r.titleFromName ? label + ' ไม่ระบุรายละเอียด' : lfMaskPII_(r.title, r.name),
+    location: lfMaskPII_(r.location, r.name),
     reportedAt: r.reportedAt,
     itemDate: r.itemDate,
     itemTime: r.itemTime,
     // รูปของเคส "รับของคืน" มักเป็นบัตรประจำตัว จึงไม่เผยแพร่
     images: r.type === 'รับของคืน' ? [] : r.images.slice(0, 3),
     status: r.status,
-    actionText: lfMaskPII_(r.actionText)
+    actionText: lfMaskPII_(r.actionText, r.name)
   };
 }
 
@@ -1300,6 +1403,9 @@ const LF_NOTIFY_IMG_WAIT_MS   = 10 * 60000;    // รอรูปได้นา
 const LF_NOTIFY_MARK_KEY      = 'LF_NOTIFY_ENQUEUED';   // {since, refs:{ref: ms}} — รายการที่ใส่คิวแล้ว (เก็บ 7 วัน)
 const LF_NOTIFY_MARK_KEEP_MS  = 7 * 86400000;
 const LF_SWEEP_EVERY_SEC      = 900;           // ตรวจรายการที่ตกหล่นทุก ~15 นาที (ภายใน trigger คิวเดิม)
+const LF_WEBAPP_VER_KEY       = 'lf_webapp_version';  // รุ่นโค้ดที่ deploy เป็น web app (เขียนจาก doPost)
+const LF_SENDING_GRACE_MS     = 7 * 60000;     // execution หนึ่งรันได้ไม่เกิน 6 นาที — เผื่อไว้ 7
+const LF_UNCERTAIN_KEEP_MS    = 7 * 86400000;  // เก็บรายการที่ไม่แน่ใจไว้ให้ตรวจ 7 วัน
 const LF_SWEEP_MIN_AGE_MS     = 3 * 60000;     // ไม่แตะแถวที่เพิ่งบันทึก (อาจกำลังใส่คิว)
 const LF_SWEEP_MAX_AGE_MS     = 6 * 3600000;   // ตามเก็บย้อนหลังไม่เกิน 6 ชั่วโมง
 
@@ -1310,14 +1416,52 @@ function lfReadMarks_(props) {
   return m;
 }
 
+/**
+ * บันทึกว่ารายการนี้เข้าคิวแล้ว
+ * อ่าน-แก้-เขียนบนค่าเดียวกัน จึงต้องถือ lock กันคำขอพร้อมกันเขียนทับกัน
+ * (ถ้าจับ lock ไม่ได้ ยังเขียนต่อ — เสียเครื่องหมายดีกว่าทำให้ submit ล้ม
+ *  และตัวประมวลผลคิวจะเติมเครื่องหมายให้อีกครั้งก่อนลบรายการ)
+ */
 function lfMarkEnqueued_(props, refCode) {
-  const m = lfReadMarks_(props), now = Date.now();
-  m.refs[refCode] = now;
-  const keys = Object.keys(m.refs).filter(k => now - m.refs[k] < LF_NOTIFY_MARK_KEEP_MS)
-    .sort((a, b) => m.refs[b] - m.refs[a]).slice(0, 250);
-  const refs = {}; keys.forEach(k => { refs[k] = m.refs[k]; });
-  m.refs = refs;
-  props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(m));
+  const lock = LockService.getScriptLock();
+  let held = false;
+  try { held = lock.tryLock(5000); } catch (e) { held = false; }
+  try {
+    const m = lfReadMarks_(props), now = Date.now();
+    m.refs[refCode] = now;
+    const keys = Object.keys(m.refs).filter(k => now - m.refs[k] < LF_NOTIFY_MARK_KEEP_MS)
+      .sort((a, b) => m.refs[b] - m.refs[a]).slice(0, 250);
+    const refs = {}; keys.forEach(k => { refs[k] = m.refs[k]; });
+    m.refs = refs;
+    props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(m));
+  } finally {
+    if (held) { try { lock.releaseLock(); } catch (e) {} }
+  }
+}
+
+/**
+ * บันทึกรุ่นของโค้ดที่ "ถูก deploy เป็น web app" ไว้ใน Script Property
+ * trigger รันโค้ด Head เสมอ ส่วน doPost รันโค้ดรุ่นที่ deploy ไว้
+ * ค่าสองอันนี้จึงบอกได้ว่ากำลังอยู่ในช่วงเปลี่ยนรุ่นหรือไม่ โดยไม่ต้องอาศัยจังหวะเวลา
+ */
+function lfRecordWebAppVersion_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    if (cache.get('lf_wv_ok')) return;
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty(LF_WEBAPP_VER_KEY) !== LF_VERSION)
+      props.setProperty(LF_WEBAPP_VER_KEY, LF_VERSION);
+    cache.put('lf_wv_ok', '1', 300);
+  } catch (e) { Logger.log('record webapp version: ' + e); }
+}
+
+/**
+ * อยู่ในช่วงเปลี่ยนรุ่นหรือไม่ (โค้ด Head ≠ รุ่นที่ deploy)
+ * ยังไม่เคยมีคำขอผ่าน web app (ค่าว่าง) = ไม่ทราบ → ถือว่าไม่ใช่ช่วงเปลี่ยนรุ่น
+ */
+function lfVersionSkew_() {
+  const v = PropertiesService.getScriptProperties().getProperty(LF_WEBAPP_VER_KEY);
+  return !!v && v !== LF_VERSION ? v : '';
 }
 
 function lfEnqueueNotify_(refCode, notifyPayload, imagesPending) {
@@ -1362,6 +1506,14 @@ function lfQueueAttachImages_(refCode, imgUrl) {
 function lfSweepMissedNotifications_(props) {
   const marks = lfReadMarks_(props);
   if (!props.getProperty(LF_NOTIFY_MARK_KEY)) { props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(marks)); return 0; }
+  // ช่วงเปลี่ยนรุ่น: trigger รันโค้ดใหม่ แต่ web app ยังเป็นรุ่นเดิม
+  // รุ่นเดิมอาจทำเครื่องหมายคนละแบบ sweeper จึงอาจเข้าใจผิดว่ายังไม่ได้แจ้งแล้วแจ้งซ้ำ → พักไว้ก่อน
+  const skew = lfVersionSkew_();
+  if (skew) {
+    lfNotifyLog_('-', 'queue', 'sweep_paused', 0,
+      'พักตามเก็บงานค้าง: web app รุ่น ' + skew + ' แต่โค้ด Head รุ่น ' + LF_VERSION);
+    return 0;
+  }
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sheet) return 0;
   const last = sheet.getLastRow();
@@ -1462,9 +1614,23 @@ function lfProcessNotifyQueue() {
       if (item.imagesPending && Date.now() - item.createdAt < LF_NOTIFY_IMG_WAIT_MS) return;  // รอ URL รูป
       ['line', 'email'].forEach(function (ch) {
         const st = item[ch];
-        if (st.state === 'sent' || st.state === 'gave_up' || st.nextAt > Date.now()) return;
+        if (st.state === 'sent' || st.state === 'gave_up' || st.state === 'uncertain') return;
+        // 'sending' = เคยเริ่มส่งแล้วแต่ไม่มีการบันทึกผล — ข้อความอาจออกไปแล้วหรือไม่ก็ได้
+        // ส่งซ้ำ = เสี่ยงข้อความซ้ำ จึงพักไว้ให้เจ้าหน้าที่ตรวจแทนการเดา
+        if (st.state === 'sending') {
+          const since = st.sendingAt || item.createdAt || 0;
+          if (Date.now() - since < LF_SENDING_GRACE_MS) return;   // อาจมี execution อื่นกำลังส่งอยู่
+          st.state = 'uncertain';
+          st.uncertainAt = Date.now();
+          st.lastError = 'ส่งไปแล้วหรือไม่ ยืนยันไม่ได้ (execution หยุดก่อนบันทึกผล)';
+          props.setProperty(key, JSON.stringify(item));
+          lfNotifyLog_(item.refCode, ch, 'uncertain', st.attempts, st.lastError);
+          return;
+        }
+        if (st.nextAt > Date.now()) return;
         st.attempts++;
         st.state = 'sending';
+        st.sendingAt = Date.now();
         props.setProperty(key, JSON.stringify(item));      // บันทึกก่อนส่ง
         try {
           if (ch === 'line') lfSendLine_(cfg.lineWebhookUrl, item.payload);
@@ -1479,10 +1645,14 @@ function lfProcessNotifyQueue() {
         }
         props.setProperty(key, JSON.stringify(item));
       });
-      const done = ['line', 'email'].every(ch => item[ch].state === 'sent' || item[ch].state === 'gave_up');
-      if (done) {
+      const settled = ch => ['sent', 'gave_up', 'uncertain'].indexOf(item[ch].state) >= 0;
+      const hasUncertain = ['line', 'email'].some(ch => item[ch].state === 'uncertain');
+      if (['line', 'email'].every(settled)) {
         try { if (!lfReadMarks_(props).refs[item.refCode]) lfMarkEnqueued_(props, item.refCode); } catch (e) {}  // กัน sweeper ใส่คิวซ้ำ
-        props.deleteProperty(key);
+        // รายการที่ยังไม่แน่ใจ เก็บไว้ให้เห็นในสถานะคิว 7 วัน แล้วค่อยลบ
+        const unAt = Math.max(item.line.uncertainAt || 0, item.email.uncertainAt || 0);
+        if (!hasUncertain || Date.now() - unAt > LF_UNCERTAIN_KEEP_MS)
+          props.deleteProperty(key);
       }
     });
   } finally {
@@ -1497,7 +1667,15 @@ function lfNotifyStatus_() {
     catch (e) { return { key: k, error: 'unreadable' }; }
   });
   const hasTrigger = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'lfProcessNotifyQueue');
-  return jsonResponse({ success: true, queue: queue, triggerInstalled: hasTrigger, legacyApi: lfLegacyEnabled_() ? 'on' : 'off' });
+  const uncertain = queue.filter(q => q.line && q.email &&
+    (q.line.state === 'uncertain' || q.email.state === 'uncertain'));
+  return jsonResponse({
+    success: true, queue: queue, uncertain: uncertain,
+    triggerInstalled: hasTrigger, legacyApi: lfLegacyEnabled_() ? 'on' : 'off',
+    headVersion: LF_VERSION,
+    webAppVersion: PropertiesService.getScriptProperties().getProperty(LF_WEBAPP_VER_KEY) || '(ยังไม่มีคำขอผ่าน web app)',
+    versionSkew: !!lfVersionSkew_()
+  });
 }
 
 // ── Google Form เดิม (Form Responses) ──

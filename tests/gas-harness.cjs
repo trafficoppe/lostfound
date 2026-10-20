@@ -206,10 +206,16 @@ function makeRuntime(fixture, opts = {}) {
   if (opts.configSource) code = opts.configSource + '\n;\n' + code;
   // const/let ระดับบนสุดไม่อยู่บน global ของ vm จึง export ฟังก์ชัน/ค่าที่ต้องใช้ทดสอบ
   code += '\n;globalThis.__exports = { LF_PRIVATE_CONFIG: (typeof LF_PRIVATE_CONFIG!=="undefined"?LF_PRIVATE_CONFIG:undefined), LF_STATUSES, LF_TYPES };';
+  // ค่าคงที่ที่การทดสอบต้องอ้างถึง — อ่านจากโค้ดจริง ไม่ใช่เขียนตัวเลขซ้ำไว้ในเทสต์
+  // ใช้ typeof กันไว้ เพื่อให้ harness ยังโหลดโค้ดรุ่นเก่าที่ยังไม่มีค่าคงที่เหล่านี้ได้
+  const C = ['LF_VERSION', 'LF_CACHE_TTL_SEC', 'LF_SENDING_GRACE_MS', 'LF_WEBAPP_VER_KEY', 'LF_NOTIFY_MAX_ATTEMPT'];
+  code += '\n;globalThis.__consts = {' +
+    C.map(n => `${n}: (typeof ${n}!=="undefined"?${n}:undefined)`).join(', ') + '};';
   vm.runInContext(code, ctx, { filename: 'gas-bundle.js' });
   const call = (fn, ...args) => ctx[fn](...args);
   const json = out => JSON.parse(out.getContent());
-  return { ctx, call, json, sheets, log, sent, cacheStore, props, triggers, files, setLock: v => { lockHeld = v; } };
+  return { ctx, call, json, sheets, log, sent, cacheStore, props, triggers, files,
+    consts: ctx.__consts, setLock: v => { lockHeld = v; } };
 }
 
 module.exports = { makeRuntime, formatDate, Sheet };

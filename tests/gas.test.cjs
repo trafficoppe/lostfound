@@ -107,15 +107,19 @@ test('แคช: ครั้งที่สอง hit, force อ่านให
   now += 6000;
   assert.equal(get(r, { action: 'getPublicData', force: '1' }).cache, 'bypass');
   assert.equal(get(r, { action: 'getPublicData', force: '1' }).cache, 'hit');   // force ถี่เกิน 5 วิ ใช้แคชที่เพิ่งอ่าน
-  now += 181000;
-  assert.equal(get(r, { action: 'getPublicData' }).cache, 'miss');              // หมดอายุ (180 วินาที)
+  // อ่านอายุแคชจากค่าคงที่จริง เพื่อให้การทดสอบไม่ผูกกับตัวเลข
+  const ttlMs = r.consts.LF_CACHE_TTL_SEC * 1000;
+  now += Math.floor(ttlMs / 2);
+  assert.equal(get(r, { action: 'getPublicData' }).cache, 'hit');               // ยังไม่หมดอายุ
+  now += ttlMs;                                                                 // เลยอายุแคชแน่นอน
+  assert.equal(get(r, { action: 'getPublicData' }).cache, 'miss');              // หมดอายุตาม LF_CACHE_TTL_SEC
   // ลบชิ้นส่วนแคช → ต้องอ่าน Sheet ได้ตามปกติ
   for (const k of [...r.cacheStore.keys()]) if (/:\d+$/.test(k)) r.cacheStore.delete(k);
   const res = get(r, { action: 'getPublicData' });
   assert.equal(res.cache, 'miss');
   assert.equal(res.records.length, 4);                // รายการวันที่อนาคต (31 ต.ค./1 พ.ย.) ยังไม่แสดง
   // submit → ข้อมูลใหม่เห็นทันที
-  const s = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ', itemDesc: 'แว่นตา', phone: '0800000000', clientRequestId: 'c1' });
+  const s = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ', itemDesc: 'แว่นตา', phone: '0890000001', clientRequestId: 'c1' });
   assert.equal(s.success, true);
   const after = get(r, { action: 'getPublicData' });
   assert.ok(after.records.some(x => x.refCode === s.refCode));
@@ -335,6 +339,83 @@ test('PII สาธารณะ: ซ่อนเลขบัตร 13 หลั�
   assert.equal(m('กุญแจรถ 2 ดอก ลานจอด P1'), 'กุญแจรถ 2 ดอก ลานจอด P1');
 });
 
+test('PII: คำประสมที่ขึ้นต้นเหมือนคำนำหน้า ต้องไม่ถูกย่อ', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  // เคสที่โค้ดเดิมทำข้อความเสีย
+  assert.equal(m('พบบัตรที่ นายกสภา ชั้น 2'), 'พบบัตรที่ นายกสภา ชั้น 2');
+  assert.equal(m('นายกสภามหาวิทยาลัย เป็นประธาน'), 'นายกสภามหาวิทยาลัย เป็นประธาน');
+  assert.equal(m('ติดต่อ นายจ้าง เพื่อรับคืน'), 'ติดต่อ นายจ้าง เพื่อรับคืน');
+  assert.equal(m('ของหายบริเวณ นางเลิ้ง'), 'ของหายบริเวณ นางเลิ้ง');
+  assert.equal(m('ตลาดนางเลิ้ง'), 'ตลาดนางเลิ้ง');
+  assert.equal(m('นายกรัฐมนตรี มาตรวจเยี่ยม'), 'นายกรัฐมนตรี มาตรวจเยี่ยม');
+  assert.equal(m('ยื่นที่ นายทะเบียน อาคาร 1'), 'ยื่นที่ นายทะเบียน อาคาร 1');
+  assert.equal(m('แจ้ง นายช่าง ซ่อมแล้ว'), 'แจ้ง นายช่าง ซ่อมแล้ว');
+  assert.equal(m('นายสถานี รับเรื่องไว้'), 'นายสถานี รับเรื่องไว้');
+  // คำที่มี "นาย"/"นาง" อยู่กลางคำ ต้องไม่ถูกตีความเป็นคำนำหน้า
+  assert.equal(m('ทำนายดวงชะตา'), 'ทำนายดวงชะตา');
+  assert.equal(m('ขุนนางสมัยก่อน'), 'ขุนนางสมัยก่อน');
+});
+
+test('PII: ชื่อจริงต้องยังถูกย่อ แม้ขึ้นต้นเหมือนคำยกเว้น', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  // "นายก..." ที่เป็นชื่อคนจริง ต้องไม่หลุด
+  assert.equal(m('บัตรของ นายกอไก่ ใบไม้'), 'บัตรของ นายก*** ใ***');
+  assert.equal(m('นายกานต์ สุขใจ'), 'นายก*** ส***');
+  // คำยกเว้นสั้น ("พล", "วง") ยกเว้นเฉพาะเมื่อตรงทั้งคำ
+  assert.equal(m('นายพลอยแสง ม้าเร็ว'), 'นายพ*** ม***');
+  assert.equal(m('นายวงศกร ทองดี'), 'นายว*** ท***');
+  assert.equal(m('นายพล สั่งการ'), 'นายพล สั่งการ');
+  // คำนำหน้าแบบย่อ และติดกับจุด
+  assert.equal(m('บัตรปชช.นายพอพาน สอเสือ'), 'บัตรปชช.นายพ*** ส***');
+  assert.equal(m('น.ส.วอแหวน ซอโซ่'), 'น.ส.ว*** ซ***');
+  assert.equal(m('ด.ช.ต้นกล้า ใจงาม'), 'ด.ช.ต*** ใ***');
+});
+
+test('PII: คำต่อประโยคหลังชื่อ ต้องไม่ถูกย่อเหมือนนามสกุล', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  assert.equal(m('ได้รับบัตร นายพอพาน คืนแล้ว'), 'ได้รับบัตร นายพ*** คืนแล้ว');
+  assert.equal(m('นายสมชาย โทรมาแจ้ง'), 'นายส*** โทรมาแจ้ง');
+  assert.equal(m('นายสมชาย ติดต่อกลับ'), 'นายส*** ติดต่อกลับ');
+  // แต่ของนามสกุลจริงยังย่อ
+  assert.equal(m('นายสมชาย มอม้า'), 'นายส*** ม***');
+});
+
+test('PII: ปิดบังชื่อในระเบียนแม้ไม่มีคำนำหน้า และไม่ย่อซ้ำ', () => {
+  const r = rt();
+  const m = (s, name) => r.call('lfMaskPII_', s, name);
+  // ชื่อเขียนติดข้อความอื่น ไม่มีคำนำหน้า — ด่าน regex จับไม่ได้ แต่ชั้นชื่อในระเบียนจับได้
+  assert.equal(m('บัตรนักศึกษาชื่อบอใบไม้ ตอเต่า', 'นาย บอใบไม้ ตอเต่า'),
+    'บัตรนักศึกษาชื่อบ*** ต***');
+  assert.equal(m('ใบปริญญาบัตรของกอไก่ ขอไข่', 'นางสาว กอไก่ ขอไข่'),
+    'ใบปริญญาบัตรของก*** ข***');
+  // มีคำนำหน้าด้วย → ต้องได้ "อ***" ไม่ใช่ "อ******"
+  assert.equal(m('บัตรประชาชน ชื่อ นายออ่าง ฮอนกฮูก', 'นายออ่าง ฮอนกฮูก'),
+    'บัตรประชาชน ชื่อ นายอ*** ฮ***');
+  // ไม่ส่งชื่อมา → ทำงานเหมือนเดิม
+  assert.equal(m('กระเป๋าสีดำ'), 'กระเป๋าสีดำ');
+  // คำในช่องชื่อที่ไม่ใช่ชื่อคน ต้องไม่ไปปิดบังข้อความ
+  assert.equal(m('พบที่สถานีรถบัส', 'รปภ.อาคารตัวอย่าง สถานีรถบัส'), 'พบที่สถานีรถบัส');
+  assert.equal(m('อาคารนานาชาติ ชั้น 2', 'เจ้าหน้าที่ นานาชาติ'), 'อาคารนานาชาติ ชั้น 2');
+  // ชื่อสั้นกว่า 4 ตัว ไม่นำไปปิดบัง (กันชนคำทั่วไป เช่น ของที่หายชื่อ "ขนม")
+  assert.equal(m('ขนมในกล่อง', 'ขนม ตัวอย่าง'), 'ขนมในกล่อง');
+});
+
+test('PII: ผลลัพธ์สาธารณะใช้ชื่อในระเบียนช่วยปิดบัง', () => {
+  const r = rt();
+  const rec = r.call('lfPublicRecord_', {
+    source: 'LF_New', refCode: 'LOS-260101-0001', type: 'สิ่งของสูญหาย',
+    title: 'กระเป๋าของ สมหญิง รักเรียน', location: 'หน้าห้อง สมหญิง',
+    actionText: '', reportedAt: '', itemDate: '', itemTime: '',
+    images: [], status: 'รอดำเนินการ', name: 'นางสาว สมหญิง รักเรียน'
+  });
+  assert.equal(rec.title, 'กระเป๋าของ ส*** ร***');
+  assert.equal(rec.location, 'หน้าห้อง ส***');
+  assert.ok(!('name' in rec) && !('phone' in rec));   // ฟิลด์ส่วนบุคคลไม่ถูกส่งออกอยู่แล้ว
+});
+
 test('autofill สาธารณะ: ค่า pending ที่ดูเป็นข้อมูลส่วนบุคคลไม่ถูกส่งออก แต่ค่าที่อนุมัติแล้วยังอยู่', () => {
   const r = rt();
   const mem = r.sheets.LF_Memory;
@@ -475,4 +556,114 @@ test('รายงานรายเดือน: ไม่มี URL LINE = ล
   stubReportDrive(r3);
   r3.call('checkAndGenerateLostFoundReport');
   assert.equal(r3.sent.fetch.length + r3.sent.mail.length, 0);
+});
+
+// ── ช่วงเปลี่ยนรุ่น: กันแจ้งเตือนซ้ำ ────────────────────────────────────────
+
+test('คิว: ส่งสำเร็จแล้ว execution ตายก่อนบันทึกสถานะ → ต้องไม่ส่งซ้ำ', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ', clientRequestId: 'd1' });
+  const key = 'lfq_' + s.refCode;
+  const queued = JSON.parse(r.props.get(key));      // เก็บรายการคิวไว้ก่อนประมวลผล
+
+  // รอบแรก: ส่งออกจริงทั้ง 2 ช่องทาง
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1);
+  assert.equal(r.sent.mail.length, 1);
+
+  // จำลอง execution ตายหลัง UrlFetch/MailApp สำเร็จ แต่ก่อนบันทึก state='sent'
+  // สถานะที่ค้างบนดิสก์คือ 'sending' ทั้งที่ข้อความออกไปแล้ว
+  queued.line = { state: 'sending', attempts: 1, nextAt: 0, lastError: '', sendingAt: now };
+  queued.email = { state: 'sending', attempts: 1, nextAt: 0, lastError: '', sendingAt: now };
+  r.props.set(key, JSON.stringify(queued));
+
+  // รอบถัดไปภายในเวลาผ่อนผัน: ต้องไม่แตะ (อาจมี execution อื่นกำลังส่งอยู่)
+  now += 60000;
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1, 'ยังอยู่ในเวลาผ่อนผัน ต้องไม่ส่งซ้ำ');
+
+  // พ้นเวลาผ่อนผัน: ยังต้องไม่ส่งซ้ำ แต่ต้องทำเครื่องหมายว่าไม่แน่ใจ และบันทึกไว้ให้ตรวจ
+  now += 10 * 60000;
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1, 'พ้นเวลาผ่อนผันแล้วก็ยังต้องไม่ส่งซ้ำ');
+  assert.equal(r.sent.mail.length, 1);
+  assert.ok(r.sheets.LF_NotifyLog.rows.some(x => x[3] === 'uncertain'),
+    'ต้องบันทึก uncertain ลง LF_NotifyLog');
+
+  // ต้องมองเห็นผ่านสถานะคิว เพื่อให้เจ้าหน้าที่ตามต่อได้
+  const st = JSON.parse(r.call('lfNotifyStatus_').getContent());
+  assert.equal(st.uncertain.length, 1);
+  assert.equal(st.uncertain[0].refCode, s.refCode);
+});
+
+test('ช่วงเปลี่ยนรุ่น: โค้ด Head ใหม่ + Web app รุ่นเดิม → sweeper หยุดทำงาน ไม่แจ้งซ้ำ', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  r.call('lfProcessNotifyQueue');                   // ตั้ง since
+  now += 60000;
+
+  // Web app รุ่นเดิมรับฟอร์ม: บันทึกแถว + ใส่คิว แต่เป็นโค้ดคนละรุ่น
+  const res = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ข', itemDesc: 'ของ', clientRequestId: 'v1' });
+  r.props.set(r.consts.LF_WEBAPP_VER_KEY, '0.0.0-old');   // รุ่นที่ deploy ไว้ ยังเป็นรุ่นเก่า
+  // จำลองว่ารุ่นเก่าไม่ได้ทำเครื่องหมาย (ยังไม่มีระบบ mark) และคิวถูกประมวลผลไปแล้ว
+  r.props.delete('lfq_' + res.refCode);
+  const m = JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED')); delete m.refs[res.refCode];
+  r.props.set('LF_NOTIFY_ENQUEUED', JSON.stringify(m));
+
+  now += 20 * 60000;
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 0, 'ระหว่างรุ่นไม่ตรงกัน sweeper ต้องไม่ใส่คิวย้อนหลัง');
+  assert.ok(r.sheets.LF_NotifyLog.rows.some(x => x[3] === 'sweep_paused'));
+
+  // หลัง deploy แล้ว (รุ่นตรงกัน) sweeper กลับมาทำงานตามปกติ
+  r.props.set(r.consts.LF_WEBAPP_VER_KEY, r.consts.LF_VERSION);
+  now += 20 * 60000;
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1, 'เมื่อรุ่นตรงกันแล้วต้องตามเก็บได้');
+});
+
+test('คิว: การทำเครื่องหมายพร้อมกันหลายคำขอ ต้องไม่ทำให้เครื่องหมายหาย', () => {
+  const r = rt();
+  const props = r.ctx.PropertiesService.getScriptProperties();
+  r.call('lfMarkEnqueued_', props, 'LOS-260101-0001');
+  r.call('lfMarkEnqueued_', props, 'LOS-260101-0002');
+  r.call('lfMarkEnqueued_', props, 'LOS-260101-0003');
+  const m = JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED'));
+  assert.deepEqual(Object.keys(m.refs).sort(),
+    ['LOS-260101-0001', 'LOS-260101-0002', 'LOS-260101-0003']);
+});
+
+test('คิว: มี execution อื่นถือ lock อยู่ ต้องไม่ส่งพร้อมกัน', () => {
+  const r = rt();
+  post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ', clientRequestId: 'c1' });
+  r.setLock(true);                                  // จำลอง execution อื่นกำลังประมวลผลคิว
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 0);
+  assert.equal(r.sent.mail.length, 0);
+  r.setLock(false);
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1);
+  assert.equal(r.sent.mail.length, 1);
+});
+
+test('คิว: ช่องทางหนึ่งไม่แน่ใจ อีกช่องทางยังต้องส่งตามปกติ', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ', clientRequestId: 'p1' });
+  const key = 'lfq_' + s.refCode;
+  const q = JSON.parse(r.props.get(key));
+  q.line = { state: 'sending', attempts: 1, nextAt: 0, lastError: '', sendingAt: now };   // LINE ค้าง
+  r.props.set(key, JSON.stringify(q));              // email ยัง pending
+
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.mail.length, 1, 'อีเมลต้องส่งได้ตามปกติ');
+  assert.equal(r.sent.fetch.length, 0, 'LINE ที่ค้างอยู่ในเวลาผ่อนผัน ต้องไม่ส่งซ้ำ');
+
+  now += 8 * 60000;
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 0, 'LINE ยังต้องไม่ส่งซ้ำ');
+  const after = JSON.parse(r.props.get(key));
+  assert.equal(after.line.state, 'uncertain');
+  assert.equal(after.email.state, 'sent');
 });
