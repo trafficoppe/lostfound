@@ -130,6 +130,13 @@ function lfTest_2_ทดสอบทั้งหมด() {
 
   // ── 4a. build ของ web app ทดสอบ เทียบกับโค้ด Head ที่รันอยู่นี้ ──
   const h = lfTestGet_('action=health');
+  // ตัวส่ง LINE ของระบบเรียก URL แบบไม่แนบสิทธิ์ — web app ทดสอบต้องเปิด "ทุกคน" ไม่เช่นนั้นจะได้หน้าเข้าสู่ระบบ (HTTP 200)
+  // ซึ่งทำให้ผลการส่งดูเหมือนสำเร็จทั้งที่ไม่ใช่ → หยุดก่อน
+  if (!h.json) {
+    lfTestRecord_(G4, 'web app ทดสอบตอบเป็น JSON โดยไม่ต้องล็อกอิน', false, 'Apps Script จริง (HTTP)',
+      'ได้ HTTP ' + h.code + ' ที่ไม่ใช่ JSON — ตั้ง "ผู้ที่มีสิทธิ์เข้าถึง: ทุกคน" แล้ว deploy ใหม่');
+    return;
+  }
   const head = lfBuildId_();
   lfTestRecord_(G4, 'health แยกเลขรุ่นแอปกับ build', !!(h.json && h.json.version && h.json.build), 'Apps Script จริง (HTTP)',
     'web app version=' + (h.json && h.json.version) + ' build=' + (h.json && h.json.build) + ' · Head build=' + head);
