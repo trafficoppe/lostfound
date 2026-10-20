@@ -1030,3 +1030,69 @@ test('API สาธารณะ/health/error ไม่เปิดเผยผ�
   const err = get(r, { action: 'getPublicData' });
   assert.deepEqual(err, { success: false, error: 'Server error' });
 });
+
+test('แยกระบบทดสอบ: ตั้งชื่อโฟลเดอร์รูป/รายงานใน config ได้ ระบบจริงที่ไม่ตั้งยังใช้ชื่อเดิม', () => {
+  const names = [];
+  const r = rt();
+  r.ctx.DriveApp.getFoldersByName = n => { names.push(n); return { hasNext: () => true, next: () => ({ createFile: () => ({ getId: () => 'IMG1234567890123456789', setSharing() {} }) }) }; };
+  post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ร่ม', clientRequestId: 'f1', files: [{ mime: 'image/png', data: Buffer.from('x').toString('base64') }] });
+  assert.deepEqual(names, ['LostFound_Images']);
+  const t = rt({ configSource: adminCfg().replace('admins:', "driveFolderName: 'TEST_LostFound_Images', reportFolderName: 'TEST_รายงาน', admins:") });
+  const tn = [];
+  t.ctx.DriveApp.getFoldersByName = n => { tn.push(n); return { hasNext: () => true, next: () => ({ createFile: () => ({ getId: () => 'IMG1234567890123456789', setSharing() {} }) }) }; };
+  post(t, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ร่ม', clientRequestId: 'f2', files: [{ mime: 'image/png', data: Buffer.from('x').toString('base64') }] });
+  assert.deepEqual(tn, ['TEST_LostFound_Images']);
+  const rootNames = [];
+  const folder = { getFoldersByName: n => { rootNames.push(n); return { hasNext: () => true, next: () => folder }; } };
+  t.ctx.DriveApp.getRootFolder = () => folder;
+  t.call('getOrCreateLostFoundFolder', 2026, 10);
+  assert.equal(rootNames[0], 'TEST_รายงาน');
+});
+
+// ── ชุดทดสอบ Apps Script (tests/apps-script) — ซ้อมใน Node ก่อนให้รันจริง ─────────────
+test('ชุดทดสอบ Apps Script: ตรวจการแยกระบบปฏิเสธ config จริง และรันครบทุกกรณีได้ผลผ่านเมื่อแยกถูกต้อง', () => {
+  const kit = path.join(__dirname, 'apps-script');
+  const fs = require('fs');
+  const TEST_URL = 'https://script.google.com/macros/s/AKfycbTESTONLYdeployment00000000000000000000000000/exec';
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  const cfgSrc = fs.readFileSync(path.join(kit, 'config.test.gs'), 'utf8').replace("testWebAppUrl: '',", "testWebAppUrl: '" + TEST_URL + "',");
+  const r = makeRuntime(fixture(), { now: () => now, configSource: cfgSrc, files: ['lf_gas.gs', 'MonthlyReport.gs'],
+    extraSource: fs.readFileSync(path.join(kit, 'release_test.gs'), 'utf8') });
+  stubReportDrive(r);
+  const ss = r.ctx.SpreadsheetApp.getActiveSpreadsheet();
+  ss.getName = () => 'TEST ชีททดสอบ Lost&Found';
+  r.ctx.Session.getEffectiveUser = () => ({ getEmail: () => 'tester@example.com' });
+  r.ctx.MailApp.getRemainingDailyQuota = () => 100;
+  r.ctx.ScriptApp.getService = () => ({ getUrl: () => TEST_URL });
+  r.ctx.DriveApp.getFoldersByName = () => ({ hasNext: () => true, next: () => ({ createFile: () => ({ getId: () => 'IMG1234567890123456789', setSharing() {} }) }) });
+  const route = (url, o) => {
+    if (/INVALID_TEST_DEPLOYMENT/.test(url)) return { getResponseCode: () => 404, getContentText: () => 'not found' };
+    assert.ok(url.startsWith(TEST_URL), 'ทุกคำขอ HTTP ต้องไปที่ web app ทดสอบเท่านั้น: ' + url);
+    const [, q] = url.split('?');
+    const out = (o && o.method === 'post')
+      ? r.call('doPost', { postData: { contents: o.payload }, parameter: {} })
+      : r.call('doGet', { parameter: Object.fromEntries(new URLSearchParams(q || '')) });
+    return { getResponseCode: () => 200, getContentText: () => out.getContent() };
+  };
+  r.ctx.UrlFetchApp = { fetch: route, fetchAll: reqs => reqs.map(x => route(x.url, x)) };
+  // ตัวควบคุม: ใส่ config ที่มีปลายทางจริง → ต้องหยุด
+  const bad = makeRuntime(fixture(), { configSource: adminCfg(), extraSource: fs.readFileSync(path.join(kit, 'release_test.gs'), 'utf8') });
+  bad.ctx.SpreadsheetApp.getActiveSpreadsheet().getName = () => 'Lost & Found';
+  bad.ctx.Session.getEffectiveUser = () => ({ getEmail: () => 'tester@example.com' });
+  bad.ctx.MailApp.getRemainingDailyQuota = () => 100;
+  const iso = bad.call('lfTest_1_ตรวจการแยกระบบ');
+  assert.equal(iso.ok, false);
+  assert.ok(iso.problems.length >= 4, iso.problems.join(' | '));
+  assert.throws(() => bad.call('lfTest_2_ทดสอบทั้งหมด'), /หยุด: ตรวจการแยกระบบไม่ผ่าน/);
+  assert.equal(bad.sent.fetch.length + bad.sent.mail.length, 0, 'ไม่ส่งอะไรเลยเมื่อแยกระบบไม่ผ่าน');
+  // ชุดที่แยกถูกต้อง
+  assert.equal(r.call('lfTest_1_ตรวจการแยกระบบ').ok, true);
+  r.call('lfTest_2_ทดสอบทั้งหมด');
+  const rows = r.sheets['ผลทดสอบ_APPS_SCRIPT'].rows.slice(1);
+  const failed = rows.filter(x => x[3] === 'ไม่ผ่าน');
+  assert.deepEqual(failed.map(x => x[2] + ' — ' + x[5]), []);
+  assert.ok(rows.length >= 20, 'จำนวนกรณีที่บันทึก ' + rows.length);
+  assert.equal(r.sent.mail.length, 0, 'ไม่มีอีเมลออก (ผู้รับว่าง)');
+  r.call('lfTest_9_เก็บกวาด');
+  assert.equal(r.triggers.length >= 0, true);
+});

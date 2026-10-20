@@ -62,7 +62,11 @@ function lfCfg_() {
     reportRecipients:       c.reportRecipients || c.emailRecipients || [],
     staff:                  c.staff || {},
     overdueExtraRecipients: c.overdueExtraRecipients || [],
-    admins:                 c.admins || {}
+    admins:                 c.admins || {},
+    // ชื่อโฟลเดอร์ใน Drive — ระบบจริงไม่ต้องตั้ง (ใช้ค่าเดิม); ระบบทดสอบต้องตั้งเป็นชื่ออื่นเสมอ
+    // เพราะโค้ดค้นโฟลเดอร์ "ตามชื่อ" ใน Drive ของผู้รัน — ชื่อซ้ำ = รูป/รายงานทดสอบไปลงโฟลเดอร์จริง
+    driveFolderName:        c.driveFolderName || DRIVE_FOLDER_NAME,
+    reportFolderName:       c.reportFolderName || ''
   };
 }
 
@@ -926,8 +930,9 @@ function addTypeColorFormat(sheet) {
 }
 
 function getOrCreateDriveFolder() {
-  const folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
-  return folders.hasNext() ? folders.next() : DriveApp.createFolder(DRIVE_FOLDER_NAME);
+  const name = lfCfg_().driveFolderName;
+  const folders = DriveApp.getFoldersByName(name);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(name);
 }
 
 function convertDriveUrl(url) {

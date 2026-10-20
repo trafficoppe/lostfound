@@ -94,7 +94,7 @@ function getOrCreateFolder(folderName, parentFolder) {
 }
 
 function getOrCreateLostFoundFolder(year, month) {
-  const mainFolder = getOrCreateFolder(LOSTFOUND_REPORT_FOLDER_NAME, DriveApp.getRootFolder());
+  const mainFolder = getOrCreateFolder(lfCfg_().reportFolderName || LOSTFOUND_REPORT_FOLDER_NAME, DriveApp.getRootFolder());
   const yearFolder = getOrCreateFolder(String(year), mainFolder);
   return getOrCreateFolder(('0' + month).slice(-2) + '_' + THAI_MONTHS[month - 1], yearFolder);
 }
