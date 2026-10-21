@@ -1,0 +1,28 @@
+# ทดสอบอัตโนมัติทุก PR — อ่านอย่างเดียว ไม่มี secret ไม่ deploy ไม่ส่ง LINE/อีเมล ไม่แตะชีท
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: ทดสอบ Node (ปิดเครือข่ายภายนอก)
+        run: npm test
+      - name: ไม่มีไฟล์ลับ/ข้อมูลผู้แจ้งใน repository
+        run: |
+          if git ls-files | grep -Ei '(^|/)(config\.private\.gs|private/|\.env)|\.(xlsx|csv)$'; then
+            echo "พบไฟล์ที่ห้ามอยู่ใน repository"; exit 1; fi
