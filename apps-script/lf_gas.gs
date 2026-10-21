@@ -66,7 +66,8 @@ function lfCfg_() {
     // ชื่อโฟลเดอร์ใน Drive — ระบบจริงไม่ต้องตั้ง (ใช้ค่าเดิม); ระบบทดสอบต้องตั้งเป็นชื่ออื่นเสมอ
     // เพราะโค้ดค้นโฟลเดอร์ "ตามชื่อ" ใน Drive ของผู้รัน — ชื่อซ้ำ = รูป/รายงานทดสอบไปลงโฟลเดอร์จริง
     driveFolderName:        c.driveFolderName || DRIVE_FOLDER_NAME,
-    reportFolderName:       c.reportFolderName || ''
+    reportFolderName:       c.reportFolderName || '',
+    testMode:               c.testMode === true      // มีเฉพาะ config.test.gs ของโปรเจกต์ทดสอบ
   };
 }
 
@@ -78,7 +79,7 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   const action = p.action || 'getData';
   try {
-    lfRecordWebAppVersion_();               // บันทึก build ของ web app (ใช้ตัดสินว่า sweeper ทำงานได้หรือยัง)
+    lfRecordWebAppVersion_();               // บันทึก build ของ web app (แสดงในหน้าตรวจการแจ้งเตือนว่า web app ตรงกับโค้ด Head หรือไม่)
     if (action === 'getPublicData')     return getPublicData(e);
     if (action === 'getStats')          return getStats(e);
     if (action === 'getMemory')         return handleGetMemory(e);
@@ -103,6 +104,10 @@ function doGet(e) {
 
 function doPost(e) {
   let payload = {};
+  // โปรเจกต์ทดสอบเท่านั้น (config.test.gs มี testMode: true): จำลองคำตอบของ Cloud Function LINE
+  // ระบบจริงไม่มี testMode → ไม่เข้าเงื่อนไขนี้เลย
+  if (e && e.parameter && e.parameter.lfTestEcho && lfCfg_().testMode === true)
+    return jsonResponse(e.parameter.lfTestEcho === 'ok' ? { status: 'success', echo: true } : { status: 'error', echo: true });
   try {
     lfRecordWebAppVersion_();
     try {
@@ -295,8 +300,8 @@ const LF_NAME_FIELD_NOISE = ['สถานี', 'รถบัส', 'สถาน
 
 // ขอบซ้าย: ต้นข้อความ ช่องว่าง วงเล็บ เครื่องหมายวรรคตอน หรือจุด (รองรับ "ปชช.นายสมชาย")
 // ตั้งใจไม่รวมอักษรไทย เพื่อไม่ให้คำอย่าง "ทำนาย" ถูกตีความว่าเป็นคำนำหน้า
-const LF_TITLE_RE_TH = /(^|[\s(:\[\]{},.\/\-"'|ฯ])(นางสาว|เด็กชาย|เด็กหญิง|น\.ส\.|ด\.ช\.|ด\.ญ\.|นาย|นาง)(\s?)([ก-๙A-Za-z]+)(?:(\s+)([ก-๙A-Za-z]+))?/g;
-const LF_TITLE_RE_EN = /(^|[\s(:\[\]{},.\/\-"'|])(Mrs|Mr|Ms|Miss)(\.\s?|\s)([A-Za-z]+)(?:(\s+)([A-Za-z]+))?/g;
+const LF_TITLE_RE_TH = /(^|[\s(:\[\]{},.\/\-"'|ฯ])(นางสาว|เด็กชาย|เด็กหญิง|น\.ส\.|ด\.ช\.|ด\.ญ\.|ดร\.|นาย|นาง)(\s?)([ก-๙A-Za-z]+)(?:(\s+)([ก-๙A-Za-z]+))?/g;
+const LF_TITLE_RE_EN = /(^|[\s(:\[\]{},.\/\-"'|])(Mrs|Mr|Ms|Miss|Dr)(\.\s?|\s)([A-Za-z]+)(?:(\s+)([A-Za-z]+))?/g;
 
 /** คำที่ตามคำนำหน้าเป็นคำประสมที่ไม่ใช่ชื่อหรือไม่ */
 function lfIsTitleException_(title, word) {
@@ -346,7 +351,7 @@ function lfRedactKnownName_(text, fullName) {
   let t = String(text == null ? '' : text);
   let n = String(fullName == null ? '' : fullName).trim();
   if (!t || !n) return t;
-  n = n.replace(/^(นางสาว|นาย|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง|คุณ|Mrs\.?|Mr\.?|Ms\.?|Miss)\s*/i, '');
+  n = n.replace(/^(นางสาว|นาย|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|ดร\.|เด็กชาย|เด็กหญิง|คุณ|Mrs\.?|Mr\.?|Ms\.?|Miss|Dr\.?)\s*/i, '');
   const parts = n.split(/[\s,]+/);
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
@@ -362,12 +367,26 @@ function lfRedactKnownName_(text, fullName) {
  * @param {string} s        ข้อความ
  * @param {string} [known]  ชื่อเจ้าของระเบียน (ถ้ามี) เพื่อปิดบังแบบตรงตัวด้วย
  */
+// ตัวเลขรวมเลขไทย (๐-๙) — ผู้แจ้งบางคนพิมพ์เบอร์/เลขบัตรเป็นเลขไทย
+const LF_D_ = '[0-9๐-๙]';
+const LF_ND_ = '[^0-9๐-๙]';
+const LF_PII_RULES = [
+  // [รูปแบบ, ข้อความแทน] — ลำดับสำคัญ: แบบเฉพาะก่อน แบบกว้างทีหลัง
+  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[ซ่อนอีเมล]'],
+  [new RegExp('(^|' + LF_ND_ + ')' + LF_D_ + '(?:[\\s-]?' + LF_D_ + '){12}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนเลขบัตร]'],
+  // เบอร์ที่เขียนเป็นรูปทรงชัดเจน: (081) 234-5678 · 081.234.5678 · 02.441.0000
+  [new RegExp('(^|' + LF_ND_ + ')\\(?0' + LF_D_ + '{1,2}\\)?[\\s.-]?' + LF_D_ + '{3}[\\s.-]?' + LF_D_ + '{4}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนเบอร์]'],
+  [new RegExp('(?:\\+?66|[0๐])(?:[\\s-]?' + LF_D_ + '){8,9}(?!' + LF_D_ + ')', 'g'), '[ซ่อนเบอร์]'],
+  [new RegExp('(^|' + LF_ND_ + ')' + LF_D_ + '(?:[\\s-]?' + LF_D_ + '){8,}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนตัวเลข]'],
+  // เลขหนังสือเดินทาง/เลขเอกสารรูปแบบ อักษร 1-2 ตัว + ตัวเลข 7-8 หลัก
+  [new RegExp('(^|[^A-Za-z0-9๐-๙])[A-Z]{1,2}' + LF_D_ + '{7,8}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนเลขเอกสาร]'],
+  // รหัสนักศึกษา/บุคลากร: ตัวเลขติดกัน 7-8 หลัก (ไม่ชนเลขห้อง ปี ราคา ซึ่งสั้นกว่า หรือมีตัวคั่น)
+  [new RegExp('(^|[^A-Za-z0-9๐-๙])' + LF_D_ + '{7,8}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนตัวเลข]']
+];
+
 function lfMaskPII_(s, known) {
-  const base = lfStr_(s)
-    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[ซ่อนอีเมล]')
-    .replace(/(^|\D)\d(?:[\s-]?\d){12}(?!\d)/g, '$1[ซ่อนเลขบัตร]')
-    .replace(/(?:\+?66|0)(?:[\s-]?\d){8,9}(?!\d)/g, '[ซ่อนเบอร์]')
-    .replace(/(^|\D)\d(?:[\s-]?\d){8,}(?!\d)/g, '$1[ซ่อนตัวเลข]');
+  let base = lfStr_(s);
+  for (let i = 0; i < LF_PII_RULES.length; i++) base = base.replace(LF_PII_RULES[i][0], LF_PII_RULES[i][1]);
   // ลำดับสำคัญ: ปิดบังตามคำนำหน้าก่อน แล้วค่อยกวาดชื่อในระเบียนที่ยังเหลือ
   // (ถ้าสลับลำดับ ชื่อที่ถูกย่อแล้วจะถูกย่อซ้ำกลายเป็น "อ******")
   return lfRedactKnownName_(lfMaskNames_(base), known);
@@ -790,27 +809,48 @@ function handleSubmit(payload) {
     refCode = lfNewRefCode_(type, sheet, payload.refCode);
     timestamp = Utilities.formatDate(new Date(), LF_TZ, 'yyyy-MM-dd HH:mm:ss');
     const phone = lfClip_(payload.phone, 30);
-    sheet.appendRow([
-      timestamp, refCode, type, name,
-      lfClip_(payload.personType, 200),
-      lfClip_(payload.department || payload.dept, 200),
-      '',                                   // เบอร์โทร: เขียนแบบข้อความด้านล่าง
-      lfClip_(payload.itemDate, 20), lfClip_(payload.itemTime, 10),
-      desc, lfClip_(payload.itemLoc, 500),
-      '', 'รอดำเนินการ', '', '', ''
-    ]);
-    savedRow = sheet.getLastRow();           // ปลอดภัย: ยังถือ lock อยู่
-    if (lfStr_(sheet.getRange(savedRow, 2).getValue()) !== refCode) savedRow = lfFindRowByRef_(sheet, refCode, 0);
-    if (savedRow < 2) throw new Error('saved row not found for ' + refCode);
-    sheet.getRange(savedRow, 7).setValues([["'" + phone]]);
-    SpreadsheetApp.flush();
-    // ใส่คิวแจ้งเตือนทันทีหลังบันทึกแถว (ยังถือ lock) — ถ้าอัปโหลดรูปค้าง/หมดเวลา เจ้าหน้าที่ยังได้รับแจ้ง
+    // 1) ใส่คิวแจ้งเตือน "ก่อน" บันทึกแถว (สถานะรอแถว ยังไม่ส่ง) — ถ้า execution หยุดหลังบันทึกแถว
+    //    ตัวประมวลผลคิวจะพบรายการนี้และตรวจชีทก่อนส่ง จึงไม่ต้องเดารายการตกหล่นจากแถวในชีท
+    const props = PropertiesService.getScriptProperties();
+    let queued = false, qReason = '';
     try {
-      lfEnqueueNotify_(refCode, lfBuildNewFormNotifyPayload_(payload, refCode, type, ''), hasFiles, true);
+      lfEnqueueNotify_(refCode, lfBuildNewFormNotifyPayload_(payload, refCode, type, ''), hasFiles, true, true);
+      queued = true;
     } catch (qErr) {
       notify = 'queue_failed';
-      Logger.log('⚠️ enqueue failed (sweeper will retry): ' + qErr);
+      qReason = String((qErr && qErr.message) || qErr).slice(0, 150);
+      Logger.log('⚠️ enqueue failed: ' + qErr);
     }
+    // 2) บันทึกแถว — ถ้าไม่สำเร็จ ลบรายการคิวที่เพิ่งใส่ (ไม่มีแถว = ไม่แจ้ง) แล้วแจ้งผู้ใช้ว่าบันทึกไม่สำเร็จ
+    try {
+      sheet.appendRow([
+        timestamp, refCode, type, name,
+        lfClip_(payload.personType, 200),
+        lfClip_(payload.department || payload.dept, 200),
+        '',                                   // เบอร์โทร: เขียนแบบข้อความด้านล่าง
+        lfClip_(payload.itemDate, 20), lfClip_(payload.itemTime, 10),
+        desc, lfClip_(payload.itemLoc, 500),
+        '', 'รอดำเนินการ', '', '', ''
+      ]);
+      savedRow = sheet.getLastRow();           // ปลอดภัย: ยังถือ lock อยู่
+      if (lfStr_(sheet.getRange(savedRow, 2).getValue()) !== refCode) savedRow = lfFindRowByRef_(sheet, refCode, 0);
+      if (savedRow < 2) throw new Error('saved row not found for ' + refCode);
+      sheet.getRange(savedRow, 7).setValues([["'" + phone]]);
+      SpreadsheetApp.flush();
+    } catch (rowErr) {
+      if (queued) { try { props.deleteProperty('lfq_' + refCode); } catch (e) {} }
+      throw rowErr;
+    }
+    // 3) ยืนยันว่าบันทึกแถวแล้ว → รายการคิวพร้อมส่ง (ถ้ายืนยันไม่ได้ ตัวประมวลผลคิวจะตรวจชีทเองภายหลัง)
+    if (queued && !lfQueueRowSaved_(props, refCode)) Logger.log('⚠️ row-saved flag not written for ' + refCode + ' (processor will verify)');
+    // ใส่คิวไม่ได้ → บันทึกให้เจ้าหน้าที่เห็นที่หน้า "ตรวจการแจ้งเตือน" และระบบจะใส่คิวใหม่เมื่อมีที่ว่าง
+    if (!queued) lfNotifyLog_(refCode, 'queue', 'queue_failed', 0, 'ใส่คิวแจ้งเตือนไม่ได้: ' + qReason);
+    // สิทธิ์เพิ่มคำแนะนำ (หน่วยงาน/สถานที่) ได้ครั้งเดียวต่อรายการ และเฉพาะค่าที่ส่งมาในฟอร์มนี้
+    try {
+      cache.put('lf_memtok_' + refCode, JSON.stringify({
+        d: normalizeMemoryValue(payload.department || payload.dept).slice(0, 200),
+        l: normalizeMemoryValue(payload.itemLoc).slice(0, 200) }), 3600);
+    } catch (mErr) {}
     if (reqKey) cache.put(reqKey, JSON.stringify({ success: true, refCode: refCode, savedAt: timestamp, images: 0, imagesPending: hasFiles, notify: notify }), 21600);
   } finally {
     lock.releaseLock();
@@ -1191,7 +1231,8 @@ function touchMemoryEntry(bucket, rawValue, refCode) {
       const curStatus = rows[foundRow-1][3] || 'pending';
       const newCount  = curCount + 1;
       sheet.getRange(foundRow, 3).setValue(newCount);
-      if (curStatus === 'pending' && newCount >= MEMORY_AUTO_PROMOTE_MIN) {
+      // ค่าที่ดูเหมือนข้อมูลส่วนบุคคลไม่ถูกเลื่อนเป็นคำแนะนำสาธารณะอัตโนมัติ — รอผู้ดูแลตรวจ
+      if (curStatus === 'pending' && newCount >= MEMORY_AUTO_PROMOTE_MIN && !lfMemoryLooksPersonal_(value)) {
         sheet.getRange(foundRow, 4).setValue('approved');
         sheet.getRange(foundRow, 7).setValue(now);
         sheet.getRange(foundRow, 8).setValue('auto-promote');
@@ -1211,8 +1252,8 @@ function touchMemoryEntry(bucket, rawValue, refCode) {
 /** ค่าที่ผู้ใช้พิมพ์เอง (pending) ซึ่งดูเหมือนข้อมูลส่วนบุคคล จะไม่ถูกส่งให้ฟอร์มสาธารณะ */
 function lfMemoryLooksPersonal_(v) {
   v = lfStr_(v);
-  return v.length > 80 || /\d(?:[\s-]?\d){5,}/.test(v) || /@/.test(v) ||
-    /(^|\s)(นางสาว|นาง|นาย|น\.ส\.)\s?[ก-๙]/.test(v) || /(^|\s)(Mrs|Mr|Ms|Miss)(\.|\s)\s*[A-Za-z]/.test(v);
+  return v.length > 80 || /[0-9๐-๙](?:[\s.-]?[0-9๐-๙]){5,}/.test(v) || /@/.test(v) ||
+    /(^|\s)(นางสาว|นาง|นาย|น\.ส\.|ดร\.|คุณ)\s?[ก-๙]/.test(v) || /(^|\s)(Mrs|Mr|Ms|Miss|Dr)(\.|\s)\s*[A-Za-z]/.test(v);
 }
 
 function getMemoryEntries(bucket) {
@@ -1220,8 +1261,9 @@ function getMemoryEntries(bucket) {
   return rows
     .filter(function(r) {
       if (r.bucket !== bucket) return false;
-      if (r.status === 'approved') return true;
-      return r.status === 'pending' && !lfMemoryLooksPersonal_(r.value);
+      // ค่าที่ดูเหมือนข้อมูลส่วนบุคคล แสดงต่อสาธารณะเฉพาะเมื่อผู้ดูแล (คน) อนุมัติเอง — รวมค่าที่ระบบเคยเลื่อนอัตโนมัติไว้ก่อนหน้า
+      if (lfMemoryLooksPersonal_(r.value)) return r.status === 'approved' && !!r.reviewedBy && r.reviewedBy !== 'auto-promote';
+      return r.status === 'approved' || r.status === 'pending';
     })
     .sort(function(a,b) { return b.count - a.count; })
     .slice(0, MEMORY_MAX_RETURN)
@@ -1358,7 +1400,17 @@ function handleTouchMemoryEntry(payload) {
   if (!STATIC_MAP.hasOwnProperty(bucket) || !value) {
     return jsonResponse({ success:false, error:'invalid bucket or value' });
   }
-  touchMemoryEntry(bucket, value, refCode);
+  // นับได้เฉพาะค่าที่เพิ่งส่งมาในฟอร์มของ RefCode นี้ และครั้งเดียวต่อช่อง (กันการเรียกซ้ำเพื่อดันค่าเป็นคำแนะนำ)
+  const cache = CacheService.getScriptCache();
+  const tk = 'lf_memtok_' + lfStr_(refCode).replace(/[^A-Za-z0-9-]/g, '').slice(0, 30);
+  let tok = null;
+  try { tok = JSON.parse(cache.get(tk) || 'null'); } catch (e) { tok = null; }
+  const field = bucket.indexOf('dept_') === 0 ? 'd' : 'l';
+  const v = normalizeMemoryValue(value).slice(0, 200);
+  if (!tok || !tok[field] || tok[field].toLowerCase() !== v.toLowerCase()) return jsonResponse({ success:false, error:'not allowed' });
+  tok[field] = '';
+  try { if (tok.d || tok.l) cache.put(tk, JSON.stringify(tok), 3600); else cache.remove(tk); } catch (e) {}
+  touchMemoryEntry(bucket, v, refCode);
   return jsonResponse({ success:true });
 }
 
@@ -1411,16 +1463,87 @@ function lfBuildNewFormNotifyPayload_(payload, refCode, type, imgUrl, at) {
 const LF_NOTIFY_IMG_WAIT_MS   = 10 * 60000;    // รอรูปได้นานสุด 10 นาที จากนั้นส่งโดยไม่มีรูป
 const LF_NOTIFY_MARK_KEY      = 'LF_NOTIFY_ENQUEUED';   // {since, refs:{ref: ms}} — รายการที่ใส่คิวแล้ว (เก็บ 7 วัน)
 const LF_NOTIFY_MARK_KEEP_MS  = 7 * 86400000;
-const LF_SWEEP_EVERY_SEC      = 900;           // ตรวจรายการที่ตกหล่นทุก ~15 นาที (ภายใน trigger คิวเดิม)
+const LF_SWEEP_EVERY_SEC      = 900;           // ตรวจรายการ "ใส่คิวไม่ได้" จาก log ทุก ~15 นาที (ภายใน trigger คิวเดิม)
 const LF_WEBAPP_VER_KEY       = 'lf_webapp_version';  // build ของโค้ดที่ deploy เป็น web app (เขียนจาก doGet/doPost)
-const LF_SWEEP_GATE_KEY       = 'lf_sweep_gate';      // เหตุผลล่าสุดที่ sweeper ทำงาน/หยุด (ไว้บันทึก log เมื่อเปลี่ยนเท่านั้น)
 const LF_SENDING_GRACE_MS     = 7 * 60000;     // execution หนึ่งรันได้ไม่เกิน 6 นาที — เผื่อไว้ 7
 const LF_SWEEP_SETTLE_MS      = 10 * 60000;    // หลังพบ build ใหม่ของ web app ต้องรอคำขอรุ่นเดิมที่ค้างอยู่ให้จบก่อน (สูงสุด 6 นาที)
-const LF_SWEEP_MIN_AGE_MS     = 3 * 60000;     // ไม่แตะแถวที่เพิ่งบันทึก (อาจกำลังใส่คิว)
-const LF_SWEEP_MAX_AGE_MS     = 6 * 3600000;   // ตามเก็บย้อนหลังไม่เกิน 6 ชั่วโมง
 const LF_HOLD_UNTIL_MS        = 4102444800000; // 1 ม.ค. 2100 — ใส่ใน nextAt ของช่องทางที่ "ห้ามส่งอัตโนมัติ"
                                                // (กำลังส่ง/ไม่แน่ใจ/ปิดแล้ว) เพื่อให้โค้ดรุ่น 2.0.0 ข้ามด้วย หากต้องย้อนกลับ
-const LF_ATTENTION_MAX        = 50;            // จำนวนรายการ "ไม่แน่ใจ" สูงสุดที่เก็บรอเจ้าหน้าที่ (กันพื้นที่ Script Properties เต็ม)
+// ขีดจำกัด Script Properties ของ Google (นับเป็นไบต์ UTF-8 — อักษรไทย 1 ตัว = 3 ไบต์)
+const LF_PROP_VALUE_MAX_BYTES = 8800;          // ค่าละไม่เกิน 9 KB (9,216 ไบต์) — เผื่อไว้
+const LF_PROP_STORE_MAX_BYTES = 500 * 1024;    // ทั้งชุด (คีย์+ค่า) ไม่เกิน 500 KB
+const LF_PROP_STORE_GUARD     = 12 * 1024;     // การอัปเดตสถานะต้องไม่ทำให้ชุดเกิน 500 KB − ค่านี้
+const LF_QUEUE_NEW_BUDGET     = 400 * 1024;    // รับรายการใหม่เข้าคิวได้เมื่อรวมแล้วไม่เกินนี้ (เหลือที่ให้อัปเดตสถานะ/ค่าระบบ)
+const LF_ROW_VERIFY_MS        = 10 * 60000;    // รายการคิวที่ยังไม่ยืนยันว่าบันทึกแถวแล้ว — รอเท่านี้ก่อนตรวจชีท
+const LF_RECOVER_MAX_AGE_MS   = 7 * 86400000;  // ใส่คิวใหม่อัตโนมัติจาก log "queue_failed" ไม่เกิน 7 วัน (เกินนั้นให้เจ้าหน้าที่ตัดสิน)
+const LF_QUEUE_PAUSE_KEY      = 'LF_QUEUE_PAUSE'; // Script Property = 1 → หยุดส่ง LINE/อีเมลทุกช่องทางทันที (ฉุกเฉิน/ย้อนกลับ)
+let   LF_LAST_SAVE_ERR_       = '';
+
+/** จำนวนไบต์ UTF-8 ของข้อความ (ตามที่ Script Properties นับ) */
+function lfUtf8Bytes_(s) {
+  s = String(s == null ? '' : s);
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) { n += 4; i++; }
+    else n += 3;
+  }
+  return n;
+}
+function lfPropsBytes_(all) {
+  let n = 0;
+  Object.keys(all).forEach(function (k) { n += lfUtf8Bytes_(k) + lfUtf8Bytes_(all[k]); });
+  return n;
+}
+/** ตัดข้อความให้ไม่เกิน maxBytes (UTF-8) โดยไม่ตัดกลางอักขระ */
+function lfClipBytes_(s, maxBytes) {
+  s = String(s == null ? '' : s);
+  if (lfUtf8Bytes_(s) <= maxBytes) return s;
+  let lo = 0, hi = s.length;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (lfUtf8Bytes_(s.slice(0, mid)) <= maxBytes - 3) lo = mid; else hi = mid - 1; }
+  let out = s.slice(0, lo);
+  if (/[\uD800-\uDBFF]$/.test(out)) out = out.slice(0, -1);
+  return out + '…';
+}
+/** URL รูปหลายรายการ (คั่นด้วย ", ") — เก็บทั้ง URL ไม่ตัดกลาง */
+function lfClipUrls_(s, maxBytes) {
+  const parts = String(s || '').split(/,\s*/).filter(Boolean);
+  const keep = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (lfUtf8Bytes_(keep.concat([parts[i]]).join(', ')) > maxBytes) break;
+    keep.push(parts[i]);
+  }
+  return keep.length ? keep.join(', ') : '-';
+}
+/**
+ * JSON ของรายการคิวที่ไม่เกินขีดจำกัดต่อค่า — ย่อเฉพาะข้อความยาว (ไม่แตะสถานะการส่ง)
+ * ข้อมูลเต็มยังอยู่ในแถวของชีทเสมอ · คืน null ถ้าย่อแล้วยังไม่พอ
+ */
+function lfQueueItemJson_(item) {
+  let s = JSON.stringify(item);
+  if (lfUtf8Bytes_(s) <= LF_PROP_VALUE_MAX_BYTES) return s;
+  ['line', 'email'].forEach(function (ch) { if (item[ch] && item[ch].lastError) item[ch].lastError = lfClipBytes_(item[ch].lastError, 300); });
+  if (Array.isArray(item.decisions)) {
+    item.decisions = item.decisions.slice(-5);
+    item.decisions.forEach(function (d) { d.note = lfClipBytes_(d.note, 300); });
+  }
+  const p = item.payload || {};
+  const steps = [['itemDescription', 1500], ['locationDescription', 400], ['imageUrl', 1200], ['submitter', 200],
+                 ['department', 200], ['personType', 200], ['itemDescription', 600], ['locationDescription', 150],
+                 ['itemDescription', 240], ['imageUrl', 300]];
+  for (let i = 0; i < steps.length; i++) {
+    s = JSON.stringify(item);
+    if (lfUtf8Bytes_(s) <= LF_PROP_VALUE_MAX_BYTES) return s;
+    const f = steps[i][0], max = steps[i][1];
+    if (p[f] == null) continue;
+    p[f] = f === 'imageUrl' ? lfClipUrls_(p[f], max) : lfClipBytes_(p[f], max);
+    item.trimmed = true;
+  }
+  s = JSON.stringify(item);
+  return lfUtf8Bytes_(s) <= LF_PROP_VALUE_MAX_BYTES ? s : null;
+}
 
 function lfReadMarks_(props) {
   let m = null;
@@ -1431,7 +1554,7 @@ function lfReadMarks_(props) {
 
 /**
  * บันทึกว่ารายการนี้เข้าคิวแล้ว (อ่าน-แก้-เขียนค่าเดียวกัน จึงต้องอยู่ภายใต้ script lock)
- * lockHeld = true เมื่อผู้เรียกถือ script lock อยู่แล้ว (handleSubmit, sweeper, ตัวประมวลผลคิว)
+ * lockHeld = true เมื่อผู้เรียกถือ script lock อยู่แล้ว (handleSubmit, ตัวกู้คิวจากหลักฐาน, ตัวประมวลผลคิว)
  *   → ห้ามขอ/ปล่อย lock ซ้ำ: ถ้า LockService ไม่ re-entrant จะรอเปล่า 5 วินาที
  *     ถ้า re-entrant การปล่อยในนี้จะปล่อย lock ของผู้เรียกไปด้วย (เปิดช่องให้ส่งซ้อนกัน)
  * ถ้าจับ lock ไม่ได้ ยังเขียนต่อ — เสียเครื่องหมายดีกว่าทำให้ submit ล้ม
@@ -1446,11 +1569,16 @@ function lfMarkEnqueued_(props, refCode, lockHeld) {
   try {
     const m = lfReadMarks_(props), now = Date.now();
     m.refs[refCode] = now;
-    const keys = Object.keys(m.refs).filter(k => now - m.refs[k] < LF_NOTIFY_MARK_KEEP_MS)
-      .sort((a, b) => m.refs[b] - m.refs[a]).slice(0, 250);
-    const refs = {}; keys.forEach(k => { refs[k] = m.refs[k]; });
-    m.refs = refs;
-    props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(m));
+    let keys = Object.keys(m.refs).filter(k => now - m.refs[k] < LF_NOTIFY_MARK_KEEP_MS)
+      .sort((a, b) => m.refs[b] - m.refs[a]).slice(0, 220);
+    let out;
+    do {                                                   // ไม่ให้เกินขีดจำกัดต่อค่า (เดิม 250 รายการเกือบเต็ม 9 KB)
+      const refs = {}; keys.forEach(k => { refs[k] = m.refs[k]; });
+      out = JSON.stringify({ since: m.since, refs: refs });
+      if (lfUtf8Bytes_(out) <= LF_PROP_VALUE_MAX_BYTES) break;
+      keys = keys.slice(0, keys.length - 10);
+    } while (keys.length);
+    props.setProperty(LF_NOTIFY_MARK_KEY, out);
   } finally {
     if (held) { try { lock.releaseLock(); } catch (e) {} }
   }
@@ -1516,11 +1644,11 @@ function lfRecordWebAppVersion_() {
 }
 
 /**
- * sweeper (ตามเก็บแถวที่ไม่เคยเข้าคิว) ทำงานได้เมื่อยืนยันได้ว่าปลอดภัยเท่านั้น
- *  - unknown : web app ยังไม่เคยบันทึก build (เช่น ยังเป็น 2.0.0 ที่ใส่คิวหลังอัปโหลดรูปเสร็จ
- *              ซึ่งอาจนานหลายนาที) → หยุด เพราะอาจเข้าใจผิดว่าแถวนั้น "ตกหล่น" แล้วแจ้งซ้ำ
- *  - skew    : build ของ web app ≠ build ของโค้ด Head (กำลังเปลี่ยนรุ่น หรือแก้โค้ดโดยไม่ deploy)
- *  - settling: เพิ่งเปลี่ยนเป็น build เดียวกันไม่ถึง 10 นาที (คำขอรุ่นเดิมอาจยังทำงานอยู่)
+ * สถานะ "web app กับโค้ด trigger (Head) เป็น build เดียวกันหรือไม่" — แสดงในหน้า "ตรวจการแจ้งเตือน" เท่านั้น
+ * (ไม่ใช้ตัดสินการส่งอีกต่อไป: ระบบไม่สร้างคิวจากแถวในชีทแล้ว จึงไม่มีความเสี่ยงส่งซ้ำเมื่อรุ่นไม่ตรงกัน)
+ *  - unknown : web app ยังไม่เคยบันทึก build (เช่น ยังเป็น 2.0.0)
+ *  - skew    : build ของ web app ≠ build ของโค้ด Head (กำลังเปลี่ยนรุ่น/ย้อนกลับ หรือแก้โค้ดโดยไม่ deploy)
+ *  - settling: เพิ่งเปลี่ยนเป็น build เดียวกันไม่ถึง 10 นาที
  */
 function lfSweepGate_(props) {
   const head = lfBuildId_();
@@ -1535,58 +1663,74 @@ function lfSweepGate_(props) {
   return { ok: true, reason: 'ok', head: head, web: m.b, text: 'web app และโค้ด Head เป็น build เดียวกัน (' + head + ')' };
 }
 
-/** ข้อความเมื่อยังไม่ปลอดภัยให้ sweeper ทำงาน ('' = ปลอดภัย) — คงชื่อเดิมไว้ */
-function lfVersionSkew_() {
-  const g = lfSweepGate_(PropertiesService.getScriptProperties());
-  return g.ok ? '' : g.text;
-}
-
-/** บันทึกลง LF_NotifyLog เฉพาะเมื่อสถานะของ sweeper เปลี่ยน (ไม่ให้ log ท่วมทุก 15 นาที) */
-function lfNoteSweepGate_(props, gate) {
-  try {
-    if (props.getProperty(LF_SWEEP_GATE_KEY) === gate.reason) return;
-    props.setProperty(LF_SWEEP_GATE_KEY, gate.reason);
-  } catch (e) { return; }
-  lfNotifyLog_('-', 'queue', gate.ok ? 'sweep_resumed' : 'sweep_paused', 0, gate.text);
-}
-
-function lfEnqueueNotify_(refCode, notifyPayload, imagesPending, lockHeld) {
+/**
+ * ใส่รายการแจ้งเตือนเข้าคิว — throw ถ้าบันทึกไม่ได้ (ผู้เรียกต้องบันทึก queue_failed ให้เจ้าหน้าที่เห็น)
+ * rowPending = true: ใส่คิว "ก่อน" บันทึกแถว (handleSubmit) → ยังไม่ส่งจนกว่ายืนยันว่าบันทึกแถวแล้ว
+ *   ช่องทางถูกตั้ง nextAt = ปี 2100 ระหว่างนี้ เพื่อให้โค้ดรุ่น 2.0.0 (ถ้าย้อนกลับ) ไม่ส่งรายการที่ยังไม่มีแถว
+ */
+function lfEnqueueNotify_(refCode, notifyPayload, imagesPending, lockHeld, rowPending) {
   const props = PropertiesService.getScriptProperties();
+  const hold = rowPending ? LF_HOLD_UNTIL_MS : 0;
   const item = {
     refCode: refCode, createdAt: Date.now(), payload: notifyPayload, imagesPending: !!imagesPending,
-    line:  { state: 'pending', attempts: 0, nextAt: 0, lastError: '' },
-    email: { state: 'pending', attempts: 0, nextAt: 0, lastError: '' }
+    line:  { state: 'pending', attempts: 0, nextAt: hold, lastError: '' },
+    email: { state: 'pending', attempts: 0, nextAt: hold, lastError: '' }
   };
-  let s = JSON.stringify(item);
-  if (s.length > 8500) {                    // ขีดจำกัดค่าละ 9KB
-    item.payload.itemDescription = String(item.payload.itemDescription).slice(0, 1500);
-    s = JSON.stringify(item);
-  }
-  props.setProperty('lfq_' + refCode, s);
+  if (rowPending) item.rowPending = true;
+  if (!lfSaveQueueItem_(props, 'lfq_' + refCode, item, true)) throw new Error('queue save failed: ' + LF_LAST_SAVE_ERR_);
   try { lfMarkEnqueued_(props, refCode, !!lockHeld); } catch (e) { Logger.log('mark enqueued: ' + e); }
 }
 
-/** บันทึกรายการคิว — คืน false ถ้าเขียนไม่สำเร็จ (ผู้เรียกตัดสินใจต่อเอง) */
-function lfSaveQueueItem_(props, key, item) {
-  try { props.setProperty(key, JSON.stringify(item)); return true; }
-  catch (e) { Logger.log('⚠️ save queue item ' + key + ': ' + e); return false; }
+/** ยืนยันว่าแถวของรายการคิวถูกบันทึกแล้ว → ปลดสถานะรอแถว (ผู้เรียกถือ lock) */
+function lfQueueRowSaved_(props, refCode) {
+  const key = 'lfq_' + refCode;
+  let item;
+  try { item = JSON.parse(props.getProperty(key) || 'null'); } catch (e) { item = null; }
+  if (!item || !item.rowPending) return true;
+  delete item.rowPending;
+  ['line', 'email'].forEach(function (ch) {
+    if (item[ch].state === 'pending' && item[ch].nextAt === LF_HOLD_UNTIL_MS) item[ch].nextAt = 0;
+  });
+  return lfSaveQueueItem_(props, key, item, false);
 }
 
 /**
- * ความล้มเหลวที่ "ไม่รู้ว่าปลายทางส่งเข้า LINE แล้วหรือยัง" → ไม่ส่งซ้ำอัตโนมัติ ให้เจ้าหน้าที่ตัดสินที่หน้า "ตรวจการแจ้งเตือน"
- * หลัก: ลองใหม่อัตโนมัติเฉพาะกรณีที่คำขอไม่ถึงโค้ดที่เรียก LINE (ต่อไม่ติด, DNS, HTTP 4xx) — HTTP 5xx และหมดเวลา = ไม่แน่ใจเสมอ
- * (ตรวจโค้ด Cloud Function ในเครื่องผู้ดูแล 21 ต.ค. 2569 แล้วพบว่า 500 เกิดได้หลังเรียก LINE; รุ่นที่ deploy อยู่เทียบไม่ได้)
+ * บันทึกรายการคิว — คืน false ถ้าบันทึกไม่ได้ (เหตุผลอยู่ใน LF_LAST_SAVE_ERR_) · ผู้เรียกตัดสินใจต่อเอง
+ * ตรวจขนาดเป็นไบต์ UTF-8 ทุกครั้ง: ค่าละ ≤ 8,800 ไบต์ (ย่อข้อความยาวให้), ทั้งชุด ≤ 500 KB
+ * isNew = รายการใหม่ → ต้องไม่เกินงบ LF_QUEUE_NEW_BUDGET (เหลือที่ให้อัปเดตสถานะรายการที่มีอยู่)
+ */
+function lfSaveQueueItem_(props, key, item, isNew) {
+  LF_LAST_SAVE_ERR_ = '';
+  try {
+    const s = lfQueueItemJson_(item);
+    if (s == null) { LF_LAST_SAVE_ERR_ = 'item too large'; return false; }
+    const all = props.getProperties();
+    const old = all[key] != null ? lfUtf8Bytes_(key) + lfUtf8Bytes_(all[key]) : 0;
+    const total = lfPropsBytes_(all) - old + lfUtf8Bytes_(key) + lfUtf8Bytes_(s);
+    const limit = isNew ? LF_QUEUE_NEW_BUDGET : LF_PROP_STORE_MAX_BYTES - LF_PROP_STORE_GUARD;
+    if (total > limit) { LF_LAST_SAVE_ERR_ = 'storage full (' + Math.round(total / 1024) + ' KB > ' + Math.round(limit / 1024) + ' KB)'; return false; }
+    props.setProperty(key, s);
+    return true;
+  } catch (e) {
+    LF_LAST_SAVE_ERR_ = String((e && e.message) || e).slice(0, 150);
+    Logger.log('⚠️ save queue item ' + key + ': ' + e);
+    return false;
+  }
+}
+
+/**
+ * ผลการส่ง LINE ที่ "พิสูจน์ไม่ได้ว่าปลายทางส่งเข้า LINE แล้วหรือยัง" → ไม่ส่งซ้ำอัตโนมัติ ให้เจ้าหน้าที่ตัดสิน
+ * สัญญาการตอบกลับของ Cloud Function (โค้ดในเครื่องผู้ดูแล): HTTP 200 + JSON {status:'success'} หลัง LINE รับข้อความแล้วเท่านั้น
+ * รุ่นที่ deploy อยู่บน Firebase เทียบไม่ได้ จึงถือว่า "ส่งแล้ว" เฉพาะเมื่อได้ตามสัญญานี้ (ดู lfSendLine_)
+ *  - ได้คำตอบ HTTP ใดก็ตามที่ไม่ตรงสัญญา (2xx ที่ไม่ใช่ success, 3xx, 4xx รวม 408/429, 5xx) = ไม่แน่ใจ
+ *  - หมดเวลา/การเชื่อมต่อขาดหลังส่งคำขอ/ข้อผิดพลาดที่ไม่รู้จัก = ไม่แน่ใจ
+ *  - ล้มเหลวก่อนส่งคำขอ (ไม่ได้ตั้ง URL, DNS, ที่อยู่ผิด, โควตา UrlFetch) = ล้มเหลว ลองใหม่อัตโนมัติได้
  * อีเมลเป็นช่องทางแยก — ถ้า LINE ไม่แน่ใจ อีเมลของรายการเดียวกันยังส่งตามปกติ
+ * ระบบรับประกันไม่ได้ว่าส่ง "ครั้งเดียวเสมอ": การตัดสินของเจ้าหน้าที่ (ส่งใหม่) อาจทำให้ซ้ำได้
  */
 function lfIsAmbiguousSendError_(err) {
-  // true = ปลายทางอาจส่งข้อความเข้า LINE ไปแล้ว → ห้ามลองส่งเองอัตโนมัติ ให้เจ้าหน้าที่ตัดสิน
-  // false = คำขอไม่ถึงโค้ดที่เรียก LINE → ลองใหม่อัตโนมัติได้
-  // HTTP 5xx ทุกกรณี = ไม่แน่ใจ: เทียบโค้ด Cloud Function รุ่นที่ deploy อยู่ไม่ได้ จึงไม่ใช้ข้อความใน body ตัดสิน
-  // HTTP 4xx = ไม่ส่ง (สมมติฐาน: โค้ดในเครื่องผู้ดูแลไม่ตอบ 4xx หลังเรียก LINE; 404/403 มาจาก Google ก่อนถึงโค้ด)
-  const code = err && err.httpCode;
-  if (code) return code >= 500;
+  if (err && err.httpCode) return true;
   const text = String((err && err.message) || err || '');
-  // ต่อไม่ติด/ยังไม่ได้ส่งคำขอออกไปเลย
   if (/not configured|dns error|address unavailable|unknown host|invalid argument|bad url|too many times|bandwidth quota/i.test(text)) return false;
   return true;
 }
@@ -1603,51 +1747,86 @@ function lfQueueAttachImages_(refCode, imgUrl) {
     const item = JSON.parse(raw);
     item.payload.imageUrl = imgUrl || '-';
     item.imagesPending = false;
-    props.setProperty(key, JSON.stringify(item));
+    if (!lfSaveQueueItem_(props, key, item, false)) throw new Error('attach images: ' + LF_LAST_SAVE_ERR_);
   } finally {
     lock.releaseLock();
   }
 }
 
 /**
- * ตามเก็บแถวใน LF_New ที่บันทึกแล้วแต่ไม่เคยเข้าคิวแจ้งเตือน (เช่น execution หยุดก่อนใส่คิว)
- * ทำเฉพาะแถวที่บันทึกหลังจากเริ่มใช้ระบบเครื่องหมาย (marks.since) เพื่อไม่ให้แจ้งรายการเก่าซ้ำ
- * เรียกจาก lfProcessNotifyQueue ขณะถือ lock แล้ว
+ * สรุป LF_NotifyLog ต่อ RefCode (อ่านทั้งแท็บ — log เป็นหลักฐานถาวรว่ารายการใดเคยเข้าคิว/ส่ง/ถูกตัดสินแล้ว)
+ *  qf = เวลา queue_failed ล่าสุด, channel = เคยมีผลการส่ง LINE/อีเมล, closed = เจ้าหน้าที่ปิดแล้ว
  */
-function lfSweepMissedNotifications_(props) {
+function lfNotifyLogIndex_() {
+  const idx = {};
+  try {
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTIFY_LOG_SHEET);
+    if (!sh || sh.getLastRow() < 2) return idx;
+    sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues().forEach(function (r) {
+      const ref = lfStr_(r[1]);
+      if (!ref) return;
+      const ch = lfStr_(r[2]), res = lfStr_(r[3]);
+      const o = idx[ref] || (idx[ref] = { qf: 0, qfText: '', detail: '', channel: false, closed: false });
+      if (ch === 'queue' && res === 'queue_failed') {
+        const t = lfToDate_(r[0]);
+        o.qf = t ? t.getTime() : (o.qf || 1); o.qfText = lfStr_(r[0]); o.detail = lfStr_(r[5]);
+      } else if (ch === 'queue' && res === 'staff_close') o.closed = true;
+      else if (ch === 'line' || ch === 'email') o.channel = true;
+    });
+  } catch (e) { Logger.log('notify log index: ' + e); }
+  return idx;
+}
+
+/**
+ * รายการที่ "บันทึกแถวแล้วแต่ใส่คิวแจ้งเตือนไม่ได้" และยังไม่มีใครจัดการ
+ * หลักฐาน: log มี queue_failed + ไม่เคยมีผลการส่ง LINE/อีเมล + ไม่มีรายการคิว/เครื่องหมายเข้าคิว + เจ้าหน้าที่ยังไม่ปิด
+ * (รุ่น 2.0.0 ไม่เขียน queue_failed ลง log → รายการจาก web app รุ่นเดิมไม่มีวันเข้าเงื่อนไขนี้)
+ */
+function lfNotQueued_(props, idx) {
   const marks = lfReadMarks_(props);
-  if (!props.getProperty(LF_NOTIFY_MARK_KEY)) { props.setProperty(LF_NOTIFY_MARK_KEY, JSON.stringify(marks)); return 0; }
-  // ทำงานเฉพาะเมื่อยืนยันได้ว่า web app เป็น build เดียวกับโค้ด Head มาแล้วอย่างน้อย 10 นาที
-  // (ไม่เคยบันทึก/ต่าง build/เพิ่งเปลี่ยน = หยุด — ดู lfSweepGate_)
-  const gate = lfSweepGate_(props);
-  lfNoteSweepGate_(props, gate);
-  if (!gate.ok) return 0;
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  if (!sheet) return 0;
-  const last = sheet.getLastRow();
-  if (last < 2) return 0;
-  const n = Math.min(60, last - 1);
-  const rows = sheet.getRange(last - n + 1, 1, n, 12).getValues();
-  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+  return Object.keys(idx).filter(function (ref) {
+    const o = idx[ref];
+    return o.qf && !o.channel && !o.closed && !props.getProperty('lfq_' + ref) && !marks.refs[ref];
+  }).map(function (ref) { return { refCode: ref, at: idx[ref].qfText, qf: idx[ref].qf, detail: idx[ref].detail }; })
+    .sort((a, b) => a.qf - b.qf);
+}
+
+/** สร้าง payload แจ้งเตือนจากแถวใน LF_New (ใช้เมื่อมีหลักฐานว่าไม่เคยเข้าคิว/ไม่เคยส่งเท่านั้น) */
+function lfPayloadFromRow_(ref) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  const row = sheet ? lfFindRowByRef_(sheet, ref, 0) : 0;
+  if (row < 2) return null;
+  const r = sheet.getRange(row, 1, 1, 12).getValues()[0];
+  const type = lfStr_(r[2]);
+  if (LF_TYPES.indexOf(type) < 0) return null;
+  const tz = ss.getSpreadsheetTimeZone();
+  const p = { name: lfStr_(r[3]), personType: lfStr_(r[4]), department: lfStr_(r[5]), phone: lfPhone_(r[6]),
+              itemDate: lfCellDate_(r[7], tz), itemDesc: lfStr_(r[9]), itemLoc: lfStr_(r[10]) };
+  const pl = lfBuildNewFormNotifyPayload_(p, ref, type, lfStr_(r[11]), lfToDate_(r[0]) || new Date());
+  pl.recovered = true;
+  return pl;
+}
+
+/**
+ * ใส่คิวใหม่ให้รายการที่เคยใส่คิวไม่ได้ (เช่น พื้นที่ Script Properties เต็ม) เมื่อมีที่ว่างแล้ว
+ * แทน sweeper เดิมที่ "เดา" จากแถวในชีท — ไม่สร้างคิวจากแถวที่ไม่มีหลักฐานว่าไม่เคยส่ง จึงไม่ส่งซ้ำแม้ web app เป็นรุ่นเดิม
+ * เรียกจาก lfProcessNotifyQueue ขณะถือ lock แล้ว · คืนจำนวนรายการที่ใส่คิวได้
+ */
+function lfRecoverQueueFailed_(props) {
+  const idx = lfNotifyLogIndex_();
   const now = Date.now();
-  const from = Math.max(marks.since, now - LF_SWEEP_MAX_AGE_MS);
   let count = 0;
-  rows.forEach(function (r) {
-    const ref = lfStr_(r[1]);
-    if (!/^(LOS|FND|PKP)-\d{6}-\d{4}$/.test(ref)) return;
-    if (marks.refs[ref] || props.getProperty('lfq_' + ref)) return;
-    const ts = lfToDate_(r[0]);
-    if (!ts || ts.getTime() < from || now - ts.getTime() < LF_SWEEP_MIN_AGE_MS) return;
-    const type = lfStr_(r[2]);
-    if (LF_TYPES.indexOf(type) < 0) return;
-    const p = { name: lfStr_(r[3]), personType: lfStr_(r[4]), department: lfStr_(r[5]), phone: lfPhone_(r[6]),
-                itemDate: lfCellDate_(r[7], tz), itemDesc: lfStr_(r[9]), itemLoc: lfStr_(r[10]) };
-    const pl = lfBuildNewFormNotifyPayload_(p, ref, type, lfStr_(r[11]), ts);
-    pl.recovered = true;
-    lfEnqueueNotify_(ref, pl, false, true);              // ถือ lock ของตัวประมวลผลคิวอยู่แล้ว
-    lfNotifyLog_(ref, 'queue', 'recovered', 0, 'แถวถูกบันทึกแต่ไม่ได้เข้าคิว — ใส่คิวย้อนหลัง');
+  const list = lfNotQueued_(props, idx).filter(x => now - x.qf <= LF_RECOVER_MAX_AGE_MS).slice(0, 10);
+  for (let i = 0; i < list.length; i++) {
+    const ref = list[i].refCode;
+    const pl = lfPayloadFromRow_(ref);
+    if (!pl) continue;
+    try { lfEnqueueNotify_(ref, pl, false, true, false); }
+    catch (e) { break; }                                  // ยังเต็มอยู่ — รอบหน้าค่อยลอง (ไม่เขียน log ซ้ำทุกรอบ)
+    lfNotifyLog_(ref, 'queue', 'requeued', 0, 'ใส่คิวได้แล้ว (เดิมใส่ไม่ได้: ' + lfClip_(list[i].detail, 120) + ')');
     count++;
-  });
+  }
   return count;
 }
 
@@ -1682,18 +1861,23 @@ function lfNotifyLog_(refCode, channel, result, attempt, detail) {
   } catch (e) { Logger.log('notify log error: ' + e); }
 }
 
+/** สัญญาการตอบกลับที่ถือว่า "LINE รับข้อความแล้ว": HTTP 2xx + JSON {status:'success'} */
+function lfLineResponseOk_(code, body) {
+  if (code < 200 || code >= 300) return false;
+  try { const j = JSON.parse(String(body || '')); return !!j && j.status === 'success'; } catch (e) { return false; }
+}
+
 function lfSendLine_(url, payload) {
   if (!url) throw new Error('lineWebhookUrl not configured');
   const res = UrlFetchApp.fetch(url, {
     method: 'post', contentType: 'application/json',
-    payload: JSON.stringify(payload), muteHttpExceptions: true
+    payload: JSON.stringify(payload), muteHttpExceptions: true, followRedirects: false
   });
   const code = res.getResponseCode();
-  if (code < 200 || code >= 300) {
-    const body = String(res.getContentText());
-    const err = new Error('HTTP ' + code + ' ' + body.slice(0, 120));
-    err.httpCode = code;
-    err.body = body.slice(0, 1000);
+  const body = String(res.getContentText() || '');
+  if (!lfLineResponseOk_(code, body)) {
+    const err = new Error('HTTP ' + code + (code >= 200 && code < 300 ? ' (ไม่ใช่คำตอบ success ของ Cloud Function)' : '') + ' ' + body.slice(0, 120));
+    err.httpCode = code || -1;
     throw err;
   }
   return code;
@@ -1704,6 +1888,7 @@ function lfProcessNotifyQueue() {
   const props = PropertiesService.getScriptProperties();
   const all = props.getProperties();
   const cache = CacheService.getScriptCache();
+  if (all[LF_QUEUE_PAUSE_KEY] === '1') return;           // หยุดส่งฉุกเฉิน (ตั้งใน Script Properties)
   const sweepDue = !cache.get('lf_sweep_ok');
   let keys = Object.keys(all).filter(k => k.indexOf('lfq_') === 0);
   if (!keys.length && !sweepDue) return;
@@ -1713,9 +1898,9 @@ function lfProcessNotifyQueue() {
     if (sweepDue) {
       cache.put('lf_sweep_ok', '1', LF_SWEEP_EVERY_SEC);
       try {
-        if (lfSweepMissedNotifications_(props) > 0)
+        if (lfRecoverQueueFailed_(props) > 0)
           keys = Object.keys(props.getProperties()).filter(k => k.indexOf('lfq_') === 0);
-      } catch (sErr) { Logger.log('⚠️ sweep failed: ' + sErr); }
+      } catch (sErr) { Logger.log('⚠️ recover failed: ' + sErr); }
     }
     if (!keys.length) return;
     const cfg = lfCfg_();
@@ -1724,7 +1909,20 @@ function lfProcessNotifyQueue() {
       if (Date.now() - started > 240000) return;          // เผื่อเวลาก่อนครบ 6 นาที
       let item;
       try { item = JSON.parse(props.getProperty(key) || 'null'); } catch (e) { item = null; }
-      if (!item) { props.deleteProperty(key); return; }
+      if (!item) { try { props.deleteProperty(key); } catch (e) {} return; }
+      // ใส่คิวก่อนบันทึกแถว แต่ยังไม่ยืนยันว่าบันทึกแถวแล้ว (execution หยุดกลางคัน) → ตรวจชีทก่อนส่ง
+      if (item.rowPending) {
+        if (Date.now() - (item.createdAt || 0) < LF_ROW_VERIFY_MS) return;
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+        if (sheet && lfFindRowByRef_(sheet, item.refCode, 0) > 1) {
+          if (!lfQueueRowSaved_(props, item.refCode)) return;
+          item = JSON.parse(props.getProperty(key));
+        } else {
+          try { props.deleteProperty(key); } catch (e) {}
+          lfNotifyLog_(item.refCode, 'queue', 'dropped_no_row', 0, 'ไม่พบแถวในชีท (บันทึกไม่สำเร็จ) — ไม่ส่งแจ้งเตือน');
+          return;
+        }
+      }
       if (item.imagesPending && Date.now() - item.createdAt < LF_NOTIFY_IMG_WAIT_MS) return;  // รอ URL รูป
       ['line', 'email'].forEach(function (ch) {
         const st = item[ch];
@@ -1781,37 +1979,14 @@ function lfProcessNotifyQueue() {
       const settled = ch => ['sent', 'gave_up', 'uncertain', 'closed'].indexOf(item[ch].state) >= 0;
       const hasUncertain = ['line', 'email'].some(ch => item[ch].state === 'uncertain');
       if (['line', 'email'].every(settled)) {
-        try { if (!lfReadMarks_(props).refs[item.refCode]) lfMarkEnqueued_(props, item.refCode, true); } catch (e) {}  // กัน sweeper ใส่คิวซ้ำ
-        // รายการที่ยังไม่แน่ใจ เก็บไว้จนกว่าเจ้าหน้าที่จะตัดสิน (ไม่มีวันหมดอายุเอง)
-        if (!hasUncertain) props.deleteProperty(key);
+        try { if (!lfReadMarks_(props).refs[item.refCode]) lfMarkEnqueued_(props, item.refCode, true); } catch (e) {}  // กันตัวกู้คิวใส่คิวซ้ำ
+        // รายการที่ยังไม่แน่ใจ เก็บไว้จนกว่าเจ้าหน้าที่จะตัดสิน (ไม่มีวันหมดอายุเอง และไม่ถูกตัดทิ้งเมื่อมีจำนวนมาก)
+        if (!hasUncertain) { try { props.deleteProperty(key); } catch (e) { Logger.log('delete ' + key + ': ' + e); } }
       }
     });
-    lfTrimAttention_(props);
   } finally {
     lock.releaseLock();
   }
-}
-
-/** มีรายการไม่แน่ใจเกิน LF_ATTENTION_MAX → ย้ายรายการเก่าสุดออกจากคิว (บันทึกใน LF_NotifyLog ให้ตามต่อได้) */
-function lfTrimAttention_(props) {
-  try {
-    const all = props.getProperties();
-    const att = [];
-    Object.keys(all).forEach(function (k) {
-      if (k.indexOf('lfq_') !== 0) return;
-      try {
-        const it = JSON.parse(all[k]);
-        if (['line', 'email'].some(ch => it[ch] && it[ch].state === 'uncertain'))
-          att.push({ k: k, it: it, at: Math.max(it.line.uncertainAt || 0, it.email.uncertainAt || 0) });
-      } catch (e) {}
-    });
-    if (att.length <= LF_ATTENTION_MAX) return;
-    att.sort((a, b) => a.at - b.at).slice(0, att.length - LF_ATTENTION_MAX).forEach(function (a) {
-      props.deleteProperty(a.k);
-      lfNotifyLog_(a.it.refCode, 'queue', 'attention_overflow', 0,
-        'รายการไม่แน่ใจเกิน ' + LF_ATTENTION_MAX + ' รายการ — นำออกจากคิว ต้องตรวจย้อนหลังจาก log นี้');
-    });
-  } catch (e) { Logger.log('trim attention: ' + e); }
 }
 
 /** แถวล่าสุดของ LF_NotifyLog ที่ควรให้เจ้าหน้าที่เห็น (ไม่สำเร็จ/ไม่แน่ใจ/การตัดสินของเจ้าหน้าที่/สถานะ sweeper) */
@@ -1823,7 +1998,7 @@ function lfNotifyAttentionLog_(limit) {
     if (last < 2) return [];
     const n = Math.min(400, last - 1);
     const rows = sh.getRange(last - n + 1, 1, n, 6).getValues();
-    const want = /^(gave_up|uncertain|staff_|attention_overflow|sweep_|monthly_)/;
+    const want = /^(gave_up|uncertain|staff_|queue_failed|requeued|dropped_no_row|sweep_|monthly_)/;
     return rows.filter(r => want.test(lfStr_(r[3]))).slice(-(limit || 40)).reverse()
       .map(r => ({ at: lfStr_(r[0]), refCode: lfStr_(r[1]), channel: lfStr_(r[2]), result: lfStr_(r[3]), attempt: r[4], detail: lfStr_(r[5]) }));
   } catch (e) { return []; }
@@ -1846,8 +2021,14 @@ function lfNotifyStatus_() {
     (q.line.state === 'uncertain' || q.email.state === 'uncertain'));
   const gate = lfSweepGate_(props);
   const marker = lfReadWebAppMarker_(props);
+  const bytes = lfPropsBytes_(all);
+  const qBytes = Object.keys(all).filter(k => k.indexOf('lfq_') === 0).reduce((n, k) => n + lfUtf8Bytes_(k) + lfUtf8Bytes_(all[k]), 0);
   return jsonResponse({
     success: true, queue: queue, uncertain: uncertain,
+    notQueued: lfNotQueued_(props, lfNotifyLogIndex_()),
+    paused: all[LF_QUEUE_PAUSE_KEY] === '1',
+    storage: { bytes: bytes, queueBytes: qBytes, items: queue.length, newBudget: LF_QUEUE_NEW_BUDGET, limit: LF_PROP_STORE_MAX_BYTES,
+               pct: Math.round(bytes * 100 / LF_PROP_STORE_MAX_BYTES) },
     triggerInstalled: hasTrigger, legacyApi: lfLegacyEnabled_() ? 'on' : 'off',
     headVersion: LF_VERSION, headBuild: gate.head,
     webAppVersion: marker ? (marker.v || '') : '(ยังไม่มีคำขอจาก web app รุ่นที่บันทึก build)',
@@ -1869,13 +2050,32 @@ function lfResolveNotify_(payload, session) {
   const ref = lfStr_(payload.refCode), ch = lfStr_(payload.channel), decision = lfStr_(payload.decision);
   const note = lfClip_(payload.note, 300).trim();
   if (!/^((LOS|FND|PKP)-\d{6}-\d{4}|GF-\d{12}|TEST-\d{6,16})$/.test(ref)) return jsonResponse({ success: false, error: 'invalid refCode' });
-  if (['line', 'email'].indexOf(ch) < 0) return jsonResponse({ success: false, error: 'invalid channel' });
+  if (['line', 'email', 'queue'].indexOf(ch) < 0) return jsonResponse({ success: false, error: 'invalid channel' });
   if (['resend', 'confirm_sent', 'close'].indexOf(decision) < 0) return jsonResponse({ success: false, error: 'invalid decision' });
   if (!note) return jsonResponse({ success: false, error: 'note required', message: 'กรุณาระบุเหตุผล/สิ่งที่ตรวจพบ' });
   const props = PropertiesService.getScriptProperties();
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return jsonResponse({ success: false, error: 'busy', message: 'ระบบกำลังประมวลผลคิว กรุณาลองใหม่' });
   let st, item;
+  // รายการที่ใส่คิวไม่ได้ (ไม่มีรายการคิว): ใส่คิวใหม่ทันที หรือปิด (แจ้งทางอื่นแล้ว)
+  if (ch === 'queue') {
+    let res;
+    try {
+      const nq = lfNotQueued_(props, lfNotifyLogIndex_()).filter(x => x.refCode === ref)[0];
+      if (!nq) res = { success: false, error: 'not found', code: 404, message: 'ไม่พบรายการนี้ในรายการที่ใส่คิวไม่ได้ (อาจมีผู้จัดการไปแล้ว)' };
+      else if (decision === 'resend') {
+        const pl = lfPayloadFromRow_(ref);
+        if (!pl) res = { success: false, error: 'row not found', message: 'ไม่พบแถวของรายการนี้ในชีท' };
+        else {
+          try { lfEnqueueNotify_(ref, pl, false, true, false); res = { success: true, refCode: ref, channel: ch, state: 'queued' }; }
+          catch (e) { res = { success: false, error: 'queue full', message: 'ยังใส่คิวไม่ได้: ' + LF_LAST_SAVE_ERR_ }; }
+        }
+      } else if (decision === 'close') res = { success: true, refCode: ref, channel: ch, state: 'closed' };
+      else res = { success: false, error: 'invalid decision', message: 'รายการที่ใส่คิวไม่ได้ เลือกได้เฉพาะ ส่งใหม่ หรือ ปิด' };
+    } finally { lock.releaseLock(); }
+    if (res.success) lfNotifyLog_(ref, 'queue', 'staff_' + decision, 0, session.u + ': ' + note);
+    return jsonResponse(res);
+  }
   try {
     const key = 'lfq_' + ref;
     try { item = JSON.parse(props.getProperty(key) || 'null'); } catch (e) { item = null; }

@@ -23,12 +23,21 @@ function lfTestSha_(s) { return lfHex_(Utilities.computeDigest(Utilities.DigestA
 function lfTestCfg_() { return (typeof LF_PRIVATE_CONFIG !== 'undefined' && LF_PRIVATE_CONFIG) ? LF_PRIVATE_CONFIG : {}; }
 function lfTestDeployId_(url) { const m = String(url || '').match(/\/s\/([A-Za-z0-9_-]+)\/(exec|dev)/); return m ? m[1] : ''; }
 
-/** URL "LINE" ของโปรเจกต์ทดสอบ: web app ของตัวเอง (ค่าเริ่มต้น) หรือ URL ที่ไม่มีอยู่จริง (ทดสอบล้มเหลว) */
+/**
+ * URL "LINE" ของโปรเจกต์ทดสอบ — ไม่มีปลายทาง LINE จริง:
+ *  self    = web app ทดสอบตอบแบบ Cloud Function ({status:'success'}) ผ่าน ?lfTestEcho=ok (ทำงานเฉพาะเมื่อ config มี testMode)
+ *  bad     = web app ทดสอบตอบ HTTP 200 แต่ไม่ใช่ success → ต้องเป็น "ไม่แน่ใจ"
+ *  invalid = deployment ที่ไม่มีอยู่จริง (HTTP 404 จาก Google) → ต้องเป็น "ไม่แน่ใจ"
+ *  dns     = โดเมน .invalid (ต่อไม่ติด ยังไม่ได้ส่งคำขอ) → ล้มเหลวและลองใหม่
+ */
 function lfTestLineUrl_() {
   const mode = PropertiesService.getScriptProperties().getProperty('LF_TEST_LINE_MODE') || 'self';
+  const url = String(lfTestCfg_().testWebAppUrl || '');
   if (mode === 'invalid') return 'https://script.google.com/macros/s/INVALID_TEST_DEPLOYMENT_0000/exec';
+  if (mode === 'dns') return 'https://lf-test-no-such-host.invalid/hook';
   if (mode === 'none') return '';
-  return String(lfTestCfg_().testWebAppUrl || '');
+  if (!url) return '';
+  return url + (mode === 'bad' ? '?lfTestEcho=bad' : '?lfTestEcho=ok');
 }
 
 function lfTestSheet_() {
@@ -63,7 +72,7 @@ function lfTestIsolation_() {
   const c = lfCfg_();
   ['lineWebhookUrl', 'monthlyLineWebhookUrl'].forEach(function (k) {
     const v = String(c[k] || '');
-    if (v && v !== url && !/INVALID_TEST_DEPLOYMENT/.test(v)) problems.push(k + ' ชี้ไปที่อื่นที่ไม่ใช่ web app ทดสอบ');
+    if (v && v.split('?')[0] !== url && !/INVALID_TEST_DEPLOYMENT|\.invalid\//.test(v)) problems.push(k + ' ชี้ไปที่อื่นที่ไม่ใช่ web app ทดสอบ');
     if (/cloudfunctions\.net|line\.me|firebase/i.test(v)) problems.push(k + ' ชี้ไปที่ปลายทาง LINE/Cloud Function');
   });
   const me = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
@@ -150,13 +159,29 @@ function lfTest_2_ทดสอบทั้งหมด() {
   lfTestRecord_(G4, 'คำนวณ build ได้จริง (ไม่ใช่ unknown)', !/unknown$/.test(head), 'Apps Script จริง', head);
   lfTestRecord_(G4, 'web app ที่ deploy เป็นโค้ดเดียวกับ Head', h.json && h.json.build === head ? true : 'ไม่ตรง — Deploy ใหม่หลังวางโค้ด', 'Apps Script จริง (HTTP)', '');
   const gate = lfSweepGate_(props);
-  lfTestRecord_(G4, 'ตัวตามเก็บงานค้างหยุดรอหลังเปลี่ยนรุ่น', gate.reason === 'settling' || gate.reason === 'ok', 'Apps Script จริง', gate.reason + ' — ' + gate.text);
+  lfTestRecord_(G4, 'หน้าตรวจการแจ้งเตือนบอกสถานะรุ่น web app เทียบ Head ได้ (แสดงผลเท่านั้น)', gate.reason === 'settling' || gate.reason === 'ok', 'Apps Script จริง', gate.reason + ' — ' + gate.text);
+  // ปิดบังข้อมูลสาธารณะบน runtime จริงของ Google (regex เลขไทย) — ข้อมูลสังเคราะห์
+  const mk = [['โทร ๐๘๑-๒๓๔-๕๖๗๘', 'โทร [ซ่อนเบอร์]'], ['โทร (081) 234-5678', 'โทร [ซ่อนเบอร์]'], ['รหัส 6512345', 'รหัส [ซ่อนตัวเลข]'],
+    ['บัตรของ นายทดสอบ สมมติ', 'บัตรของ นายท*** ส***'], ['วันที่ 21.10.2569 10.30 น.', 'วันที่ 21.10.2569 10.30 น.'], ['คุณภาพดี ห้อง 1203', 'คุณภาพดี ห้อง 1203']];
+  const mkBad = mk.filter(c => lfMaskPII_(c[0]) !== c[1]).map(c => c[0] + ' → ' + lfMaskPII_(c[0]));
+  lfTestRecord_(G4, 'ปิดบังเบอร์/รหัส/ชื่อ (เลขไทยด้วย) และไม่แตะข้อความทั่วไป', mkBad.length === 0, 'Apps Script จริง', mkBad.join(' | ') || mk.length + ' เคสตรง');
 
   // ── 1. ฟอร์ม → ชีท/รูป (HTTP จริงเข้า doPost ของ web app ทดสอบ) ──
   const n0 = lfTestRowCount_();
   const a = lfTestPost_({ action: 'submit', type: 'สิ่งของสูญหาย', name: 'ผู้ทดสอบ ไม่มีรูป', itemDesc: 'ร่มทดสอบ', itemLoc: 'ประตูทดสอบ',
     phone: '0890000001', clientRequestId: 'rt-a-' + started });
   lfTestRecord_(G1, 'ส่งฟอร์มไม่มีรูป', !!(a.json && a.json.success && a.json.refCode && a.json.notify === 'queued'), 'Apps Script จริง (HTTP)', JSON.stringify(a.json || a.text));
+  const ai = a.json && a.json.refCode ? lfTestItem_(a.json.refCode) : null;
+  lfTestRecord_(G1, 'รายการคิวพร้อมส่งหลังบันทึกแถว (ไม่ค้างสถานะรอแถว)', !!(ai && !ai.rowPending && ai.line.nextAt === 0), 'Apps Script จริง', ai ? JSON.stringify({ rowPending: ai.rowPending, nextAt: ai.line.nextAt }) : 'ไม่พบรายการ');
+  // ข้อความไทยยาว: Script Properties จริงนับไบต์ UTF-8 (ค่าละ 9 KB) — ต้องเข้าคิวได้และไม่เกินขีดจำกัด
+  const longTh = new Array(80).join('กระเป๋าสีน้ำตาลมีสายคล้องไหล่ ').slice(0, 2000);
+  const lt = lfTestPost_({ action: 'submit', type: 'สิ่งของสูญหาย', name: 'ผู้ทดสอบ ข้อความยาว', itemDesc: longTh,
+    itemLoc: new Array(40).join('บริเวณลานจอดรถด้านหลังอาคาร ').slice(0, 500), department: new Array(20).join('หน่วยงานทดสอบ ').slice(0, 200),
+    clientRequestId: 'rt-long-' + started });
+  const ltRaw = lt.json && lt.json.refCode ? PropertiesService.getScriptProperties().getProperty('lfq_' + lt.json.refCode) : '';
+  const ltBytes = ltRaw ? Utilities.newBlob(ltRaw).getBytes().length : 0;
+  lfTestRecord_(G1, 'ข้อความไทยยาวเข้าคิวได้ (ย่อในคิว ≤ 8,800 ไบต์, ข้อมูลเต็มอยู่ในชีท)', !!(lt.json && lt.json.notify === 'queued' && ltBytes > 0 && ltBytes <= 8800),
+    'Apps Script จริง (Script Properties จริง)', 'notify=' + (lt.json && lt.json.notify) + ' · ' + ltBytes + ' ไบต์');
   const b = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ มีรูป', itemDesc: 'กระเป๋าทดสอบ', itemLoc: 'อาคารทดสอบ',
     clientRequestId: 'rt-b-' + started, files: [{ mime: 'image/png', data: LF_TEST_PNG }] });
   const bRow = b.json && b.json.refCode ? lfFindRowByRef_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME), b.json.refCode, 0) : 0;
@@ -177,7 +202,13 @@ function lfTest_2_ทดสอบทั้งหมด() {
   lfTestRecord_(G1, 'ส่งพร้อมกัน 5 คำขอ: รหัสไม่ซ้ำ, ไม่มีแถวหาย', new Set(ccRefs).size === ccRefs.length && ccRefs.length + busy === 5, 'Apps Script จริง (HTTP พร้อมกัน)',
     'สำเร็จ ' + ccRefs.length + ', busy ' + busy + ', รหัสไม่ซ้ำ ' + new Set(ccRefs).size);
   const n1 = lfTestRowCount_();
-  lfTestRecord_(G1, 'จำนวนแถวที่เพิ่มตรงกับคำขอที่สำเร็จ', n1 - n0 === 3 + ccRefs.length, 'Apps Script จริง', 'เพิ่ม ' + (n1 - n0) + ' (คาด ' + (3 + ccRefs.length) + ')');
+  lfTestRecord_(G1, 'จำนวนแถวที่เพิ่มตรงกับคำขอที่สำเร็จ', n1 - n0 === 4 + ccRefs.length, 'Apps Script จริง', 'เพิ่ม ' + (n1 - n0) + ' (คาด ' + (4 + ccRefs.length) + ')');
+  // คำแนะนำฟอร์ม: เรียกตรงโดยไม่มีการส่งฟอร์มต้องถูกปฏิเสธ; หลังส่งฟอร์มนับได้ครั้งเดียว
+  const mt0 = lfTestPost_({ action: 'touchMemoryEntry', bucket: 'loc_th', value: 'ประตูทดสอบ', refCode: 'LOS-000000-0000' });
+  const mt1 = lfTestPost_({ action: 'touchMemoryEntry', bucket: 'loc_th', value: 'ประตูทดสอบ', refCode: a.json && a.json.refCode });
+  const mt2 = lfTestPost_({ action: 'touchMemoryEntry', bucket: 'loc_th', value: 'ประตูทดสอบ', refCode: a.json && a.json.refCode });
+  lfTestRecord_(G1, 'คำแนะนำฟอร์ม: ไม่มีการส่งฟอร์ม = ปฏิเสธ, หลังส่งฟอร์มนับได้ครั้งเดียว', !!(mt0.json && mt0.json.success === false && mt1.json && mt1.json.success === true && mt2.json && mt2.json.success === false),
+    'Apps Script จริง (HTTP)', [mt0, mt1, mt2].map(x => x.json ? x.json.success : x.code).join(' / '));
 
   // ── 2. คิวแจ้งเตือน ──
   const refA = a.json && a.json.refCode;
@@ -189,17 +220,35 @@ function lfTest_2_ทดสอบทั้งหมด() {
   const logA = refA ? lfTestLogRows_(refA).map(r => r[2] + ':' + r[3]) : [];
   lfTestRecord_(G2, 'อีเมลไม่มีผู้รับ → ลองใหม่จนเลิกลอง และ LINE ไม่ถูกส่งซ้ำ', refA && !lfTestItem_(refA) && logA.filter(x => x === 'line:sent').length === 1 && logA.indexOf('email:gave_up') >= 0,
     'Apps Script จริง', logA.join(', '));
-  // URL ปลายทางผิด → ล้มเหลวและรอลองใหม่ (HTTP จริง 404)
+  // ปลายทางตอบ HTTP 404 (deployment ไม่มีอยู่จริง) → ได้คำตอบ HTTP ที่ไม่ใช่ success = ไม่แน่ใจ (ไม่ส่งซ้ำเอง)
   props.setProperty('LF_TEST_LINE_MODE', 'invalid');
   const f = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ URL ผิด', itemDesc: 'แว่นทดสอบ', clientRequestId: 'rt-f-' + started });
   lfProcessNotifyQueue();
   it = f.json ? lfTestItem_(f.json.refCode) : null;
-  lfTestRecord_(G2, 'ปลายทางตอบ HTTP ผิดพลาด → ล้มเหลว รอลองใหม่ (ไม่ใช่ส่งแล้ว)', !!(it && it.line.state === 'failed' && it.line.nextAt > Date.now()), 'Apps Script จริง (HTTP)',
+  lfTestRecord_(G2, 'ปลายทางตอบ HTTP 404 → ไม่แน่ใจ (ไม่ส่งซ้ำเอง)', !!(it && it.line.state === 'uncertain'), 'Apps Script จริง (HTTP)',
+    it ? it.line.state + ' · ' + it.line.lastError : '');
+  // ปลายทางตอบ HTTP 200 แต่ไม่ใช่ {status:'success'} (เช่น หน้าเข้าสู่ระบบ) → ไม่แน่ใจ
+  props.setProperty('LF_TEST_LINE_MODE', 'bad');
+  const bj = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ คำตอบผิดรูป', itemDesc: 'หูฟังทดสอบ', clientRequestId: 'rt-bj-' + started });
+  lfProcessNotifyQueue();
+  it = bj.json ? lfTestItem_(bj.json.refCode) : null;
+  lfTestRecord_(G2, 'ปลายทางตอบ 200 ที่ไม่ใช่ success → ไม่แน่ใจ', !!(it && it.line.state === 'uncertain'), 'Apps Script จริง (HTTP)', it ? it.line.lastError : '');
+  // ต่อไม่ติด (DNS) = ยังไม่ได้ส่งคำขอ → ล้มเหลว รอลองใหม่ แล้วลองใหม่สำเร็จ
+  props.setProperty('LF_TEST_LINE_MODE', 'dns');
+  const dn = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ DNS', itemDesc: 'พวงกุญแจทดสอบ', clientRequestId: 'rt-dn-' + started });
+  lfProcessNotifyQueue();
+  it = dn.json ? lfTestItem_(dn.json.refCode) : null;
+  lfTestRecord_(G2, 'ต่อปลายทางไม่ติด (DNS) → ล้มเหลว รอลองใหม่', !!(it && it.line.state === 'failed' && it.line.nextAt > Date.now()), 'Apps Script จริง (UrlFetch จริง)',
     it ? it.line.state + ' · ' + it.line.lastError : '');
   props.setProperty('LF_TEST_LINE_MODE', 'self');
-  if (it) { lfTestForceDue_(f.json.refCode); lfProcessNotifyQueue(); }
-  it = f.json ? lfTestItem_(f.json.refCode) : null;
+  if (it) { lfTestForceDue_(dn.json.refCode); lfProcessNotifyQueue(); }
+  it = dn.json ? lfTestItem_(dn.json.refCode) : null;
   lfTestRecord_(G2, 'แก้ปลายทางแล้วลองใหม่สำเร็จ', !it || it.line.state === 'sent', 'Apps Script จริง (HTTP)', it ? it.line.state : 'ส่งครบ/ลบแล้ว');
+  // เจ้าหน้าที่สั่งส่งใหม่รายการที่ได้ 404 → ส่งสำเร็จ (ปลายทางทดสอบ)
+  if (f.json) lfResolveNotify_({ refCode: f.json.refCode, channel: 'line', decision: 'resend', note: 'ทดสอบ: ปลายทางผิด แก้แล้ว' }, { u: 'release-test' });
+  lfProcessNotifyQueue();
+  const logF = f.json ? lfTestLogRows_(f.json.refCode).map(r => r[3]) : [];
+  lfTestRecord_(G2, 'เจ้าหน้าที่สั่งส่งใหม่รายการ 404 → ส่งสำเร็จ', logF.indexOf('staff_resend') >= 0 && logF.indexOf('sent') >= 0, 'Apps Script จริง (HTTP)', logF.join(', '));
   // ปลายทางหมดเวลา (mock — Apps Script ทดสอบหมดเวลาจริงไม่ได้โดยไม่มีปลายทางภายนอก)
   const realSend = lfSendLine_;
   const g = lfTestPost_({ action: 'submit', type: 'สิ่งของสูญหาย', name: 'ผู้ทดสอบ หมดเวลา', itemDesc: 'กล้องทดสอบ', clientRequestId: 'rt-g-' + started });
@@ -231,10 +280,21 @@ function lfTest_2_ทดสอบทั้งหมด() {
   const st = JSON.parse(lfNotifyStatus_().getContent());
   lfTestRecord_(G2, 'หน้าผู้ดูแลเห็นรายการไม่แน่ใจ', st.uncertain.length >= 1, 'Apps Script จริง', 'ไม่แน่ใจ ' + st.uncertain.length + ' รายการ · sweep=' + st.sweep.reason);
   // ปลายทาง "LINE" ของโปรเจกต์ทดสอบคือ web app ทดสอบเอง — ข้อความแจ้งเตือนต้องไม่ถูกบันทึกเป็นรายการใหม่ (ไม่วนซ้ำ)
-  const okSubmits = [f, g, s].filter(x => x.json && x.json.success).length;
+  const okSubmits = [f, bj, dn, g, s].filter(x => x.json && x.json.success).length;
   const n2 = lfTestRowCount_();
   lfTestRecord_(G2, 'ข้อความแจ้งเตือนที่ส่งเข้า web app ทดสอบไม่สร้างแถวใหม่', n2 - n1 === okSubmits, 'Apps Script จริง (HTTP)',
     'แถวเพิ่มช่วงทดสอบคิว ' + (n2 - n1) + ' (คาด ' + okSubmits + ' = ฟอร์มที่ส่งเอง)');
+
+  // หยุดส่งฉุกเฉิน: LF_QUEUE_PAUSE=1 → ไม่ส่ง; ลบค่าแล้วส่งตามปกติ
+  props.setProperty('LF_QUEUE_PAUSE', '1');
+  const pz = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ หยุดส่ง', itemDesc: 'ปากกาทดสอบ', clientRequestId: 'rt-pz-' + started });
+  lfProcessNotifyQueue();
+  const pzHeld = pz.json ? lfTestItem_(pz.json.refCode) : null;
+  props.deleteProperty('LF_QUEUE_PAUSE');
+  lfProcessNotifyQueue();
+  const pzAfter = pz.json ? lfTestItem_(pz.json.refCode) : null;
+  lfTestRecord_(G2, 'หยุดส่งฉุกเฉิน (LF_QUEUE_PAUSE=1) → ไม่ส่ง; ยกเลิกแล้วส่ง', !!(pzHeld && pzHeld.line.state === 'pending' && (!pzAfter || pzAfter.line.state === 'sent')),
+    'Apps Script จริง', 'ระหว่างหยุด=' + (pzHeld && pzHeld.line.state) + ' · หลังยกเลิก=' + (pzAfter ? pzAfter.line.state : 'ส่งครบ/ลบแล้ว'));
 
   if (Date.now() - started > 240000) { lfTestRecord_(G3, 'ข้าม (เวลาใกล้ครบ 6 นาที) — รัน lfTest_3_รายงานรายเดือน แยก', 'ข้าม', '-', ''); return; }
   lfTest_3_รายงานรายเดือน();
@@ -267,6 +327,14 @@ function lfTest_3_รายงานรายเดือน() {
   generateLostFoundReportPreviousMonth(true);
   st = lfReadReportState_(props.getProperty(key));
   lfTestRecord_(G3, 'หลังครบแล้วรันซ้ำ: ไม่ส่งอะไรเพิ่ม', st.line.attempts === lineAttempts, 'Apps Script จริง', 'line attempts ' + st.line.attempts);
+  // PDF เดิมหาย (ย้ายไปถังขยะ) แต่มีตัวเลขชุดเดิม → สร้าง PDF ใหม่จากตัวเลขเดิม ไม่ส่ง LINE ซ้ำ
+  props.setProperty(key, 'done ' + JSON.stringify({ state: 'partial', pdfFileId: st.pdfFileId, snap: st.snap, line: { state: 'sent', attempts: lineAttempts }, email: { state: 'failed', attempts: 1 } }));
+  try { DriveApp.getFileById(st.pdfFileId).setTrashed(true); } catch (e) {}
+  const oldPdf = st.pdfFileId, oldTotal = st.snap && st.snap.totalItems;
+  generateLostFoundReportPreviousMonth(true);
+  st = lfReadReportState_(props.getProperty(key));
+  lfTestRecord_(G3, 'PDF เดิมหาย → สร้างใหม่จากตัวเลขชุดเดิม, ไม่ส่ง LINE ซ้ำ', st.pdfFileId && st.pdfFileId !== oldPdf && st.snap.totalItems === oldTotal && st.line.attempts === lineAttempts,
+    'Apps Script จริง (Drive+Docs)', 'pdf ใหม่=' + (st.pdfFileId !== oldPdf) + ' · total ' + oldTotal + '→' + (st.snap && st.snap.totalItems) + ' · line attempts ' + st.line.attempts);
   // ค้าง sending จากรอบก่อน → ไม่แน่ใจ
   props.setProperty(key, JSON.stringify({ state: 'partial', pdfFileId: st.pdfFileId, snap: st.snap, line: { state: 'sending', attempts: 1 }, email: { state: 'closed', attempts: 0 } }));
   generateLostFoundReportPreviousMonth(true);

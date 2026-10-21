@@ -52,7 +52,7 @@ function stubReportDrive(r) {
   r.ctx.MimeType = { PDF: 'pdf' };
   const pdfs = {};
   const folder = { getFoldersByName: () => ({ hasNext: () => true, next: () => folder }), createFolder: () => folder,
-    createFile: () => { const id = 'pdf' + (++r.pdfCount); return (pdfs[id] = { getId: () => id, getUrl: () => 'https://drive/' + id, getAs: () => ({}), isTrashed: () => false }); } };
+    createFile: () => { const id = 'pdf' + (++r.pdfCount); let trashed = false; return (pdfs[id] = { getId: () => id, getUrl: () => 'https://drive/' + id, getAs: () => ({}), isTrashed: () => trashed, setTrashed: v => { trashed = !!v; } }); } };
   r.ctx.DriveApp.getRootFolder = () => folder;
   r.ctx.DriveApp.getFileById = id => pdfs[id] || ({ moveTo() {}, getName: () => 'x', getAs: () => ({ setName() {} }) });
 }
@@ -249,10 +249,12 @@ test('ช่วงเปลี่ยนผ่าน (legacy on): API เดิ�
   assert.equal(post(r, { action: 'updateStatus', refCode: 'PKP-261018-5403', newStatus: 'รับของคืนแล้ว' }).code, 401);
 });
 
-test('คิวแจ้งเตือน: คำขอไม่ถึง Cloud Function (HTTP 404) แล้ว retry ภายหลัง อีเมลไม่ส่งซ้ำ', () => {
+test('คิวแจ้งเตือน: ต่อปลายทางไม่ติด (DNS — ยังไม่ได้ส่งคำขอ) แล้ว retry ภายหลัง อีเมลไม่ส่งซ้ำ', () => {
   let now = Date.parse('2026-10-19T10:00:00+07:00');
-  let lineCode = 404;
-  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => 'not found' });
+  let lineCode = 0;
+  const r = rt({ now: () => now });
+  const realFetch = r.ctx.UrlFetchApp.fetch;
+  r.ctx.UrlFetchApp = { fetch: (u, o) => { r.sent.fetch.push({ url: u, body: o.payload }); if (!lineCode) throw new Error('Exception: DNS error: https://line.invalid/hook'); return { getResponseCode: () => 200, getContentText: () => '{"status":"success"}' }; } };
   const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ง', itemDesc: 'ของ', clientRequestId: 'n1' });
   r.call('lfProcessNotifyQueue');
   assert.equal(r.sent.mail.length, 1);
@@ -266,7 +268,7 @@ test('คิวแจ้งเตือน: คำขอไม่ถึง Cloud
   assert.equal(r.sent.fetch.length, 2);
   assert.equal(r.sent.mail.length, 1);               // อีเมลไม่ซ้ำ
   assert.ok(!r.props.has('lfq_' + s.refCode));
-  // เฉพาะแถวของช่องทางส่ง (แถวช่องทาง 'queue' คือสถานะ sweeper ซึ่งบันทึกเมื่อเปลี่ยนเท่านั้น)
+  // เฉพาะแถวของช่องทางส่ง (แถวช่องทาง 'queue' คือเหตุการณ์ของคิว เช่น queue_failed / requeued / staff_close)
   const log = r.sheets.LF_NotifyLog.rows.slice(1).filter(x => x[2] !== 'queue').map(x => x[3]);
   assert.deepEqual(log, ['failed', 'sent', 'sent']);
 });
@@ -386,6 +388,35 @@ test('PII: คำต่อประโยคหลังชื่อ ต้อ�
   assert.equal(m('นายสมชาย มอม้า'), 'นายส*** ม***');
 });
 
+test('PII: เลขไทย เบอร์แบบวงเล็บ/จุด รหัส 7–8 หลัก เลขหนังสือเดินทาง และ ดร./Dr. (ข้อมูลสังเคราะห์)', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  // ต้องถูกปิดบัง — ทุกบรรทัดนี้หลุดในโค้ดชุด e
+  assert.equal(m('โทร ๐๘๑๒๓๔๕๖๗๘'), 'โทร [ซ่อนเบอร์]');
+  assert.equal(m('โทร ๐๘๑-๒๓๔-๕๖๗๘'), 'โทร [ซ่อนเบอร์]');
+  assert.equal(m('บัตร ๑๒๓๔๕๖๗๘๙๐๑๒๓'), 'บัตร [ซ่อนเลขบัตร]');
+  assert.equal(m('โทร (081) 234-5678'), 'โทร [ซ่อนเบอร์]');
+  assert.equal(m('โทร 081.234.5678 ด่วน'), 'โทร [ซ่อนเบอร์] ด่วน');
+  assert.equal(m('บัตรนักศึกษา รหัส 6512345'), 'บัตรนักศึกษา รหัส [ซ่อนตัวเลข]');
+  assert.equal(m('รหัสบุคลากร 65123456'), 'รหัสบุคลากร [ซ่อนตัวเลข]');
+  assert.equal(m('พาสปอร์ต AA1234567'), 'พาสปอร์ต [ซ่อนเลขเอกสาร]');
+  assert.equal(m('บัตรของ ดร.สมพร ดีมาก'), 'บัตรของ ดร.ส*** ด***');
+  assert.equal(m('card of Dr. Jane Roe'), 'card of Dr. J*** R***');
+  // ต้องไม่ถูกแตะ — วันที่/เวลาแบบจุด ราคา เลขห้อง รุ่นสินค้า เลขไทยสั้น
+  for (const s of ['วันที่ 21.10.2569 10.30 น.', 'เปิด 08.30-16.30 น.', 'วันที่ 01.02.2026', 'ชั้น ๓ ห้อง ๓๐๒', 'โทร ๑๖๖๙',
+    'รุ่น SM-G991B', 'MacBook A2337', 'Galaxy S23 Ultra 512GB', 'ป้ายทะเบียน 1กก 2345', 'ราคา 0.50 บาท', 'ราคา 1,500 บาท',
+    'ห้อง 1203 ชั้น 12', 'ปี 2569', 'รถเมล์สาย 515', 'คุณภาพดี คุณค่า คุณสมบัติ', 'อาคารเรียนรวม อ.1', 'Main Dr', 'ID 2026', 'เบอร์ภายใน 1234 ต่อ 56']) {
+    assert.equal(m(s), s, s);
+  }
+});
+
+test('PII: คำแนะนำฟอร์มที่ดูเป็นข้อมูลส่วนบุคคล รวมเลขไทย คุณ/ดร. ไม่ถูกส่งสาธารณะ', () => {
+  const r = rt();
+  const p = v => r.call('lfMemoryLooksPersonal_', v);
+  for (const v of ['นายสมชาย', '0812345678', '๐๘๑๒๓๔๕๖๗๘', '081.234.5678', 'a@b.co', 'คุณสมหญิง', 'ดร.สมพร', 'รหัส 6512345', 'Dr. Roe']) assert.equal(p(v), true, v);
+  for (const v of ['คณะวิศวกรรมศาสตร์', 'อาคารเรียนรวม 2', 'ห้อง 1203', 'โรงอาหาร', 'ศูนย์การเรียนรู้', 'ลานจอดรถ P1']) assert.equal(p(v), false, v);
+});
+
 test('PII: ปิดบังชื่อในระเบียนแม้ไม่มีคำนำหน้า และไม่ย่อซ้ำ', () => {
   const r = rt();
   const m = (s, name) => r.call('lfMaskPII_', s, name);
@@ -486,40 +517,62 @@ test('submit มีรูปแต่ execution หยุดระหว่า�
   assert.ok(!r.props.has('lfq_' + res.refCode));
 });
 
-test('sweeper: แถวที่บันทึกแล้วแต่ไม่เคยเข้าคิว ถูกใส่คิวย้อนหลังครั้งเดียว และไม่แตะรายการเก่าก่อนเริ่มใช้', () => {
+test('ใส่คิวก่อนบันทึกแถว: execution หยุดหลังบันทึกแถว → ตรวจชีทแล้วส่งครั้งเดียว; ไม่มีแถว → ไม่ส่ง; บันทึกแถวไม่ได้ → ลบคิว', () => {
   let now = Date.parse('2026-10-19T10:00:00+07:00');
   const r = rt({ now: () => now });
-  r.call('lfProcessNotifyQueue');                    // ครั้งแรก: เริ่มนับ (since) ไม่ส่งรายการเก่าใน fixture
-  assert.equal(r.sent.fetch.length + r.sent.mail.length, 0);
-  assert.ok(r.props.get('LF_NOTIFY_ENQUEUED'));
-  now += 60000;
-  const res = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ข', itemDesc: 'ของ', phone: '0811111111', clientRequestId: 'sw1' });
-  // จำลอง execution ตายก่อนใส่คิว: ลบคิวและเครื่องหมายทิ้ง
-  r.props.delete('lfq_' + res.refCode);
-  const m = JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED')); delete m.refs[res.refCode]; r.props.set('LF_NOTIFY_ENQUEUED', JSON.stringify(m));
-  now += 60000;
-  r.call('lfProcessNotifyQueue');                    // ยังไม่ถึงรอบ sweep / แถวยังใหม่เกินไป
-  assert.equal(r.sent.fetch.length, 0);
-  now += 16 * 60000;
-  r.call('lfProcessNotifyQueue');                    // sweep → ใส่คิว → ส่งในรอบเดียวกัน
-  assert.equal(r.sent.fetch.length, 1);
-  const body = JSON.parse(r.sent.fetch[0].body);
-  assert.equal(body.refCode, res.refCode); assert.equal(body.recovered, true); assert.equal(body.phone, '0811111111');
-  assert.equal(r.sent.mail.length, 1);
-  now += 16 * 60000;
-  r.call('lfProcessNotifyQueue');                    // ไม่ส่งซ้ำ
-  assert.equal(r.sent.fetch.length, 1);
-  assert.ok(r.sheets.LF_NotifyLog.rows.some(x => x[3] === 'recovered'));
+  // (ก) หยุดหลังบันทึกแถว ก่อนปลดสถานะรอแถว
+  const realSaved = r.ctx.lfQueueRowSaved_;
+  r.ctx.lfQueueRowSaved_ = () => false;
+  const a = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ข', itemDesc: 'ของ', phone: '0811111111', clientRequestId: 'rp1' });
+  r.ctx.lfQueueRowSaved_ = realSaved;
+  assert.equal(a.success, true);
+  assert.equal(JSON.parse(r.props.get('lfq_' + a.refCode)).rowPending, true);
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length + r.sent.mail.length, 0, 'ยังไม่ส่งก่อนตรวจชีท');
+  now += r.consts.LF_ROW_VERIFY_MS + 60000; r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1); assert.equal(r.sent.mail.length, 1);
+  assert.equal(JSON.parse(r.sent.fetch[0].body).phone, '0811111111');
+  now += 3600000; r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1, 'ไม่ส่งซ้ำ');
+  // (ข) มีรายการคิวรอแถว แต่ไม่มีแถว (หยุดก่อนบันทึกแถว)
+  r.call('lfEnqueueNotify_', 'LOS-261019-9999', { refCode: 'LOS-261019-9999', subject: 'สิ่งของสูญหาย' }, false, true, true);
+  now += r.consts.LF_ROW_VERIFY_MS + 60000; r.call('lfProcessNotifyQueue');
+  assert.ok(!r.props.has('lfq_LOS-261019-9999'));
+  assert.equal(r.sent.fetch.length, 1, 'ไม่มีแถว = ไม่ส่ง');
+  assert.ok(lineRows(r).some(x => x[1] === 'LOS-261019-9999' && x[3] === 'dropped_no_row'));
+  // (ค) บันทึกแถวไม่สำเร็จ → ผู้ใช้ได้ error และไม่มีรายการคิวค้าง
+  r.sheets.LF_New.beforeAppend = () => { throw new Error('sheet write failed'); };
+  const c = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ค', itemDesc: 'ของ', clientRequestId: 'rp3' });
+  r.sheets.LF_New.beforeAppend = null;
+  assert.equal(c.success, false);
+  assert.equal([...r.props.keys()].filter(k => k.indexOf('lfq_') === 0).length, 0);
 });
 
-test('รายงานรายเดือน: คำขอไม่ถึง Cloud Function (HTTP 404) = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
+test('ไม่สร้างคิวจากแถวในชีทที่ไม่มีหลักฐาน: แถวจาก web app รุ่นเดิม/แถวที่ไม่เคยเข้าคิว ไม่ถูกส่งเอง (กันส่ง LINE ซ้ำ)', () => {
+  let now = Date.parse('2026-10-19T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  get(r, { action: 'health' });
+  r.call('lfProcessNotifyQueue');
+  const s1 = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ร่ม', clientRequestId: 'nq1' });
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1);
+  // แถวที่ไม่เคยเข้าคิว (ไม่มีรายการคิว/เครื่องหมาย/log queue_failed) — เช่น เขียนโดยรุ่นเดิม
+  r.sheets.LF_New.appendRow(['2026-10-19 10:01:00', 'LOS-261019-7777', 'สิ่งของสูญหาย', 'ข', '', '', '', '', '', 'ของ', '', '', 'รอดำเนินการ']);
+  for (let i = 0; i < 6; i++) { now += 20 * 60000; sweepDue(r); r.call('lfProcessNotifyQueue'); }
+  assert.equal(r.sent.fetch.length, 1, 'แถวที่ไม่มีหลักฐานไม่ถูกใส่คิว');
+  assert.ok(!lineRows(r).some(x => x[1] === 'LOS-261019-7777'));
+  assert.ok(s1.success);
+});
+
+test('รายงานรายเดือน: ต่อปลายทางไม่ติด (DNS) = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
   let now = Date.parse('2026-11-01T09:05:00+07:00');
-  let lineCode = 404;
-  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => 'not found' });
+  let lineCode = 0;
+  const r = rt({ now: () => now });
+  r.ctx.UrlFetchApp = { fetch: (u, o) => { r.sent.fetch.push({ url: u, body: o.payload }); if (!lineCode) throw new Error('Exception: DNS error: https://line.invalid/monthly'); return { getResponseCode: () => 200, getContentText: () => '{"status":"success"}' }; } };
   stubReportDrive(r);
   r.call('checkAndGenerateLostFoundReport');
   let st = mstate(r);
-  assert.equal(st.state, 'partial'); assert.equal(st.line.state, 'failed'); assert.equal(st.line.code, 404);
+  assert.equal(st.state, 'partial'); assert.equal(st.line.state, 'failed');
   assert.equal(st.email.state, 'sent'); assert.equal(r.sent.mail.length, 1); assert.equal(r.pdfCount, 1);
   now += 86400000; lineCode = 200;
   r.call('checkAndGenerateLostFoundReport');
@@ -671,7 +724,7 @@ const qItem = (r, ref) => JSON.parse(r.props.get('lfq_' + ref));
 const sweepDue = r => r.cacheStore.delete('lf_sweep_ok');
 const status = (r, token) => post(r, { action: 'adminNotifyStatus', token });
 
-test('อัปเกรดครั้งแรกจาก 2.0.0 (ยังไม่มี marker): web app เดิมใส่คิวหลังอัปโหลดรูปนาน → sweeper ต้องไม่แจ้งซ้ำ', () => {
+test('อัปเกรดครั้งแรกจาก 2.0.0 (ยังไม่มี marker): web app เดิมใส่คิวหลังอัปโหลดรูปนาน → โค้ดใหม่ต้องไม่แจ้งซ้ำ', () => {
   let now = Date.parse('2026-10-25T10:00:00+07:00');
   const web = rt({ now: () => now, sourceDir: V200 });          // web app = รุ่น 2.0.0 (deployment เดิม)
   const head = rt({ now: () => now, shareWith: web });          // trigger = โค้ด Head ใหม่ (Save แล้ว ยังไม่ Deploy)
@@ -685,54 +738,65 @@ test('อัปเกรดครั้งแรกจาก 2.0.0 (ยังไ
   const res = web.json(web.call('doPost', { postData: { contents: JSON.stringify({ action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก',
     itemDesc: 'ของ', clientRequestId: 'slow1', files: [{ mime: 'image/png', data: Buffer.from('x').toString('base64') }] }) }, parameter: {} }));
   assert.equal(res.success, true); assert.ok(midRun);
-  assert.equal(web.sent.fetch.length, 0, 'ระหว่างอัปโหลด sweeper ต้องไม่ใส่คิวย้อนหลัง');
-  assert.ok(lineRows(head).some(x => x[3] === 'sweep_paused' && /ยังไม่มีคำขอจาก web app/.test(x[5])));
+  assert.equal(web.sent.fetch.length, 0, 'ระหว่างอัปโหลด โค้ดใหม่ต้องไม่ใส่คิวย้อนหลัง');
+  assert.ok(!lineRows(head).some(x => x[3] === 'requeued' || x[3] === 'recovered'), 'โค้ดใหม่ไม่สร้างคิวจากแถวของรุ่นเดิม');
   now += 60000; head.call('lfProcessNotifyQueue');
   now += 20 * 60000; sweepDue(head); head.call('lfProcessNotifyQueue');
   assert.equal(web.sent.fetch.length, 1, 'LINE ส่งครั้งเดียว');
   assert.equal(web.sent.mail.length, 1, 'อีเมลส่งครั้งเดียว');
 });
 
-test('ตัวควบคุม: ถ้า sweeper เชื่อว่าปลอดภัยทั้งที่ web app ยังเป็น 2.0.0 จะเกิดแจ้งซ้ำจริง (ยืนยันว่าการหยุดมีผล)', () => {
+test('ย้อนกลับฉุกเฉิน (web app รุ่นเดิม + โค้ด Head ใหม่ + marker บอกว่าตรงรุ่นนานแล้ว): ไม่ส่งซ้ำ — กรณีที่ sweeper เดิมส่งซ้ำ 2 ครั้ง', () => {
   let now = Date.parse('2026-10-25T10:00:00+07:00');
   const web = rt({ now: () => now, sourceDir: V200 });
   const head = rt({ now: () => now, shareWith: web });
   head.call('lfProcessNotifyQueue');
-  // ปลอมว่า web app เป็น build เดียวกับ Head มานานแล้ว (สิ่งที่โค้ดรุ่นก่อนเข้าใจเมื่อ marker ว่าง)
+  // marker ยังเป็น build ใหม่ (เขียนก่อนย้อนกลับ) และพ้นช่วงรอแล้ว — ตัวตามเก็บงานจากแถวในชีทของชุด e จะเชื่อว่าปลอดภัย
   head.props.set(head.consts.LF_WEBAPP_VER_KEY, JSON.stringify({ v: head.consts.LF_VERSION, b: head.call('lfBuildId_'), since: now - 3600000, at: now }));
   now += 20 * 60000;
   web.ctx.DriveApp.getFoldersByName = () => ({ hasNext: () => true, next: () => ({
-    createFile: () => { now += 6 * 60000; head.call('lfProcessNotifyQueue'); return { getId: () => 'IMG1234567890123456789', setSharing() {} }; } }) });
+    createFile: () => { now += 6 * 60000; sweepDue(head); head.call('lfProcessNotifyQueue'); return { getId: () => 'IMG1234567890123456789', setSharing() {} }; } }) });
   web.call('doPost', { postData: { contents: JSON.stringify({ action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ',
     clientRequestId: 'slow2', files: [{ mime: 'image/png', data: Buffer.from('x').toString('base64') }] }) }, parameter: {} });
-  now += 60000; head.call('lfProcessNotifyQueue');
-  assert.equal(web.sent.fetch.length, 2, 'กรณีนี้ส่ง LINE ซ้ำ — จึงต้องหยุด sweeper เมื่อยืนยัน build ไม่ได้');
+  for (let i = 0; i < 4; i++) { now += 20 * 60000; sweepDue(head); head.call('lfProcessNotifyQueue'); }
+  assert.equal(web.sent.fetch.length, 1, 'LINE ครั้งเดียว');
+  assert.equal(web.sent.mail.length, 1, 'อีเมลครั้งเดียว');
 });
 
-test('หลัง Deploy: คำขอแรกบันทึก build, sweeper รอ 10 นาทีให้คำขอรุ่นเดิมจบก่อน แล้วจึงตามเก็บแถวตกหล่น', () => {
+test('ใส่คิวไม่ได้ (พื้นที่เต็ม): ฟอร์มบอกผู้ใช้ตามจริง, log queue_failed, หน้าเจ้าหน้าที่เห็น, ใส่คิวใหม่อัตโนมัติเมื่อมีที่ว่าง และส่งครั้งเดียว', () => {
   let now = Date.parse('2026-10-25T10:00:00+07:00');
   const r = rt({ now: () => now });
-  r.call('lfProcessNotifyQueue');
-  get(r, { action: 'health' });                                 // คำขอแรกผ่าน deployment ใหม่
-  const mk = JSON.parse(r.props.get(r.consts.LF_WEBAPP_VER_KEY));
-  assert.equal(mk.b, r.call('lfBuildId_')); assert.equal(mk.since, now);
-  now += 60000;
-  const s = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ร่ม', clientRequestId: 'g1' });
-  r.props.delete('lfq_' + s.refCode);                          // จำลองใส่คิวไม่สำเร็จ
-  const m = JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED')); delete m.refs[s.refCode]; r.props.set('LF_NOTIFY_ENQUEUED', JSON.stringify(m));
-  now += 5 * 60000; sweepDue(r); r.call('lfProcessNotifyQueue');
-  assert.equal(r.sent.fetch.length, 0, 'ยังอยู่ในช่วงรอ (settling)');
-  assert.ok(lineRows(r).some(x => x[3] === 'sweep_paused' && /เพิ่งเป็น/.test(x[5])));
-  now += 6 * 60000; sweepDue(r); r.call('lfProcessNotifyQueue');
-  assert.equal(r.sent.fetch.length, 1, 'พ้นช่วงรอแล้วตามเก็บได้');
-  assert.ok(lineRows(r).some(x => x[3] === 'sweep_resumed'));
-  assert.ok(lineRows(r).some(x => x[3] === 'recovered' && x[1] === s.refCode));
-  const pausedRows = lineRows(r).filter(x => x[3] === 'sweep_paused').length;
-  now += 16 * 60000; r.call('lfProcessNotifyQueue'); now += 16 * 60000; r.call('lfProcessNotifyQueue');
-  assert.equal(lineRows(r).filter(x => x[3] === 'sweep_paused').length, pausedRows, 'log สถานะ sweeper เฉพาะเมื่อเปลี่ยน');
+  r.propHooks.failSet = k => k.indexOf('lfq_') === 0;                 // จำลองเขียนคิวไม่ได้
+  const s = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ร่มสีเขียว', phone: '0899999999', clientRequestId: 'qf1' });
+  assert.equal(s.success, true); assert.equal(s.notify, 'queue_failed');
+  assert.ok(r.sheets.LF_New.rows.some(x => x[1] === s.refCode), 'ข้อมูลไม่หาย');
+  assert.ok(lineRows(r).some(x => x[1] === s.refCode && x[3] === 'queue_failed'));
+  const token = login(r);
+  let st = status(r, token);
+  assert.deepEqual(st.notQueued.map(x => x.refCode), [s.refCode]);
+  assert.ok(st.log.some(x => x.result === 'queue_failed'));
+  sweepDue(r); r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 0, 'ยังเต็มอยู่ — ยังไม่ได้ใส่คิว');
+  r.propHooks.failSet = null;                                            // มีที่ว่างแล้ว
+  now += 20 * 60000; sweepDue(r); r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1); assert.equal(r.sent.mail.length, 1);
+  assert.equal(JSON.parse(r.sent.fetch[0].body).phone, '0899999999');
+  assert.ok(lineRows(r).some(x => x[1] === s.refCode && x[3] === 'requeued'));
+  for (let i = 0; i < 3; i++) { now += 20 * 60000; sweepDue(r); r.call('lfProcessNotifyQueue'); }
+  assert.equal(r.sent.fetch.length, 1, 'ไม่ส่งซ้ำ');
+  st = status(r, token);
+  assert.equal(st.notQueued.length, 0);
+  // กรณีเจ้าหน้าที่ปิดเอง (แจ้งทางอื่นแล้ว)
+  r.propHooks.failSet = k => k.indexOf('lfq_') === 0;
+  const s2 = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ข', itemDesc: 'กุญแจ', clientRequestId: 'qf2' });
+  r.propHooks.failSet = null;
+  assert.equal(post(r, { action: 'adminResolveNotify', token, refCode: s2.refCode, channel: 'queue', decision: 'close', note: 'โทรแจ้งเวรแล้ว' }).success, true);
+  now += 20 * 60000; sweepDue(r); r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1, 'ปิดแล้วไม่ใส่คิว');
+  assert.equal(status(r, token).notQueued.length, 0);
 });
 
-test('marker ค้างในแคช + คำขอรุ่นเดิมที่ยังทำงานหลัง Deploy: บันทึก build ใหม่ได้ทันที และ sweeper หยุดเมื่อค่าพลิกกลับ', () => {
+test('marker ค้างในแคช + คำขอรุ่นเดิมที่ยังทำงานหลัง Deploy: บันทึก build ใหม่ได้ทันที และสถานะรุ่นพลิกเป็นต่างรุ่นเมื่อค่าพลิกกลับ', () => {
   let now = Date.parse('2026-10-25T10:00:00+07:00');
   const oldWeb = rt({ now: () => now, extraSource: 'function lfBuildTagOld_() { return 1; }' });   // build เดิม เลขรุ่นเดียวกัน
   const newWeb = rt({ now: () => now, shareWith: oldWeb });                                          // build ใหม่ = Head
@@ -754,7 +818,7 @@ test('marker ค้างในแคช + คำขอรุ่นเดิม�
   assert.equal(JSON.parse(newWeb.call('lfNotifyStatus_').getContent()).sweep.reason, 'ok');
 });
 
-test('โค้ดต่าง build แต่เลขรุ่นเดียวกัน → health แยก version กับ build และ sweeper ถือว่าต่างรุ่น', () => {
+test('โค้ดต่าง build แต่เลขรุ่นเดียวกัน → health แยก version กับ build และหน้าตรวจการแจ้งเตือนแสดงว่าต่างรุ่น', () => {
   let now = Date.parse('2026-10-25T10:00:00+07:00');
   const head = rt({ now: () => now });
   const web = rt({ now: () => now, shareWith: head, extraSource: 'function lfLocalEditNotDeployed_() { return 2; }' });
@@ -825,28 +889,28 @@ test('ส่งสำเร็จแต่บันทึกสถานะใ�
   assert.equal(qItem(r, s.refCode).line.state, 'uncertain');
 });
 
-test('ปลายทางตอบไม่ชัดเจน: HTTP 5xx/หมดเวลา = ไม่แน่ใจ (ไม่ส่งซ้ำเอง); ต่อไม่ติด/4xx = ล้มเหลวและลองใหม่', () => {
+test('ผล LINE: ส่งแล้วเฉพาะ 2xx + {status:"success"}; คำตอบ HTTP อื่นทุกแบบ/หมดเวลา = ไม่แน่ใจ (ไม่ส่งซ้ำเอง); ล้มเหลวก่อนส่งคำขอ = ลองใหม่', () => {
   const resp = (code, body) => () => ({ getResponseCode: () => code, getContentText: () => body });
   const cf = msg => JSON.stringify({ status: 'error', message: msg });
   const cases = [
-    // ไม่แน่ใจ — Cloud Function อาจเรียก LINE ไปแล้ว
-    [() => { throw new Error('Exception: Timeout: https://line.invalid/hook'); }, 'uncertain'],
-    [resp(504, 'gateway timeout'), 'uncertain'],
-    [resp(500, cf('Request failed with status code 500')), 'uncertain'],     // LINE ตอบ 5xx
-    [resp(500, cf('socket hang up')), 'uncertain'],                          // เครือข่าย Cloud Function→LINE ขาด
-    [resp(500, '<html>Internal Server Error</html>'), 'uncertain'],          // ไม่ใช่คำตอบจากโค้ด
-    [resp(503, '<html>Service Unavailable</html>'), 'uncertain'],
-    [resp(502, 'bad gateway'), 'uncertain'],
-    [() => { throw new Error('Exception: Unexpected error while getting the method or property fetch'); }, 'uncertain'],
-    // 5xx ที่ body บอกว่ายังไม่ส่ง — เทียบรุ่นที่ deploy ไม่ได้ จึงไม่เชื่อ body
+    [resp(200, '{"status":"success","subject":"x"}'), 'sent'],
+    [resp(200, '<html>Sign in</html>'), 'uncertain'],                  // หน้าเข้าสู่ระบบ/หน้าอื่นที่ตอบ 200
+    [resp(200, cf('x')), 'uncertain'],
+    [resp(204, ''), 'uncertain'],
+    [resp(302, ''), 'uncertain'],
+    [resp(400, 'bad request'), 'uncertain'],
+    [resp(403, 'forbidden'), 'uncertain'],
+    [resp(404, 'not found'), 'uncertain'],
+    [resp(408, 'request timeout'), 'uncertain'],
+    [resp(429, 'too many requests'), 'uncertain'],
     [resp(500, cf('Request failed with status code 400')), 'uncertain'],
-    [resp(500, cf('Request failed with status code 429')), 'uncertain'],
     [resp(503, cf('LINE client not configured')), 'uncertain'],
-    // ล้มเหลว ลองใหม่ได้ — คำขอไม่ถึงโค้ดที่เรียก LINE
-    [resp(404, 'not found'), 'failed'],
-    [resp(403, 'forbidden'), 'failed'],
+    [resp(504, 'gateway timeout'), 'uncertain'],
+    [() => { throw new Error('Exception: Timeout: https://line.invalid/hook'); }, 'uncertain'],
+    [() => { throw new Error('Exception: Unexpected error while getting the method or property fetch'); }, 'uncertain'],
     [() => { throw new Error('Exception: DNS error: https://line.invalid/hook'); }, 'failed'],
-    [() => { throw new Error('Exception: Address unavailable: https://line.invalid/hook'); }, 'failed']
+    [() => { throw new Error('Exception: Address unavailable: https://line.invalid/hook'); }, 'failed'],
+    [() => { throw new Error('Exception: Service invoked too many times for one day: urlfetch.'); }, 'failed']
   ];
   cases.forEach(([impl, want], i) => {
     let now = Date.parse('2026-10-25T10:00:00+07:00');
@@ -855,6 +919,7 @@ test('ปลายทางตอบไม่ชัดเจน: HTTP 5xx/หม
     r.ctx.UrlFetchApp = { fetch: (u, o) => { calls++; return impl(u, o); } };
     const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ', clientRequestId: 'amb' + i });
     r.call('lfProcessNotifyQueue');
+    if (want === 'sent') { assert.ok(!r.props.has('lfq_' + s.refCode) || qItem(r, s.refCode).line.state === 'sent', 'กรณี ' + i); return; }
     assert.equal(qItem(r, s.refCode).line.state, want, 'กรณี ' + i);
     now += 3 * 3600000; r.call('lfProcessNotifyQueue');
     assert.equal(calls, want === 'uncertain' ? 1 : 2, 'กรณี ' + i + ': จำนวนครั้งที่ส่ง');
@@ -880,7 +945,7 @@ test('รายการ "ไม่แน่ใจ" ไม่หมดอาย�
   assert.equal(post(r, { action: 'adminResolveNotify', token, refCode: a.refCode, channel: 'line', decision: 'resend', note: '' }).success, false);
   assert.equal(post(r, { action: 'adminResolveNotify', token, refCode: a.refCode, channel: 'email', decision: 'resend', note: 'x' }).code, 409, 'อีเมลส่งแล้ว ไม่ต้องตัดสิน');
   // ส่งใหม่
-  r.ctx.UrlFetchApp = { fetch: (u, o) => { r.sent.fetch.push({ url: u, body: o.payload }); return { getResponseCode: () => 200, getContentText: () => 'ok' }; } };
+  r.ctx.UrlFetchApp = { fetch: (u, o) => { r.sent.fetch.push({ url: u, body: o.payload }); return { getResponseCode: () => 200, getContentText: () => '{"status":"success"}' }; } };
   assert.equal(post(r, { action: 'adminResolveNotify', token, refCode: a.refCode, channel: 'line', decision: 'resend', note: 'ตรวจกลุ่ม LINE แล้วไม่พบข้อความ' }).success, true);
   r.call('lfProcessNotifyQueue');
   assert.equal(r.sent.fetch.length, 1);
@@ -894,7 +959,7 @@ test('รายการ "ไม่แน่ใจ" ไม่หมดอาย�
   const staff = lineRows(r).filter(x => /^staff_/.test(x[3]));
   assert.deepEqual(staff.map(x => x[3]), ['staff_resend', 'staff_confirm_sent', 'staff_close']);
   assert.ok(staff.every(x => /^admin01: /.test(x[5])));
-  assert.equal(JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED')).refs[b.refCode] > 0, true, 'กัน sweeper ใส่คิวซ้ำ');
+  assert.equal(JSON.parse(r.props.get('LF_NOTIFY_ENQUEUED')).refs[b.refCode] > 0, true, 'กันตัวกู้คิวใส่คิวซ้ำ');
   assert.ok(status(r, token).log.some(x => x.result === 'staff_close'));
 });
 
@@ -954,7 +1019,7 @@ test('รายงานรายเดือน: LINE หมดเวลา = �
   stubReportDrive(r);
   let mode = 'timeout';
   r.ctx.UrlFetchApp = { fetch: (u, o) => { if (mode === 'timeout') throw new Error('Exception: Timeout: https://line.invalid/monthly');
-    r.sent.fetch.push({ url: u, body: o.payload }); return { getResponseCode: () => 200, getContentText: () => 'ok' }; } };
+    r.sent.fetch.push({ url: u, body: o.payload }); return { getResponseCode: () => 200, getContentText: () => '{"status":"success"}' }; } };
   r.call('checkAndGenerateLostFoundReport');
   let st = mstate(r);
   assert.equal(st.line.state, 'uncertain'); assert.equal(st.email.state, 'sent');
@@ -1099,10 +1164,12 @@ test('ชุดทดสอบ Apps Script: ตรวจการแยกระ
   const route = (url, o) => {
     if (archived) return { getResponseCode: () => 404, getContentText: () => '<html>Sorry, unable to open the file at this time.</html>' };
     if (/INVALID_TEST_DEPLOYMENT/.test(url)) return { getResponseCode: () => 404, getContentText: () => 'not found' };
+    if (/\.invalid\//.test(url)) throw new Error('Exception: DNS error: ' + url);
     assert.ok(url.startsWith(TEST_URL), 'ทุกคำขอ HTTP ต้องไปที่ web app ทดสอบเท่านั้น: ' + url);
     const [, q] = url.split('?');
+    const qp = Object.fromEntries(new URLSearchParams(q || ''));
     const out = (o && o.method === 'post')
-      ? r.call('doPost', { postData: { contents: o.payload }, parameter: {} })
+      ? r.call('doPost', { postData: { contents: o.payload }, parameter: qp })
       : r.call('doGet', { parameter: Object.fromEntries(new URLSearchParams(q || '')) });
     return { getResponseCode: () => 200, getContentText: () => out.getContent() };
   };
@@ -1154,4 +1221,195 @@ test('ชุดทดสอบ Apps Script: เขตเวลาชีทต่
   const row = r.sheets['ผลทดสอบ_APPS_SCRIPT'].rows.find(x => x[2] === 'เขตเวลาชีททดสอบตรงกับระบบจริง (UTC+7)');
   assert.equal(row[3], 'ไม่ผ่าน');
   assert.match(row[5], /Etc\/GMT/);
+});
+
+// ── ข้อขวางการเผยแพร่ (21 ต.ค. 2569 เย็น): ทุกข้อล้มกับโค้ดชุด e ────────────────────────────
+const TH = (n, unit = 'กระเป๋าสีน้ำตาลมีสายคล้องไหล่ ') => unit.repeat(Math.ceil(n / unit.length)).slice(0, n);
+const u8 = s => Buffer.byteLength(String(s), 'utf8');
+
+test('คิว: ขนาดนับเป็นไบต์ UTF-8 — ข้อความไทยยาวเกิน 9 KB ถูกย่อแล้วบันทึกได้ (เดิมนับตัวอักษร → เขียนไม่ได้ → ไม่แจ้งเจ้าหน้าที่)', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: TH(200, 'ชื่อทดสอบนามสกุลยาว '), personType: TH(200, 'ประเภทบุคคล '),
+    department: TH(200, 'หน่วยงานทดสอบ '), itemDesc: TH(2000), itemLoc: TH(500, 'บริเวณลานจอดรถด้านหลังอาคาร '), phone: '0811111111', clientRequestId: 'b1' });
+  assert.equal(s.success, true);
+  assert.equal(s.notify, 'queued', 'ต้องเข้าคิวได้');
+  const raw = r.props.get('lfq_' + s.refCode);
+  assert.ok(u8(raw) <= r.consts.LF_PROP_VALUE_MAX_BYTES, 'ไม่เกินขีดจำกัดต่อค่า: ' + u8(raw));
+  const it = JSON.parse(raw);
+  assert.equal(it.trimmed, true); assert.equal(it.payload.refCode, s.refCode); assert.equal(it.payload.phone, '0811111111');
+  assert.equal(r.sheets.LF_New.rows.find(x => x[1] === s.refCode)[9].length, 2000, 'ข้อมูลเต็มยังอยู่ในชีท');
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 1); assert.equal(r.sent.mail.length, 1);
+  assert.match(JSON.parse(r.sent.fetch[0].body).itemDescription, /…$/);
+});
+
+test('คิว: การตัดสินของเจ้าหน้าที่/ข้อผิดพลาดซ้ำหลายรอบบนรายการใหญ่ ยังบันทึกได้และไม่เกิน 9 KB', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  r.ctx.UrlFetchApp = { fetch: () => { throw new Error('Exception: Timeout: ' + TH(400, 'ข้อผิดพลาดยาว ')); } };
+  const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: TH(200, 'ชื่อ '), department: TH(200, 'หน่วยงาน '),
+    itemDesc: TH(2000), itemLoc: TH(500, 'สถานที่ '), clientRequestId: 'b2' });
+  const token = login(r);
+  for (let i = 0; i < 12; i++) {
+    r.call('lfProcessNotifyQueue');
+    assert.equal(qItem(r, s.refCode).line.state, 'uncertain', 'รอบ ' + i);
+    const res = post(r, { action: 'adminResolveNotify', token, refCode: s.refCode, channel: 'line', decision: 'resend', note: TH(300, 'ตรวจกลุ่มแล้วไม่พบ ') });
+    assert.equal(res.success, true, 'บันทึกการตัดสินรอบ ' + i + ': ' + JSON.stringify(res));
+    assert.ok(u8(r.props.get('lfq_' + s.refCode)) <= r.consts.LF_PROP_VALUE_MAX_BYTES);
+  }
+  assert.ok(qItem(r, s.refCode).decisions.length >= 5);
+});
+
+test('คิว: เต็มงบรวม (หลายร้อยรายการไม่แน่ใจ) → รายการใหม่ยังบันทึกแถวได้ แจ้งผู้ใช้/เจ้าหน้าที่ตามจริง และพื้นที่ทั้งชุดไม่เกิน 500 KB', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  r.ctx.UrlFetchApp = { fetch: () => { throw new Error('Exception: Timeout'); } };
+  let full = null, n = 0;
+  for (; n < 400 && !full; n++) {
+    const s = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ ' + n, itemDesc: TH(1500), itemLoc: TH(300, 'อาคาร '), clientRequestId: 'many' + n });
+    assert.equal(s.success, true);
+    if (s.notify === 'queue_failed') full = s;
+    now += 60000; r.call('lfProcessNotifyQueue');
+  }
+  assert.ok(full, 'ต้องถึงงบภายใน 400 รายการ (ใส่ได้ ' + n + ')');
+  let total = 0; r.props.forEach((v, k) => { total += u8(k) + u8(v); });
+  assert.ok(total <= 500 * 1024, 'ทั้งชุด ' + total);
+  assert.ok(lineRows(r).some(x => x[1] === full.refCode && x[3] === 'queue_failed'));
+  const st = status(r, login(r));
+  assert.ok(st.storage.pct >= 75, 'แสดงการใช้พื้นที่ ' + st.storage.pct);
+  assert.equal(st.notQueued[0].refCode, full.refCode);
+  assert.ok(st.uncertain.length > 50, 'รายการไม่แน่ใจทั้งหมดยังอยู่ ' + st.uncertain.length);
+});
+
+test('ไม่แน่ใจเกิน 50 รายการ (52): ไม่มีรายการถูกตัดทิ้ง อีเมลที่ค้างยังส่งได้ครบ และผล LINE ยังรอเจ้าหน้าที่ทุกรายการ', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  r.ctx.UrlFetchApp = { fetch: () => { throw new Error('Exception: Timeout'); } };
+  let mailOk = false; const realMail = r.ctx.MailApp.sendEmail;
+  r.ctx.MailApp.sendEmail = function (m) { if (!mailOk) throw new Error('Service invoked too many times for one day: email.'); return realMail.call(this, m); };
+  const refs = [];
+  // 52 รายการในช่วงสั้น ๆ: LINE หมดเวลาทุกรายการ, อีเมลส่งไม่ได้ชั่วคราว (ยังไม่ครบจำนวนครั้งที่ลอง)
+  for (let i = 0; i < 52; i++) { refs.push(post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ ' + i, clientRequestId: 'o' + i }).refCode); now += 1000; r.call('lfProcessNotifyQueue'); }
+  assert.ok(refs.every(x => !r.props.has('lfq_' + x) || qItem(r, x).email.state === 'failed'), 'อีเมลยังค้าง (failed) ทุกรายการ');
+  assert.equal(refs.filter(x => !r.props.has('lfq_' + x)).length, 0, 'ไม่มีรายการถูกตัดออก');
+  mailOk = true;
+  for (let k = 0; k < 12; k++) { now += 3600000; r.call('lfProcessNotifyQueue'); }
+  const mailed = r.sent.mail.map(m => JSON.stringify(m));
+  assert.equal(refs.filter(ref => !mailed.some(m => m.indexOf(ref) >= 0)).length, 0, 'อีเมลส่งครบทุกรายการ');
+  const st = status(r, login(r));
+  assert.equal(st.uncertain.length, 52);
+  assert.ok(!lineRows(r).some(x => x[3] === 'attention_overflow'));
+});
+
+test('log เขียนไม่ได้ / Script Properties เขียนไม่ได้: สถานะการส่งยังถูกต้อง ไม่ส่งซ้ำ ไม่ตัดรายการ', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  // (ก) log เขียนไม่ได้ทั้งรอบ
+  const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ', clientRequestId: 'lf1' });
+  r.ctx.UrlFetchApp = { fetch: () => { throw new Error('Exception: Timeout'); } };
+  const logSheet = r.sheets.LF_NotifyLog || null;
+  if (logSheet) logSheet.beforeAppend = () => { throw new Error('log write failed'); };
+  r.ctx.SpreadsheetApp.getActiveSpreadsheet().insertSheet = function () { throw new Error('log write failed'); };
+  r.call('lfProcessNotifyQueue');
+  assert.equal(qItem(r, s.refCode).line.state, 'uncertain'); assert.equal(qItem(r, s.refCode).email.state, 'sent');
+  // (ข) บันทึก "กำลังส่ง" ไม่ได้ → ไม่ส่ง
+  const s2 = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ข', itemDesc: 'ของ', clientRequestId: 'lf2' });
+  const sentBefore = r.sent.mail.length;
+  r.propHooks.failSet = (k, v) => k === 'lfq_' + s2.refCode && /"state":"sending"/.test(v);
+  r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.mail.length, sentBefore, 'บันทึกกำลังส่งไม่ได้ = ไม่ส่ง');
+  assert.equal(qItem(r, s2.refCode).email.state, 'pending');
+  // (ค) ส่งสำเร็จแต่บันทึกผลไม่ได้ → รอบถัดไปเป็น "ไม่แน่ใจ" ไม่ส่งซ้ำ
+  r.propHooks.failSet = (k, v) => k === 'lfq_' + s2.refCode && /"email":\{"state":"sent"/.test(v);
+  r.call('lfProcessNotifyQueue');
+  r.propHooks.failSet = null;
+  assert.equal(r.sent.mail.length, sentBefore + 1);
+  now += 10 * 60000; r.call('lfProcessNotifyQueue');
+  assert.equal(qItem(r, s2.refCode).email.state, 'uncertain');
+  assert.equal(r.sent.mail.length, sentBefore + 1, 'ไม่ส่งอีเมลซ้ำ');
+});
+
+test('หยุดส่งฉุกเฉิน (Script Property LF_QUEUE_PAUSE=1): ไม่ส่ง LINE/อีเมล/รายงาน แต่ฟอร์มยังบันทึกได้ — ยกเลิกแล้วส่งครั้งเดียว', () => {
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  const r = rt({ now: () => now });
+  stubReportDrive(r);
+  r.props.set(r.consts.LF_QUEUE_PAUSE_KEY, '1');
+  const s = post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ร่ม', clientRequestId: 'p1' });
+  assert.equal(s.success, true);
+  r.call('lfProcessNotifyQueue'); r.call('checkAndGenerateLostFoundReport');
+  assert.equal(r.sent.fetch.length + r.sent.mail.length, 0);
+  assert.equal(status(r, login(r)).paused, true);
+  r.props.delete(r.consts.LF_QUEUE_PAUSE_KEY);
+  r.call('lfProcessNotifyQueue'); r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.mail.filter(m => JSON.stringify(m).indexOf(s.refCode) >= 0).length, 1);
+});
+
+test('คำแนะนำฟอร์ม: เรียก touchMemoryEntry ซ้ำไม่ดันข้อมูลส่วนบุคคลขึ้นเป็นคำแนะนำสาธารณะ (ข้อมูลสังเคราะห์)', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  const pii = 'นาย ทดสอบ สมมุติ 0812345678';
+  // เรียกตรงโดยไม่มีการส่งฟอร์ม = ไม่นับ
+  for (let i = 0; i < 15; i++) assert.equal(post(r, { action: 'touchMemoryEntry', bucket: 'dept_th', value: pii, refCode: 'LOS-261025-0001' }).success, false);
+  const mem = () => (r.sheets.LF_Memory ? r.sheets.LF_Memory.rows.slice(1) : []);
+  assert.equal(mem().length, 0);
+  // ส่งฟอร์มจริง 12 ครั้งด้วยค่าเดียวกัน: นับได้ครั้งละ 1 แต่ไม่เลื่อนเป็นคำแนะนำ
+  for (let i = 0; i < 12; i++) {
+    const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', department: pii, itemLoc: 'อาคารทดสอบใหม่', itemDesc: 'ของ', clientRequestId: 'm' + i });
+    assert.equal(post(r, { action: 'touchMemoryEntry', bucket: 'dept_th', value: pii, refCode: s.refCode }).success, true);
+    assert.equal(post(r, { action: 'touchMemoryEntry', bucket: 'dept_th', value: pii, refCode: s.refCode }).success, false, 'ครั้งเดียวต่อรายการ');
+    assert.equal(post(r, { action: 'touchMemoryEntry', bucket: 'loc_th', value: 'อาคารทดสอบใหม่', refCode: s.refCode }).success, true);
+  }
+  const row = mem().find(x => x[1] === pii);
+  assert.equal(row[2], 12); assert.equal(row[3], 'pending', 'ข้อมูลส่วนบุคคลไม่ถูกเลื่อนอัตโนมัติ');
+  assert.equal(mem().find(x => x[1] === 'อาคารทดสอบใหม่')[3], 'approved', 'คำทั่วไปยังเลื่อนได้ตามเดิม');
+  const pub = get(r, { action: 'getMemory', bucket: 'dept_th' }).entries.map(e => e.value);
+  assert.ok(pub.indexOf(pii) < 0);
+  assert.ok(get(r, { action: 'getMemory', bucket: 'loc_th' }).entries.some(e => e.value === 'อาคารทดสอบใหม่'));
+  // ค่าที่ระบบเคยเลื่อนอัตโนมัติไว้ก่อนแก้ → ซ่อนจากสาธารณะ · ค่าที่ผู้ดูแลอนุมัติเอง → แสดง
+  r.sheets.LF_Memory.appendRow(['dept_th', 'คุณ ทดสอบ ตัวอย่าง a.b@example.com', 30, 'approved', '', '', '2026-10-01', 'auto-promote', '']);
+  r.sheets.LF_Memory.appendRow(['dept_th', 'สำนักงาน 02-123-4567 ต่อ 9', 0, 'approved', '', '', '2026-10-01', 'admin01', 'manual add']);
+  const pub2 = get(r, { action: 'getMemory', bucket: 'dept_th' }).entries.map(e => e.value);
+  assert.ok(pub2.indexOf('คุณ ทดสอบ ตัวอย่าง a.b@example.com') < 0);
+  assert.ok(pub2.indexOf('สำนักงาน 02-123-4567 ต่อ 9') >= 0);
+});
+
+test('รายงานรายเดือน: PDF เดิมหายแต่มีตัวเลขชุดเดิม → สร้าง PDF ใหม่จากตัวเลขเดิม (ไม่ใช้ข้อมูลที่เปลี่ยนภายหลัง) ไม่ส่ง LINE ซ้ำ', () => {
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  const r = rt({ now: () => now, failMail: true });
+  stubReportDrive(r);
+  r.call('checkAndGenerateLostFoundReport');
+  let st = mstate(r);
+  assert.equal(st.line.state, 'sent'); assert.equal(st.email.state, 'failed');
+  const total = st.snap.totalItems, firstPdf = st.pdfFileId;
+  // หลังรอบแรก: มีรายการของเดือนเดียวกันเพิ่มในชีท และ PDF เดิมถูกลบ
+  r.sheets.LF_New.appendRow(['2026-10-30 10:00:00', 'LOS-261030-0999', 'สิ่งของสูญหาย', 'ก', '', '', '', '', '', 'ของเพิ่ม', '', '', 'รอดำเนินการ']);
+  const realGet = r.ctx.DriveApp.getFileById;
+  r.ctx.DriveApp.getFileById = id => { if (id === firstPdf) return { isTrashed: () => true, getUrl: () => 'trashed' }; return realGet ? realGet(id) : null; };
+  now += 86400000;
+  const rFix = r;
+  rFix.ctx.MailApp.sendEmail = m => { rFix.sent.mail.push(m); };
+  r.call('checkAndGenerateLostFoundReport');
+  st = mstate(r);
+  assert.equal(st.state, 'done'); assert.equal(st.email.state, 'sent');
+  assert.equal(st.snap.totalItems, total, 'ใช้ตัวเลขชุดเดิม');
+  assert.equal(r.sent.fetch.length, 1, 'ไม่ส่ง LINE ซ้ำ');
+  assert.ok(JSON.stringify(r.sent.mail[0]).indexOf(String(total)) >= 0);
+  assert.ok(lineRows(r).some(x => x[3] === 'monthly_pdf_rebuilt'));
+});
+
+test('ย้อนกลับแบบวางโค้ดเดิมเป็น Head ก่อน: web app ใหม่ + ตัวประมวลผลรุ่น 2.0.0 ส่งรายการใหม่ครั้งเดียว; กลับมาใช้รุ่นใหม่แล้วไม่ส่งซ้ำ', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const web = rt({ now: () => now });                             // web app ยังเป็นรุ่นใหม่ (ยังไม่ได้ Deploy รุ่นเดิม)
+  const oldHead = rt({ now: () => now, sourceDir: V200, shareWith: web });   // Head = โค้ดเดิม (trigger)
+  const s = post(web, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', itemDesc: 'ของ', clientRequestId: 'rb1' });
+  const it = JSON.parse(web.props.get('lfq_' + s.refCode));
+  assert.ok(!it.rowPending); assert.equal(it.line.nextAt, 0, 'พร้อมให้รุ่นเดิมส่ง');
+  oldHead.call('lfProcessNotifyQueue');
+  assert.equal(web.sent.fetch.length, 1); assert.equal(web.sent.mail.length, 1);
+  // กลับมาใช้รุ่นใหม่ทั้ง Head และ web app
+  const newHead = rt({ now: () => now, shareWith: web });
+  for (let i = 0; i < 4; i++) { now += 20 * 60000; sweepDue(newHead); newHead.call('lfProcessNotifyQueue'); }
+  assert.equal(web.sent.fetch.length, 1, 'ไม่ส่งซ้ำหลังกลับมา');
+  assert.equal(web.sent.mail.length, 1);
 });

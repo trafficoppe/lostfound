@@ -116,6 +116,9 @@ function makeRuntime(fixture, opts = {}) {
   const sent = sh ? sh.sent : { mail: [], fetch: [] };
   const cacheStore = sh ? sh.cacheStore : new Map();
   const props = sh ? sh.props : new Map(Object.entries(opts.props || {}));
+  // ขีดจำกัดจริงของ Script Properties: ค่าละ 9 KB, ทั้งชุด 500 KB (นับไบต์ UTF-8) · propHooks.failSet(k,v) = จำลองเขียนไม่สำเร็จ
+  const propHooks = sh ? sh.propHooks : {};
+  const u8 = x => Buffer.byteLength(String(x), 'utf8');
   const triggers = sh ? sh.triggers : [];
   const lockState = sh ? sh.lockState : { held: false };
   const now = () => (opts.now ? new Date(opts.now()) : new Date());
@@ -164,8 +167,15 @@ function makeRuntime(fixture, opts = {}) {
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: k => (props.has(k) ? props.get(k) : null),
-        setProperty: (k, v) => { props.set(k, String(v)); },
-        deleteProperty: k => props.delete(k),
+        setProperty: (k, v) => {
+          v = String(v);
+          if (propHooks.failSet && propHooks.failSet(k, v)) throw new Error('Exception: Service error: Properties (simulated)');
+          if (u8(v) > 9216) throw new Error('Exception: Argument too large: value');
+          let total = 0; props.forEach((val, key) => { if (key !== k) total += u8(key) + u8(val); });
+          if (total + u8(k) + u8(v) > 500 * 1024) throw new Error('Exception: You have exceeded the property storage quota.');
+          props.set(k, v);
+        },
+        deleteProperty: k => { if (propHooks.failDelete && propHooks.failDelete(k)) throw new Error('Exception: Service error (simulated)'); props.delete(k); },
         getProperties: () => Object.fromEntries(props)
       })
     },
@@ -194,7 +204,7 @@ function makeRuntime(fixture, opts = {}) {
       createFolder: () => ({})
     },
     MailApp: { sendEmail: m => { if (opts.failMail) throw new Error('mail quota'); sent.mail.push(m); } },
-    UrlFetchApp: { fetch: (url, o) => { sent.fetch.push({ url, body: o && o.payload }); const code = opts.lineCode ? opts.lineCode() : 200; const body = opts.lineBody ? opts.lineBody() : 'ok'; return { getResponseCode: () => code, getContentText: () => body }; } },
+    UrlFetchApp: { fetch: (url, o) => { sent.fetch.push({ url, body: o && o.payload }); const code = opts.lineCode ? opts.lineCode() : 200; const body = opts.lineBody ? opts.lineBody() : JSON.stringify({ status: 'success' }); return { getResponseCode: () => code, getContentText: () => body }; } },
     ScriptApp: {
       getProjectTriggers: () => triggers.map(t => ({ getHandlerFunction: () => t })),
       newTrigger: fn => { const b = { timeBased: () => b, everyMinutes: () => b, everyDays: () => b, atHour: () => b, create: () => triggers.push(fn) }; return b; },
@@ -212,7 +222,8 @@ function makeRuntime(fixture, opts = {}) {
   code += '\n;globalThis.__exports = { LF_PRIVATE_CONFIG: (typeof LF_PRIVATE_CONFIG!=="undefined"?LF_PRIVATE_CONFIG:undefined), LF_STATUSES, LF_TYPES };';
   // ค่าคงที่ที่การทดสอบต้องอ้างถึง — อ่านจากโค้ดจริง ไม่ใช่เขียนตัวเลขซ้ำไว้ในเทสต์
   // ใช้ typeof กันไว้ เพื่อให้ harness ยังโหลดโค้ดรุ่นเก่าที่ยังไม่มีค่าคงที่เหล่านี้ได้
-  const C = ['LF_VERSION', 'LF_CACHE_TTL_SEC', 'LF_SENDING_GRACE_MS', 'LF_WEBAPP_VER_KEY', 'LF_NOTIFY_MAX_ATTEMPT', 'LF_SWEEP_SETTLE_MS', 'LF_HOLD_UNTIL_MS'];
+  const C = ['LF_VERSION', 'LF_CACHE_TTL_SEC', 'LF_SENDING_GRACE_MS', 'LF_WEBAPP_VER_KEY', 'LF_NOTIFY_MAX_ATTEMPT', 'LF_SWEEP_SETTLE_MS', 'LF_HOLD_UNTIL_MS',
+    'LF_PROP_VALUE_MAX_BYTES', 'LF_QUEUE_NEW_BUDGET', 'LF_ROW_VERIFY_MS', 'LF_QUEUE_PAUSE_KEY', 'LF_NOTIFY_IMG_WAIT_MS'];
   code += '\n;globalThis.__consts = {' +
     C.map(n => `${n}: (typeof ${n}!=="undefined"?${n}:undefined)`).join(', ') + '};';
   vm.runInContext(code, ctx, { filename: 'gas-bundle.js' });
@@ -220,7 +231,7 @@ function makeRuntime(fixture, opts = {}) {
   const json = out => JSON.parse(out.getContent());
   return { ctx, call, json, sheets, log, sent, cacheStore, props, triggers, files,
     consts: ctx.__consts, setLock: v => { lockState.held = v; }, isLocked: () => lockState.held,
-    shared: { sheets, sent, cacheStore, props, triggers, lockState } };
+    propHooks, shared: { sheets, sent, cacheStore, props, triggers, lockState, propHooks } };
 }
 
 module.exports = { makeRuntime, formatDate, Sheet };

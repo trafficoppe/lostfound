@@ -166,15 +166,15 @@ function sendLostFoundReportToLine(pdfFile, data) {
   };
   const response = UrlFetchApp.fetch(url, {
     method: 'post', contentType: 'application/json',
-    payload: JSON.stringify(payload), muteHttpExceptions: true
+    payload: JSON.stringify(payload), muteHttpExceptions: true, followRedirects: false
   });
   const code = response.getResponseCode();
+  const body = String(response.getContentText() || '');
   Logger.log('📡 LINE response: ' + code);
-  if (code < 200 || code >= 300) {
-    const body = String(response.getContentText());
-    const err = new Error('HTTP ' + code + ' ' + body.slice(0, 120));
-    err.httpCode = code;
-    err.body = body.slice(0, 1000);
+  // ถือว่าส่งแล้วเฉพาะ HTTP 2xx + JSON {status:'success'} (สัญญาเดียวกับการแจ้งเตือนรายการใหม่ — ดู lfLineResponseOk_)
+  if (!lfLineResponseOk_(code, body)) {
+    const err = new Error('HTTP ' + code + (code >= 200 && code < 300 ? ' (ไม่ใช่คำตอบ success ของ Cloud Function)' : '') + ' ' + body.slice(0, 120));
+    err.httpCode = code || -1;
     throw err;
   }
   return code;
@@ -247,7 +247,14 @@ function lfReadReportState_(raw) {
  */
 function lfSaveReportState_(props, key, st) {
   const out = ['line', 'email'].some(ch => st[ch] && ['sent', 'sending', 'uncertain', 'closed'].indexOf(st[ch].state) >= 0);
-  props.setProperty(key, (out || st.state === 'done' ? 'done ' : '') + JSON.stringify(st));
+  const prefix = (out || st.state === 'done' ? 'done ' : '');
+  let s = prefix + JSON.stringify(st);
+  if (lfUtf8Bytes_(s) > LF_PROP_VALUE_MAX_BYTES) {              // ขีดจำกัด 9 KB ต่อค่า (นับไบต์ UTF-8)
+    ['line', 'email'].forEach(ch => { if (st[ch] && st[ch].err) st[ch].err = lfClipBytes_(st[ch].err, 300); });
+    if (Array.isArray(st.decisions)) st.decisions = st.decisions.slice(-5).map(d => Object.assign(d, { note: lfClipBytes_(d.note, 300) }));
+    s = prefix + JSON.stringify(st);
+  }
+  props.setProperty(key, s);
 }
 
 /** ตัวเลขที่ใช้ทำ PDF — เก็บไว้ส่งรอบถัดไป ให้ข้อความ LINE/อีเมลตรงกับ PDF เดิมเสมอ */
@@ -312,6 +319,10 @@ function generateLostFoundReportPreviousMonth(fromTrigger) {
   const ui = function (msg) { if (fromTrigger !== true) { try { SpreadsheetApp.getUi().alert(msg); } catch (e) {} } };
   try {
     const st = lfReadReportState_(props.getProperty(key));
+    if (props.getProperty(LF_QUEUE_PAUSE_KEY) === '1') {        // หยุดส่งฉุกเฉิน — ไม่สร้าง/ไม่ส่งรายงาน
+      Logger.log('⏸️ รายงาน ' + key + ': หยุดส่งชั่วคราว (' + LF_QUEUE_PAUSE_KEY + '=1)');
+      return { success: false, paused: true };
+    }
     if (st.state === 'done') {
       Logger.log('ℹ️ รายงาน ' + key + ' ส่งครบแล้ว: ' + (st.legacy || JSON.stringify(st)));
       ui('ℹ️ รายงานเดือนนี้ส่งครบแล้ว');
@@ -338,9 +349,12 @@ function generateLostFoundReportPreviousMonth(fromTrigger) {
       try { pdfFile = DriveApp.getFileById(st.pdfFileId); if (pdfFile.isTrashed()) pdfFile = null; }
       catch (e) { pdfFile = null; Logger.log('⚠️ PDF เดิมเปิดไม่ได้ สร้างใหม่: ' + e); }
     }
-    if (pdfFile && st.snap) data = st.snap;
+    // มีตัวเลขชุดเดิม (snapshot) แล้ว → ใช้ชุดเดิมเสมอ แม้ PDF เดิมหาย (สร้าง PDF ใหม่จากตัวเลขเดิม)
+    // เพื่อให้ LINE/อีเมลที่ส่งต่างรอบกันแสดงตัวเลขตรงกัน แม้ข้อมูลในชีทเปลี่ยนไปหลังรอบแรก
+    if (st.snap) data = st.snap;
     if (!data) data = lfMonthlyStats_(pm.y, pm.m, null);
     if (!pdfFile) {
+      if (st.snap) lfNotifyLog_('MONTHLY-' + key.slice(-7), 'queue', 'monthly_pdf_rebuilt', 0, 'PDF เดิมหาย/อยู่ในถังขยะ — สร้างใหม่จากตัวเลขชุดเดิม');
       st.state = 'building'; save();
       pdfFile = lfBuildReportPdf_(pm.y, pm.m, null, data).pdfFile;
       st.pdfFileId = pdfFile.getId();

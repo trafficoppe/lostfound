@@ -11,7 +11,7 @@
   const CH = { line: 'LINE', email: 'อีเมล' };
   const STATE = { pending: 'รอส่ง', sending: 'กำลังส่ง', sent: 'ส่งแล้ว', failed: 'ล้มเหลว (รอลองใหม่)', gave_up: 'เลิกลองแล้ว',
                   uncertain: 'ไม่แน่ใจ', closed: 'ปิดโดยไม่ส่ง', done: 'ส่งครบ', partial: 'ยังไม่ครบ', building: 'กำลังสร้าง PDF', none: 'ยังไม่มี', new: 'ยังไม่เริ่ม',
-                  ok: 'ทำงานได้', unknown: 'หยุด — ยืนยันรุ่นไม่ได้', skew: 'หยุด — รุ่นไม่ตรง', settling: 'หยุดชั่วคราว — รอหลังเปลี่ยนรุ่น' };
+                  ok: 'ตรงกัน', unknown: 'ยืนยันรุ่นไม่ได้', skew: 'รุ่นไม่ตรง', settling: 'เพิ่งเปลี่ยนรุ่น' };
   const DECISION = [
     ['', '— เลือกการตัดสิน —'],
     ['confirm_sent', 'ตรวจแล้ว ปลายทางได้รับแล้ว (ไม่ส่งซ้ำ)'],
@@ -28,9 +28,13 @@
   const pill = s => el('span', { cls: 'pill ' + (s || ''), text: STATE[s] || s || '-' });
   const when = v => { const d = LF.parseDate(v); return d ? LF.format(d, { dateStyle: 'medium', timeStyle: 'short' }) + ' น.' : (v || '-'); };
 
-  function decideForm(onSubmit, allowResend) {
+  function decideForm(onSubmit, allowResend, only) {
     const sel = el('select', { 'aria-label': 'การตัดสิน' });
-    DECISION.forEach(([v, t]) => { if (v !== 'resend' || allowResend) sel.appendChild(el('option', { value: v, text: t })); });
+    DECISION.forEach(([v, t]) => {
+      if (v === 'resend' && !allowResend) return;
+      if (only && v && only.indexOf(v) < 0) return;
+      sel.appendChild(el('option', { value: v, text: only && v === 'resend' ? 'ใส่คิวและส่งตอนนี้' : t }));
+    });
     const note = el('input', { type: 'text', maxlength: '300', placeholder: 'เหตุผล / สิ่งที่ตรวจพบ (จำเป็น)', 'aria-label': 'เหตุผล' });
     const btn = el('button', { type: 'button', text: 'บันทึกการตัดสิน' });
     const warn = el('div', { cls: 'warn', text: 'ส่งใหม่: ถ้าปลายทางได้รับไปแล้วจริง ผู้รับจะได้ข้อความซ้ำ — เลือกเมื่อตรวจแล้วว่ายังไม่ได้รับ' });
@@ -68,6 +72,20 @@
     });
   }
 
+  // บันทึกแถวแล้วแต่ใส่คิวแจ้งเตือนไม่ได้ (เช่น พื้นที่เต็ม) — ระบบใส่คิวให้เองเมื่อมีที่ว่างภายใน 7 วัน
+  function renderNotQueued(list) {
+    const box = $('notqueued'); box.textContent = '';
+    if (!list.length) { box.appendChild(el('div', { cls: 'empty', text: '✅ ไม่มี' })); return; }
+    list.forEach(q => {
+      const it = el('div', { cls: 'item' }, [
+        el('div', { cls: 'head' }, [el('strong', { text: q.refCode }), el('span', { cls: 'muted', text: 'ใส่คิวไม่ได้เมื่อ ' + when(q.at) })]),
+        el('div', { cls: 'muted', text: q.detail || '' })
+      ]);
+      it.appendChild(decideForm((decision, note) => LF.adminCall('adminResolveNotify', { refCode: q.refCode, channel: 'queue', decision, note }, 30000), true, ['resend', 'close']));
+      box.appendChild(it);
+    });
+  }
+
   function renderMonthly(list) {
     const box = $('monthly'); box.textContent = '';
     if (!list.length) { box.appendChild(el('div', { cls: 'empty', text: 'ไม่มีข้อมูล' })); return; }
@@ -95,11 +113,15 @@
     const box = $('sys'); box.textContent = '';
     const kv = (k, v) => { box.appendChild(el('div', { text: k })); box.appendChild(typeof v === 'string' ? el('div', { text: v }) : el('div', {}, [v])); };
     kv('ตัวประมวลผลคิว (trigger)', r.triggerInstalled ? '✅ ติดตั้งแล้ว' : '❌ ยังไม่ติดตั้ง');
+    kv('การส่งแจ้งเตือน', r.paused ? '⏸️ หยุดส่งชั่วคราว (Script Property LF_QUEUE_PAUSE = 1)' : 'ทำงานปกติ');
+    const sg = r.storage || {};
+    kv('พื้นที่เก็บคิว (Script Properties)', (sg.pct >= 70 ? '⚠️ ' : '') + (sg.pct !== undefined ? sg.pct + '% ของ 500 KB' : '-') +
+      (sg.items !== undefined ? ' · ' + sg.items + ' รายการในคิว' : '') + (sg.pct >= 70 ? ' — ตัดสินรายการ "ไม่แน่ใจ" เพื่อคืนพื้นที่' : ''));
     kv('API เดิม (ไม่ต้องล็อกอิน)', r.legacyApi === 'on' ? '⚠️ เปิดอยู่' : 'ปิด');
     kv('โค้ด Head', (r.headVersion || '') + ' · build ' + (r.headBuild || '-'));
     kv('Web app ที่ deploy', (r.webAppVersion || '-') + (r.webAppBuild ? ' · build ' + r.webAppBuild : '') + (r.webAppSince ? ' · ตั้งแต่ ' + when(r.webAppSince) : ''));
     const sw = r.sweep || {};
-    kv('ตัวตามเก็บงานค้าง', el('span', {}, [pill(sw.reason), ' ', el('span', { cls: 'muted', text: sw.text || '' })]));
+    kv('Web app กับโค้ด trigger', el('span', {}, [pill(sw.reason), ' ', el('span', { cls: 'muted', text: sw.text || '' })]));
   }
 
   function renderQueue(list) {
@@ -134,6 +156,7 @@
     try {
       const r = await LF.adminCall('adminNotifyStatus', {}, 30000);
       renderUncertain(r.uncertain || []);
+      renderNotQueued(r.notQueued || []);
       renderMonthly(r.monthly || []);
       renderSys(r);
       renderQueue(r.queue || []);
