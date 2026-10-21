@@ -121,6 +121,7 @@ Google Form เดิม ───────────▶ Sheet Form Respons
 ## ทดสอบ
 - `npm test` — รันโค้ด .gs จริงด้วย runtime จำลอง (รวมการจำลองช่วงเปลี่ยนรุ่น/ย้อนกลับกับโค้ดจริง 2.0.0)
 - `tests/apps-script/` — ชุดทดสอบบน Apps Script จริงในโปรเจกต์แยก (ตรวจการแยกระบบก่อนทุกครั้ง, Archive web app ทดสอบหลังเก็บผล) — ขั้นตอนใน `tests/apps-script/README.md`
+- `tests/ui-smoke.check.cjs` — ตรวจหน้าเว็บแบบผู้ใช้ (ฟอร์มสองภาษา รูป กดส่งซ้ำ ค้นหา/กรอง สิทธิ์ผู้ดูแล PDF) ด้วย API จำลอง ไม่ออกเน็ต
 - `tests/ui-notify.check.cjs`, `tests/ui-perf.check.cjs` — ทดสอบหน้าเว็บด้วยเบราว์เซอร์ (ต้องมี Playwright)
 
 ## v2.1.1 (เพิ่มจาก v2.1)
