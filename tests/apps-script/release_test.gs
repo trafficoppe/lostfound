@@ -4,11 +4,14 @@
  * ห้ามวางไฟล์นี้ในโปรเจกต์ระบบจริง
  * ============================================================
  * ไฟล์ในโปรเจกต์ทดสอบ: lf_gas.gs, MonthlyReport.gs (ชุด candidate), config.test.gs, release_test.gs (ไฟล์นี้)
- * ลำดับ: 1) lfTest_1_ตรวจการแยกระบบ  2) lfTest_2_ทดสอบทั้งหมด  3) lfTest_9_เก็บกวาด (ไม่บังคับ)
+ * ลำดับ: 1) lfTest_1_ตรวจการแยกระบบ  2) lfTest_2_ทดสอบทั้งหมด  3) lfTest_9_เก็บกวาด
+ *        4) Archive deployment ของ web app ทดสอบ (กดเองในตัวแก้ไข — ไม่ใช่ของระบบจริง)  5) lfTest_10_ตรวจว่าปิดURLทดสอบแล้ว
  * ผลลัพธ์บันทึกในแท็บ "ผลทดสอบ_APPS_SCRIPT" ของชีททดสอบ — คอลัมน์ "หลักฐาน" บอกว่าเป็นของจริงหรือ mock
  *
  * หลักการ: ถ้าตรวจการแยกระบบไม่ผ่าน ฟังก์ชันทดสอบอื่นจะหยุดทันที (ไม่ส่ง/ไม่เขียนอะไร)
+ * ไม่มีฟังก์ชันใดในไฟล์นี้สร้าง แก้ หรือ Archive deployment เอง
  */
+const LF_TEST_PROD_TZ = 'Etc/GMT-7';   // เขตเวลาของชีทระบบจริง (UTC+7) — โค้ดอ่านวันที่ตามเขตเวลาชีท
 
 // ค่า hash ของ ID ระบบจริง (ไม่เก็บ ID ตรง ๆ) — ใช้ยืนยันว่า "ไม่ใช่" ระบบจริง
 const LF_TEST_PROD_SHEET_SHA  = '35d448eea369cd1f3831b745a6668f78c5fa022c5ce920283184850d0cd0a9e9';
@@ -87,6 +90,10 @@ function lfTest_1_ตรวจการแยกระบบ() {
   const iso = lfTestIsolation_();
   lfTestRecord_('0 แยกระบบ', 'ทุกจุดเชื่อมต่อไม่ชี้ระบบจริง', iso.ok, 'Apps Script จริง',
     (iso.ok ? 'ผ่าน' : iso.problems.join(' | ')) + ' · ' + JSON.stringify(iso.info));
+  // ไม่เกี่ยวกับความปลอดภัย แต่ถ้าเขตเวลาต่างจากระบบจริง ผลเรื่องวันที่/ขอบเดือนจะไม่แทนระบบจริง
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+  lfTestRecord_('0 แยกระบบ', 'เขตเวลาชีททดสอบตรงกับระบบจริง (UTC+7)', tz === LF_TEST_PROD_TZ, 'Apps Script จริง',
+    'ชีท=' + tz + ' · สคริปต์=' + Session.getScriptTimeZone());
   return iso;
 }
 
@@ -223,6 +230,11 @@ function lfTest_2_ทดสอบทั้งหมด() {
     it ? 'line=' + it.line.state + ' email=' + it.email.state : '');
   const st = JSON.parse(lfNotifyStatus_().getContent());
   lfTestRecord_(G2, 'หน้าผู้ดูแลเห็นรายการไม่แน่ใจ', st.uncertain.length >= 1, 'Apps Script จริง', 'ไม่แน่ใจ ' + st.uncertain.length + ' รายการ · sweep=' + st.sweep.reason);
+  // ปลายทาง "LINE" ของโปรเจกต์ทดสอบคือ web app ทดสอบเอง — ข้อความแจ้งเตือนต้องไม่ถูกบันทึกเป็นรายการใหม่ (ไม่วนซ้ำ)
+  const okSubmits = [f, g, s].filter(x => x.json && x.json.success).length;
+  const n2 = lfTestRowCount_();
+  lfTestRecord_(G2, 'ข้อความแจ้งเตือนที่ส่งเข้า web app ทดสอบไม่สร้างแถวใหม่', n2 - n1 === okSubmits, 'Apps Script จริง (HTTP)',
+    'แถวเพิ่มช่วงทดสอบคิว ' + (n2 - n1) + ' (คาด ' + okSubmits + ' = ฟอร์มที่ส่งเอง)');
 
   if (Date.now() - started > 240000) { lfTestRecord_(G3, 'ข้าม (เวลาใกล้ครบ 6 นาที) — รัน lfTest_3_รายงานรายเดือน แยก', 'ข้าม', '-', ''); return; }
   lfTest_3_รายงานรายเดือน();
@@ -294,4 +306,18 @@ function lfTest_9_เก็บกวาด() {
   const props = PropertiesService.getScriptProperties();
   Object.keys(props.getProperties()).forEach(k => props.deleteProperty(k));
   lfTestRecord_('9 เก็บกวาด', 'ลบ trigger และ Script Properties ของโปรเจกต์ทดสอบ', true, 'Apps Script จริง', '');
+}
+
+/**
+ * รันหลังกด Archive deployment ของ web app ทดสอบแล้ว: ยืนยันว่า URL ทดสอบไม่ตอบข้อมูลอีก
+ * (ฟังก์ชันนี้เรียก URL ทดสอบอย่างเดียว — ไม่แตะ deployment ใด ๆ และไม่เรียก URL ระบบจริง)
+ */
+function lfTest_10_ตรวจว่าปิดURLทดสอบแล้ว() {
+  lfTestGuard_();
+  const h = lfTestGet_('action=health');
+  const off = !h.json;
+  lfTestRecord_('9 เก็บกวาด', 'URL web app ทดสอบปิดแล้ว (Archive แล้ว ไม่ตอบข้อมูล)', off, 'Apps Script จริง (HTTP)',
+    off ? 'HTTP ' + h.code + ' ไม่ใช่ข้อมูล JSON = ปิดแล้ว'
+        : 'ยังตอบข้อมูล (version=' + h.json.version + ') — ยังไม่ได้ Archive หรือ Archive ผิดรายการ');
+  return off;
 }

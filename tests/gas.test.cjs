@@ -1062,10 +1062,13 @@ test('ชุดทดสอบ Apps Script: ตรวจการแยกระ
   const ss = r.ctx.SpreadsheetApp.getActiveSpreadsheet();
   ss.getName = () => 'TEST ชีททดสอบ Lost&Found';
   r.ctx.Session.getEffectiveUser = () => ({ getEmail: () => 'tester@example.com' });
+  r.ctx.Session.getScriptTimeZone = () => 'Asia/Bangkok';
   r.ctx.MailApp.getRemainingDailyQuota = () => 100;
   r.ctx.ScriptApp.getService = () => ({ getUrl: () => TEST_URL });
   r.ctx.DriveApp.getFoldersByName = () => ({ hasNext: () => true, next: () => ({ createFile: () => ({ getId: () => 'IMG1234567890123456789', setSharing() {} }) }) });
+  let archived = false;
   const route = (url, o) => {
+    if (archived) return { getResponseCode: () => 404, getContentText: () => '<html>Sorry, unable to open the file at this time.</html>' };
     if (/INVALID_TEST_DEPLOYMENT/.test(url)) return { getResponseCode: () => 404, getContentText: () => 'not found' };
     assert.ok(url.startsWith(TEST_URL), 'ทุกคำขอ HTTP ต้องไปที่ web app ทดสอบเท่านั้น: ' + url);
     const [, q] = url.split('?');
@@ -1079,6 +1082,7 @@ test('ชุดทดสอบ Apps Script: ตรวจการแยกระ
   const bad = makeRuntime(fixture(), { configSource: adminCfg(), extraSource: fs.readFileSync(path.join(kit, 'release_test.gs'), 'utf8') });
   bad.ctx.SpreadsheetApp.getActiveSpreadsheet().getName = () => 'Lost & Found';
   bad.ctx.Session.getEffectiveUser = () => ({ getEmail: () => 'tester@example.com' });
+  bad.ctx.Session.getScriptTimeZone = () => 'Asia/Bangkok';
   bad.ctx.MailApp.getRemainingDailyQuota = () => 100;
   const iso = bad.call('lfTest_1_ตรวจการแยกระบบ');
   assert.equal(iso.ok, false);
@@ -1093,6 +1097,32 @@ test('ชุดทดสอบ Apps Script: ตรวจการแยกระ
   assert.deepEqual(failed.map(x => x[2] + ' — ' + x[5]), []);
   assert.ok(rows.length >= 20, 'จำนวนกรณีที่บันทึก ' + rows.length);
   assert.equal(r.sent.mail.length, 0, 'ไม่มีอีเมลออก (ผู้รับว่าง)');
+  const names = rows.map(x => x[2]);
+  assert.ok(names.indexOf('ข้อความแจ้งเตือนที่ส่งเข้า web app ทดสอบไม่สร้างแถวใหม่') >= 0);
+  assert.ok(names.indexOf('เขตเวลาชีททดสอบตรงกับระบบจริง (UTC+7)') >= 0);
   r.call('lfTest_9_เก็บกวาด');
-  assert.equal(r.triggers.length >= 0, true);
+  assert.equal(r.triggers.length, 0);
+  // ก่อน Archive: URL ยังตอบ → ต้องรายงานว่า "ยังไม่ปิด"
+  assert.equal(r.call('lfTest_10_ตรวจว่าปิดURLทดสอบแล้ว'), false);
+  archived = true;
+  assert.equal(r.call('lfTest_10_ตรวจว่าปิดURLทดสอบแล้ว'), true);
+  const last = r.sheets['ผลทดสอบ_APPS_SCRIPT'].rows.slice(-2).map(x => x[3]);
+  assert.deepEqual(last, ['ไม่ผ่าน', 'ผ่าน']);
+});
+
+test('ชุดทดสอบ Apps Script: เขตเวลาชีทต่างจากระบบจริง → บันทึกว่าไม่ผ่าน', () => {
+  const fs = require('fs');
+  const kit = path.join(__dirname, 'apps-script');
+  const r = makeRuntime(fixture(), { configSource: fs.readFileSync(path.join(kit, 'config.test.gs'), 'utf8'),
+    extraSource: fs.readFileSync(path.join(kit, 'release_test.gs'), 'utf8') });
+  const ss = r.ctx.SpreadsheetApp.getActiveSpreadsheet();
+  ss.getName = () => 'TEST ชีท';
+  ss.getSpreadsheetTimeZone = () => 'Etc/GMT';
+  r.ctx.Session.getEffectiveUser = () => ({ getEmail: () => 'tester@example.com' });
+  r.ctx.Session.getScriptTimeZone = () => 'Asia/Bangkok';
+  r.ctx.MailApp.getRemainingDailyQuota = () => 100;
+  r.call('lfTest_1_ตรวจการแยกระบบ');
+  const row = r.sheets['ผลทดสอบ_APPS_SCRIPT'].rows.find(x => x[2] === 'เขตเวลาชีททดสอบตรงกับระบบจริง (UTC+7)');
+  assert.equal(row[3], 'ไม่ผ่าน');
+  assert.match(row[5], /Etc\/GMT/);
 });
