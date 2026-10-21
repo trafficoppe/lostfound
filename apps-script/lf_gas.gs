@@ -1574,27 +1574,17 @@ function lfSaveQueueItem_(props, key, item) {
 
 /**
  * ความล้มเหลวที่ "ไม่รู้ว่าปลายทางส่งเข้า LINE แล้วหรือยัง" → ไม่ส่งซ้ำอัตโนมัติ ให้เจ้าหน้าที่ตัดสินที่หน้า "ตรวจการแจ้งเตือน"
- * หลัก: ลองใหม่อัตโนมัติเฉพาะกรณีที่ยืนยันจากโค้ด Cloud Function ได้ว่ายังไม่มีข้อความออก (ตรวจโค้ดในเครื่องผู้ดูแล 21 ต.ค. 2569;
- * ยังไม่ได้เทียบกับรุ่นที่ deploy อยู่ — ถ้า Cloud Function เปลี่ยน ต้องตรวจกติกานี้ใหม่)
+ * หลัก: ลองใหม่อัตโนมัติเฉพาะกรณีที่คำขอไม่ถึงโค้ดที่เรียก LINE (ต่อไม่ติด, DNS, HTTP 4xx) — HTTP 5xx และหมดเวลา = ไม่แน่ใจเสมอ
+ * (ตรวจโค้ด Cloud Function ในเครื่องผู้ดูแล 21 ต.ค. 2569 แล้วพบว่า 500 เกิดได้หลังเรียก LINE; รุ่นที่ deploy อยู่เทียบไม่ได้)
  * อีเมลเป็นช่องทางแยก — ถ้า LINE ไม่แน่ใจ อีเมลของรายการเดียวกันยังส่งตามปกติ
  */
 function lfIsAmbiguousSendError_(err) {
   // true = ปลายทางอาจส่งข้อความเข้า LINE ไปแล้ว → ห้ามลองส่งเองอัตโนมัติ ให้เจ้าหน้าที่ตัดสิน
-  // false = ยืนยันได้ว่ายังไม่ถึง LINE → ลองใหม่อัตโนมัติได้
-  // อิงโค้ด Cloud Function (notifyLostFound / notifyMonthlyLostFoundReport):
-  //   503 + message "LINE client not configured" = หยุดก่อนเรียก LINE
-  //   500 + message "Request failed with status code 4xx" = LINE ปฏิเสธคำขอ (รวม 429 โควตา) ไม่มีข้อความออก
-  //   500 อื่น ๆ (LINE 5xx, เครือข่าย Cloud Function→LINE ขาด), 5xx อื่น, หมดเวลา, ข้อผิดพลาดที่ไม่รู้จัก = ไม่แน่ใจ
-  //   4xx จาก Cloud Function/Google (URL ผิด, ไม่มีสิทธิ์) = คำขอไม่ถึงโค้ดที่ส่ง LINE
+  // false = คำขอไม่ถึงโค้ดที่เรียก LINE → ลองใหม่อัตโนมัติได้
+  // HTTP 5xx ทุกกรณี = ไม่แน่ใจ: เทียบโค้ด Cloud Function รุ่นที่ deploy อยู่ไม่ได้ จึงไม่ใช้ข้อความใน body ตัดสิน
+  // HTTP 4xx = ไม่ส่ง (สมมติฐาน: โค้ดในเครื่องผู้ดูแลไม่ตอบ 4xx หลังเรียก LINE; 404/403 มาจาก Google ก่อนถึงโค้ด)
   const code = err && err.httpCode;
-  if (code) {
-    if (code < 500) return false;
-    let msg = '';
-    try { msg = String((JSON.parse(String(err.body || '')) || {}).message || ''); } catch (e) { msg = ''; }
-    if (code === 503 && msg === 'LINE client not configured') return false;
-    if (code === 500 && /^Request failed with status code 4\d\d$/.test(msg)) return false;
-    return true;
-  }
+  if (code) return code >= 500;
   const text = String((err && err.message) || err || '');
   // ต่อไม่ติด/ยังไม่ได้ส่งคำขอออกไปเลย
   if (/not configured|dns error|address unavailable|unknown host|invalid argument|bad url|too many times|bandwidth quota/i.test(text)) return false;

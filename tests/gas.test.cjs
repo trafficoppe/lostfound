@@ -249,10 +249,10 @@ test('ช่วงเปลี่ยนผ่าน (legacy on): API เดิ�
   assert.equal(post(r, { action: 'updateStatus', refCode: 'PKP-261018-5403', newStatus: 'รับของคืนแล้ว' }).code, 401);
 });
 
-test('คิวแจ้งเตือน: LINE ปฏิเสธคำขอ (ยังไม่ส่ง) แล้ว retry ภายหลัง อีเมลไม่ส่งซ้ำ', () => {
+test('คิวแจ้งเตือน: คำขอไม่ถึง Cloud Function (HTTP 404) แล้ว retry ภายหลัง อีเมลไม่ส่งซ้ำ', () => {
   let now = Date.parse('2026-10-19T10:00:00+07:00');
-  let lineCode = 500;
-  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 400' }) });
+  let lineCode = 404;
+  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => 'not found' });
   const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ง', itemDesc: 'ของ', clientRequestId: 'n1' });
   r.call('lfProcessNotifyQueue');
   assert.equal(r.sent.mail.length, 1);
@@ -512,14 +512,14 @@ test('sweeper: แถวที่บันทึกแล้วแต่ไม�
   assert.ok(r.sheets.LF_NotifyLog.rows.some(x => x[3] === 'recovered'));
 });
 
-test('รายงานรายเดือน: LINE ปฏิเสธคำขอ (HTTP 500 + LINE 4xx) = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
+test('รายงานรายเดือน: คำขอไม่ถึง Cloud Function (HTTP 404) = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
   let now = Date.parse('2026-11-01T09:05:00+07:00');
-  let lineCode = 500;
-  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 400' }) });
+  let lineCode = 404;
+  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => 'not found' });
   stubReportDrive(r);
   r.call('checkAndGenerateLostFoundReport');
   let st = mstate(r);
-  assert.equal(st.state, 'partial'); assert.equal(st.line.state, 'failed'); assert.equal(st.line.code, 500);
+  assert.equal(st.state, 'partial'); assert.equal(st.line.state, 'failed'); assert.equal(st.line.code, 404);
   assert.equal(st.email.state, 'sent'); assert.equal(r.sent.mail.length, 1); assert.equal(r.pdfCount, 1);
   now += 86400000; lineCode = 200;
   r.call('checkAndGenerateLostFoundReport');
@@ -534,9 +534,9 @@ test('รายงานรายเดือน: LINE ปฏิเสธคำ�
   assert.equal(r.sent.fetch.length, 2); assert.equal(r.sent.mail.length, 1);
 });
 
-test('รายงานรายเดือน: LINE ตอบ HTTP 500 ที่ยืนยันไม่ได้ว่ายังไม่ส่ง = ไม่แน่ใจ, ไม่ส่ง LINE ซ้ำเอง, อีเมลยังส่งตามปกติ', () => {
+test('รายงานรายเดือน: LINE ตอบ HTTP 500 (แม้ body บอกว่า LINE ปฏิเสธ) = ไม่แน่ใจ, ไม่ส่ง LINE ซ้ำเอง, อีเมลยังส่งตามปกติ', () => {
   let now = Date.parse('2026-11-01T09:05:00+07:00');
-  const r = rt({ now: () => now, lineCode: () => 500, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 502' }) });
+  const r = rt({ now: () => now, lineCode: () => 500, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 400' }) });
   stubReportDrive(r);
   r.call('checkAndGenerateLostFoundReport');
   let st = mstate(r);
@@ -825,7 +825,7 @@ test('ส่งสำเร็จแต่บันทึกสถานะใ�
   assert.equal(qItem(r, s.refCode).line.state, 'uncertain');
 });
 
-test('ปลายทางตอบไม่ชัดเจน: ยืนยันไม่ได้ว่ายังไม่ส่ง = ไม่แน่ใจ (ไม่ส่งซ้ำเอง); ยืนยันได้ว่ายังไม่ถึง LINE = ล้มเหลวและลองใหม่', () => {
+test('ปลายทางตอบไม่ชัดเจน: HTTP 5xx/หมดเวลา = ไม่แน่ใจ (ไม่ส่งซ้ำเอง); ต่อไม่ติด/4xx = ล้มเหลวและลองใหม่', () => {
   const resp = (code, body) => () => ({ getResponseCode: () => code, getContentText: () => body });
   const cf = msg => JSON.stringify({ status: 'error', message: msg });
   const cases = [
@@ -838,10 +838,11 @@ test('ปลายทางตอบไม่ชัดเจน: ยืนยั
     [resp(503, '<html>Service Unavailable</html>'), 'uncertain'],
     [resp(502, 'bad gateway'), 'uncertain'],
     [() => { throw new Error('Exception: Unexpected error while getting the method or property fetch'); }, 'uncertain'],
-    // ล้มเหลว ลองใหม่ได้ — ยืนยันจากโค้ด Cloud Function ว่ายังไม่มีข้อความออก
-    [resp(500, cf('Request failed with status code 400')), 'failed'],
-    [resp(500, cf('Request failed with status code 429')), 'failed'],
-    [resp(503, cf('LINE client not configured')), 'failed'],
+    // 5xx ที่ body บอกว่ายังไม่ส่ง — เทียบรุ่นที่ deploy ไม่ได้ จึงไม่เชื่อ body
+    [resp(500, cf('Request failed with status code 400')), 'uncertain'],
+    [resp(500, cf('Request failed with status code 429')), 'uncertain'],
+    [resp(503, cf('LINE client not configured')), 'uncertain'],
+    // ล้มเหลว ลองใหม่ได้ — คำขอไม่ถึงโค้ดที่เรียก LINE
     [resp(404, 'not found'), 'failed'],
     [resp(403, 'forbidden'), 'failed'],
     [() => { throw new Error('Exception: DNS error: https://line.invalid/hook'); }, 'failed'],
