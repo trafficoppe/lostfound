@@ -48,7 +48,7 @@ const LF_NOTIFY_MAX_ATTEMPT = 5;
 // MEMORY CONFIG
 // ============================================================
 const MEMORY_SHEET_NAME       = 'LF_Memory';
-const MEMORY_AUTO_PROMOTE_MIN = 10;   // count ≥ 10 → auto-approve pending
+// คำแนะนำที่ผู้ใช้พิมพ์เองไม่ถูกเลื่อนเป็นสาธารณะอัตโนมัติ (ยกเลิก auto-promote) — ต้องมีผู้ดูแลอนุมัติ
 const MEMORY_MAX_RETURN       = 200;  // max entries per getMemory response
 const MEMORY_CLEANUP_DAYS     = 90;   // ลบ rejected เก่ากว่า N วัน
 
@@ -106,8 +106,11 @@ function doPost(e) {
   let payload = {};
   // โปรเจกต์ทดสอบเท่านั้น (config.test.gs มี testMode: true): จำลองคำตอบของ Cloud Function LINE
   // ระบบจริงไม่มี testMode → ไม่เข้าเงื่อนไขนี้เลย
-  if (e && e.parameter && e.parameter.lfTestEcho && lfCfg_().testMode === true)
+  if (e && e.parameter && e.parameter.lfTestEcho && lfCfg_().testMode === true) {
+    // ชุดทดสอบ: จำลองเจ้าหน้าที่ตั้งสวิตช์หยุดส่งระหว่างที่ตัวประมวลผลคิวกำลังส่ง (เฉพาะ config ทดสอบ testMode: true)
+    if (e.parameter.lfTestPause === '1') { try { PropertiesService.getScriptProperties().setProperty(LF_QUEUE_PAUSE_KEY, '1'); } catch (x) {} }
     return jsonResponse(e.parameter.lfTestEcho === 'ok' ? { status: 'success', echo: true } : { status: 'error', echo: true });
+  }
   try {
     lfRecordWebAppVersion_();
     try {
@@ -256,12 +259,16 @@ function lfDriveIds_(raw) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
- * การปิดบังชื่อบุคคลในข้อความสาธารณะ — ทำสองชั้น
+ * การปิดบังข้อมูลส่วนบุคคลในข้อความสาธารณะ — ทำเป็นชั้น (ลำดับใน lfMaskPII_ / lfPublicMasker_)
  *
- *   ชั้นที่ 1  lfRedactKnownName_  ปิดบัง "ชื่อที่อยู่ในระเบียนนั้นเอง" แบบตรงตัว
- *              ไม่ต้องเดาจากคำนำหน้า จึงจับได้แม้ผู้แจ้งพิมพ์ชื่อติดกับข้อความอื่น
- *   ชั้นที่ 2  lfMaskNames_        ปิดบังชื่อ "บุคคลที่สาม" ที่ตามหลังคำนำหน้า
- *              (เช่น ชื่อบนบัตรที่เก็บได้) โดยมีบัญชียกเว้นคำประสม
+ *   ชั้นที่ 1  LF_PII_RULES        อีเมล (รวมแบบเลี่ยง @ เช่น [at] / dot / แอท) เลขบัตร เบอร์ รหัส
+ *                                  LINE ID / IG / FB ที่มีคำบอกนำหน้า และ @handle
+ *   ชั้นที่ 2  lfMaskCueNames_     ชื่อที่ตามหลังคำว่า "ชื่อ" / name / owner แม้ไม่มีคำนำหน้า
+ *   ชั้นที่ 3  lfMaskNames_        ชื่อที่ตามหลังคำนำหน้า (นาย นาง คุณ อาจารย์ อ. ดร. ผศ. ...)
+ *              โดยมีบัญชียกเว้นคำประสม (คุณภาพ นายก ...) และที่อยู่ (อ.พุทธมณฑล ต.… อ.… จ.…)
+ *   ชั้นที่ 4  lfRedactKnownName_  ชื่อที่อยู่ในช่องชื่อของระเบียนนั้นเอง แบบตรงตัว
+ *   ชั้นที่ 5  (เฉพาะ getPublicData) ชื่อในช่องชื่อของ "ระเบียนอื่น" ทั้งชุดข้อมูล
+ *              และคำที่เจ้าหน้าที่สั่งปิดใน Script Property LF_PUBLIC_REDACT
  *
  * ขอบเขตที่วิธีนี้ยังตรวจไม่ได้ — ดู README หัวข้อ "ขอบเขตการปิดบังข้อมูล"
  * ──────────────────────────────────────────────────────────────────────── */
@@ -279,8 +286,20 @@ const LF_TITLE_EXCEPT = {
   'นาง': ['เลิ้ง', 'รอง', 'พญา', 'ฟ้า', 'แบบ', 'งาม', 'เอก', 'สนม', 'กวัก', 'ใน', 'รำ',
     'ผี', 'ไม้', 'บำเรอ', 'สงเคราะห์', 'เงือก', 'มาร', 'ยักษ์', 'ครวญ', 'ละคร', 'กำนัล',
     'ทาส', 'พยาบาล', 'เลี้ยง'],
-  'นางสาว': ['ไทย']
+  'นางสาว': ['ไทย'],
+  // คำนามที่ขึ้นต้นด้วย "คุณ" (คุณภาพ คุณค่า ...) และ "คุณ" ที่เป็นสรรพนามตามด้วยกริยา (คุณสามารถ คุณจะ ...)
+  'คุณ': ['ภาพ', 'ค่า', 'สมบัติ', 'ธรรม', 'ประโยชน์', 'ลักษณะ', 'วุฒิ', 'ูปการ', 'งามความดี', 'ประการ',
+    'สามารถ', 'จะ', 'ได้', 'ต้อง', 'เคย', 'ยัง', 'ไม่', 'ช่วย', 'กรุณา', 'เป็น', 'คือ', 'ทำ', 'อยาก', 'ควร', 'ลอง', 'โปรด'],
+  // อาจารย์ + คำที่ไม่ใช่ชื่อ
+  'อาจารย์': ['ที่ปรึกษา', 'ประจำ', 'ผู้', 'พิเศษ', 'ใหญ่', 'ท่าน', 'คณะ', 'ภาค', 'สอน', 'ทุก', 'หลาย'],
+  // อ. ที่เป็นอำเภอ/อาคาร ไม่ใช่อาจารย์ (ที่อยู่เต็มรูปแบบ ต.… อ.… จ.… ตรวจจากบริบทแยกต่างหาก)
+  'อ.': ['เมือง', 'พุทธมณฑล', 'สามพราน', 'นครชัยศรี', 'บางเลน', 'ดอนตูม', 'กำแพงแสน', 'บางกรวย', 'บางใหญ่',
+    'บางบัวทอง', 'ไทรน้อย', 'ปากเกร็ด', 'กระทุ่มแบน', 'บ้านแพ้ว', 'บางพลี', 'พระประแดง', 'ลาดหลุมแก้ว',
+    'ลำลูกกา', 'คลองหลวง', 'ธัญบุรี', 'สามโคก', 'บางปะอิน', 'ศาลายา', 'เรียนรวม', 'ศูนย์', 'สำนัก', 'หอพัก',
+    'หอสมุด', 'หอประชุม', 'คณะ', 'ปฏิบัติการ', 'กิจกรรม']
 };
+// คำนำหน้าแบบ "คุณ + คำเรียก" ใช้บัญชียกเว้นเดียวกับ "คุณ" ไม่ได้ (คุณแม่ โทรมา) จึงตรวจแค่ว่าคำถัดไปเป็นคำต่อประโยคหรือไม่
+const LF_KHUN_ROLES = ['ครู', 'หมอ', 'ป้า', 'ลุง', 'น้า', 'ยาย', 'พี่', 'น้อง', 'แม่', 'พ่อ', 'หญิง', 'นาย', 'ชาย'];
 
 /** คำที่ไม่ควรถูกนับเป็น "นามสกุล" เมื่ออยู่ถัดจากชื่อ (กันไม่ให้กินคำถัดไปของประโยค) */
 const LF_NOT_SURNAME = ['โทร', 'แจ้ง', 'มา', 'ได้', 'ว่า', 'ที่', 'และ', 'หรือ', 'ของ',
@@ -299,18 +318,53 @@ const LF_NAME_FIELD_NOISE = ['สถานี', 'รถบัส', 'สถาน
   'ภาควิชา', 'สำนักงาน', 'มหาวิทยาลัย', 'มหิดล', 'ศาลายา', 'รปภ.', 'รปภ'];
 
 // ขอบซ้าย: ต้นข้อความ ช่องว่าง วงเล็บ เครื่องหมายวรรคตอน หรือจุด (รองรับ "ปชช.นายสมชาย")
-// ตั้งใจไม่รวมอักษรไทย เพื่อไม่ให้คำอย่าง "ทำนาย" ถูกตีความว่าเป็นคำนำหน้า
-const LF_TITLE_RE_TH = /(^|[\s(:\[\]{},.\/\-"'|ฯ])(นางสาว|เด็กชาย|เด็กหญิง|น\.ส\.|ด\.ช\.|ด\.ญ\.|ดร\.|นาย|นาง)(\s?)([ก-๙A-Za-z]+)(?:(\s+)([ก-๙A-Za-z]+))?/g;
-const LF_TITLE_RE_EN = /(^|[\s(:\[\]{},.\/\-"'|])(Mrs|Mr|Ms|Miss|Dr)(\.\s?|\s)([A-Za-z]+)(?:(\s+)([A-Za-z]+))?/g;
+// ตั้งใจไม่รวมอักษรไทย เพื่อไม่ให้คำอย่าง "ทำนาย" "ขอบคุณ" "ให้คุณ" ถูกตีความว่าเป็นคำนำหน้า
+// กลุ่ม: (ขอบซ้าย)(ตำแหน่งวิชาการนำหน้า เช่น "ผศ." "อาจารย์ ")(คำนำหน้าตัวสุดท้าย)(ช่องว่าง)(ชื่อ)(ช่องว่าง)(นามสกุล)
+const LF_TITLE_FINAL_TH_ = 'นางสาว|เด็กชาย|เด็กหญิง|อาจารย์|คุณ(?:' + LF_KHUN_ROLES.join('|') + ')?|' +
+  'น\\.ส\\.|ด\\.ช\\.|ด\\.ญ\\.|ผศ\\.|รศ\\.|ศ\\.|ดร\\.|อ\\.|นาย|นาง';
+const LF_TITLE_RE_TH = new RegExp('(^|[\\s(:\\[\\]{},.\\/\\-"\'|ฯ])((?:(?:อาจารย์|ผศ\\.|รศ\\.|ศ\\.|ดร\\.|อ\\.)\\s?)*)(' +
+  LF_TITLE_FINAL_TH_ + ')(\\s?)([ก-๙A-Za-z]+)(?:(\\s+)([ก-๙A-Za-z]+))?', 'g');
+const LF_TITLE_RE_EN = /(^|[\s(:\[\]{},.\/\-"'|])()(Mrs|Mr|Ms|Miss|Dr|Prof|Ajarn)(\.\s?|\s)([A-Za-z]+)(?:(\s+)([A-Za-z]+))?/g;
 
 /** คำที่ตามคำนำหน้าเป็นคำประสมที่ไม่ใช่ชื่อหรือไม่ */
 function lfIsTitleException_(title, word) {
   const list = LF_TITLE_EXCEPT[title];
   if (!list) return false;
+  const minPrefix = title === 'คุณ' ? 2 : 3;        // "คุณจะ…" "คุณทำ…" เป็นสรรพนาม + กริยา
   for (let i = 0; i < list.length; i++) {
     const stem = list[i];
     if (word === stem) return true;
-    if (stem.length >= 3 && word.indexOf(stem) === 0) return true;
+    if (stem.length >= minPrefix && word.indexOf(stem) === 0) return true;
+  }
+  return false;
+}
+
+/** ข้อความเริ่มด้วยคำใดคำหนึ่งในรายการหรือไม่ */
+function lfStartsWithAny_(word, list) {
+  for (let i = 0; i < list.length; i++) if (word.indexOf(list[i]) === 0) return true;
+  return false;
+}
+
+/**
+ * คำหลังคำนำหน้า "ไม่ใช่ชื่อคน" หรือไม่ (ใช้ตัดสินก่อนย่อ)
+ * @param {string} pre   อักขระขอบซ้ายที่จับได้
+ * @param {string} chain ตำแหน่งวิชาการที่นำหน้า (ถ้ามี)
+ * @param {string} title คำนำหน้าตัวสุดท้าย
+ * @param {string} first คำถัดจากคำนำหน้า
+ * @param {string} before ข้อความก่อนคำที่จับได้ (ไม่เกิน 40 ตัว)
+ * @param {string} afterFirst ข้อความหลังคำ first
+ */
+function lfTitleNotName_(pre, chain, title, first, before, afterFirst) {
+  if (/^[๐-๙]+$/.test(first)) return true;                               // เลขไทย เช่น "อ.๒"
+  if (title === 'ศ.' && !chain && pre === '.') return true;               // พ.ศ. / ค.ศ. / ร.ศ.
+  if (lfIsTitleException_(title, first)) return true;
+  if (title === 'อาจารย์' || title === 'คุณ' || title.indexOf('คุณ') === 0) {
+    if (!lfLooksLikeSurname_(first)) return true;                         // "อาจารย์ แจ้งว่า" "คุณแม่ โทรมา"
+  }
+  if (title === 'อ.' && !chain) {
+    // ที่อยู่: "ต.ศาลายา อ.พุทธมณฑล" หรือ "อ.xxx จ.นครปฐม"
+    if (/(?:ต\.|ตำบล|แขวง)\s*[ก-๙]+\s*$/.test(before)) return true;
+    if (/^\s*(?:จ\.|จังหวัด)/.test(afterFirst)) return true;
   }
   return false;
 }
@@ -333,14 +387,50 @@ function lfLooksLikeSurname_(w) {
 /** ย่อชื่อบุคคลที่ตามหลังคำนำหน้า เช่น "นายสมชาย ใจดี" → "นายส*** ใ***" (ยังพอให้เจ้าของจำได้) */
 function lfMaskNames_(s) {
   const mask = w => (w ? w.charAt(0) + '***' : '');
-  const apply = (m, pre, title, sp, first, spL, last) => {
-    if (lfIsTitleException_(title, first)) return m;        // คำประสม ไม่ใช่ชื่อ → คงไว้
-    let out = pre + title + sp + mask(first);
+  const apply = (m, pre, chain, title, sp, first, spL, last, offset, str) => {
+    const firstEnd = offset + pre.length + chain.length + title.length + sp.length + first.length;
+    const before = str.slice(Math.max(0, offset + pre.length - 40), offset + pre.length);
+    if (lfTitleNotName_(pre, chain, title, first, before, str.slice(firstEnd))) return m;   // ไม่ใช่ชื่อ → คงไว้
+    let out = pre + chain + title + sp + mask(first);
     if (last) out += spL + (lfLooksLikeSurname_(last) ? mask(last) : last);
     return out;
   };
   return String(s == null ? '' : s).replace(LF_TITLE_RE_TH, apply).replace(LF_TITLE_RE_EN, apply)
     .replace(/\*{4,}/g, '***');                              // กันเครื่องหมายซ้อนกันเมื่อปิดบังสองชั้น
+}
+
+/**
+ * ชื่อที่ไม่มีคำนำหน้า แต่ตามหลังคำบอก เช่น "บัตรนักศึกษาชื่อสมชาย ใจดี" "ชื่อเล่นต้น" "name John Doe"
+ * ถ้าคำถัดไปเป็นคำนำหน้าอยู่แล้ว ปล่อยให้ lfMaskNames_ จัดการ (กันย่อซ้อน)
+ * ไม่นับ "ชื่อ" ที่เป็นส่วนของ "เชื่อ" (เชื่อม เชื่อว่า) — พบจากการตรวจข้อมูลหน้าสาธารณะจริงแบบนับจำนวน
+ */
+const LF_NAME_CUE_TH = /((?<!เ)ชื่อ(?:\s*[-:：])?(?:\s*(?:ว่า|เล่น|จริง|เต็ม|-?นามสกุล|ผู้แจ้ง|ผู้ใช้|ผู้รับ|ผู้พบ|เจ้าของ|บัญชี|ของ|บนบัตร|ในบัตร)(?:\s*[:：])?)*\s*)([ก-๙A-Za-z]+)(?:(\s+)([ก-๙A-Za-z]+))?/g;
+const LF_NAME_CUE_EN = /(^|[^A-Za-z])((?:[Oo]wner|OWNER)(?:'s)?(?:\s+[Nn]ame)?|[Nn]amed?|NAMED?)(\s*(?:is\s+|[:：-]\s*)?)([A-Z][A-Za-z'-]+)(?:(\s+)([A-Z][A-Za-z'-]+))?/g;
+// คำหลัง "ชื่อ" ที่ไม่ใช่ชื่อคน (เทียบแบบขึ้นต้น)
+const LF_CUE_NOT_NAME = ['เสียง', 'สินค้า', 'ร้าน', 'ยี่ห้อ', 'รุ่น', 'แอป', 'บริษัท', 'เรื่อง', 'หนังสือ', 'วิชา', 'คณะ',
+  'ไฟล์', 'อยู่', 'บน', 'ใน', 'ที่', 'และ', 'หรือ', 'ไม่', 'ภาษา', 'ย่อ', 'ตึก', 'อาคาร', 'หน่วยงาน', 'ถนน', 'สถานที่',
+  'ผลิตภัณฑ์', 'แบรนด์', 'ทีม', 'งาน', 'โครงการ', 'กลุ่ม', 'ชมรม', 'ห้อง', 'ตำแหน่ง', 'เดียวกัน', 'ด้วย', 'ไว้', 'ติด'];
+const LF_CUE_EN_NOT_NAME = ['Card', 'Tag', 'Badge', 'Plate', 'Sticker', 'Brand', 'Unknown', 'Not', 'None', 'Label', 'Is'];
+const LF_STARTS_WITH_TITLE_RE = /^(?:นางสาว|นาง|นาย|เด็กชาย|เด็กหญิง|คุณ|อาจารย์|น\.ส\.|ด\.ช\.|ด\.ญ\.|ดร\.|ผศ\.|รศ\.|ศ\.|อ\.|(?:Mrs|Mr|Ms|Miss|Dr|Prof)\b)/;
+
+function lfMaskCueNames_(s) {
+  const mask = w => (w ? w.charAt(0) + '***' : '');
+  let t = String(s == null ? '' : s);
+  t = t.replace(LF_NAME_CUE_TH, function (m, cue, first, spL, last, offset, str) {
+    if (LF_STARTS_WITH_TITLE_RE.test(str.slice(offset + cue.length))) return m;
+    if (/^[๐-๙]+$/.test(first) || lfStartsWithAny_(first, LF_CUE_NOT_NAME) || !lfLooksLikeSurname_(first)) return m;
+    let out = cue + mask(first);
+    if (last) out += spL + (lfLooksLikeSurname_(last) && !lfStartsWithAny_(last, LF_CUE_NOT_NAME) ? mask(last) : last);
+    return out;
+  });
+  t = t.replace(LF_NAME_CUE_EN, function (m, pre, cue, sep, first, spL, last) {
+    if (LF_CUE_EN_NOT_NAME.indexOf(first) >= 0) return m;
+    if (/^(?:Mrs|Mr|Ms|Miss|Dr|Prof)$/.test(first)) return m;                  // ให้ lfMaskNames_ ย่อแทน
+    let out = pre + cue + sep + mask(first);
+    if (last) out += spL + (LF_CUE_EN_NOT_NAME.indexOf(last) >= 0 ? last : mask(last));
+    return out;
+  });
+  return t;
 }
 
 /**
@@ -370,9 +460,46 @@ function lfRedactKnownName_(text, fullName) {
 // ตัวเลขรวมเลขไทย (๐-๙) — ผู้แจ้งบางคนพิมพ์เบอร์/เลขบัตรเป็นเลขไทย
 const LF_D_ = '[0-9๐-๙]';
 const LF_ND_ = '[^0-9๐-๙]';
+// อีเมลที่เลี่ยงเครื่องหมาย @ : somchai [at] example.com · somchai at example dot com · somchai แอท gmail ดอท com · ＠
+const LF_AT_ = '(?:\\s*[\\[({<]\\s*(?:at|AT|At)\\s*[\\])}>]\\s*|\\s*＠\\s*|\\s+(?:at|AT)\\s+|\\s*แอท\\s*)';
+const LF_DOT_ = '(?:\\s*\\.\\s*|\\s*[\\[({<]\\s*(?:dot|DOT|Dot)\\s*[\\])}>]\\s*|\\s+(?:dot|DOT)\\s+|\\s*ดอท\\s*)';
+const LF_OBF_EMAIL_RE = new RegExp('(^|[^A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+)(' + LF_AT_ + ')([A-Za-z0-9-]+(?:' + LF_DOT_ + '[A-Za-z0-9-]+)+)', 'g');
+function lfMaskObfEmail_(m, pre, user, at, domain) {
+  const parts = domain.split(new RegExp(LF_DOT_));
+  const tld = parts[parts.length - 1];
+  if (!/^[A-Za-z]{2,6}$/.test(tld)) return m;                       // "lost at MLC.2" ไม่ใช่อีเมล
+  // แบบ " at " ธรรมดา: ต้องเขียน dot เป็นคำ หรือโดเมนลงท้ายที่พบบ่อย กันประโยคอย่าง "lunch at cafe.amazon"
+  if (/^\s+(?:at|AT)\s+$/.test(at) && !/dot|ดอท/i.test(domain) && !/^(?:com|net|org|co|ac|th|edu|io|me|go|or|in)$/i.test(tld)) return m;
+  return pre + '[ซ่อนอีเมล]';
+}
+// LINE ID / IG / FB / TikTok ที่มีคำบอกนำหน้า
+const LF_SOCIAL_RE = /(^|[^A-Za-z])((?:LINE|Line|line|ไอดีไลน์|ไลน์|ไอดี|IG|Ig|ig|ไอจี|[Ii]nstagram|FB|Fb|fb|[Ff]acebook|เฟส(?:บุ๊[คก]|บุค)?|เฟซ(?:บุ๊[คก])?|[Tt]ik[Tt]ok|ติ๊กต็อก)(?:\s*(?:ID|Id|id|ไอดี))?)(\s*[:：=]?\s*)(@?[A-Za-z0-9._-]{2,})((?:\s+[A-Z][A-Za-z]+)?)/g;
+function lfMaskSocial_(m, pre, cue, sep, id, more) {
+  const thaiCue = /[ก-๙]/.test(cue);
+  const idWord = /(?:ID|Id|id|ไอดี)$/.test(cue) || cue.indexOf('ไอดี') >= 0;
+  const colon = /[:：=]/.test(sep);
+  const handle = id.charAt(0) === '@' || (/[A-Za-z]/.test(id) && /[0-9_.]/.test(id));
+  if (!/[A-Za-z]/.test(id)) return m;                                       // "line 515" (สายรถ)
+  if (!(thaiCue || idWord || colon || handle)) return m;                    // "Line Friends"
+  const fb = /^(?:FB|Fb|fb|[Ff]acebook|เฟส|เฟซ)/.test(cue);
+  return pre + cue + sep + '[ซ่อนไอดี]' + (fb ? '' : more);                 // ชื่อเฟซบุ๊กมักเป็นสองคำ
+}
+const LF_FB_THAI_NAME_RE = /((?:เฟส(?:บุ๊[คก]|บุค)?|เฟซ(?:บุ๊[คก])?|[Ff]acebook|FB|fb)(?:\s*[:：]\s*|\s+))([ก-๙]+)(?:(\s+)([ก-๙]+))?/g;
+function lfMaskFbThai_(m, cue, first, spL, last) {
+  if (!lfLooksLikeSurname_(first) || /^[๐-๙]+$/.test(first)) return m;
+  return cue + first.charAt(0) + '***' + (last ? spL + (lfLooksLikeSurname_(last) ? last.charAt(0) + '***' : last) : '');
+}
+
 const LF_PII_RULES = [
   // [รูปแบบ, ข้อความแทน] — ลำดับสำคัญ: แบบเฉพาะก่อน แบบกว้างทีหลัง
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[ซ่อนอีเมล]'],
+  [LF_OBF_EMAIL_RE, lfMaskObfEmail_],
+  [LF_SOCIAL_RE, lfMaskSocial_],
+  [LF_FB_THAI_NAME_RE, lfMaskFbThai_],
+  // @handle ลอย ๆ (ไม่ใช่อีเมล) — ข้ามตัวย่อพิมพ์ใหญ่ล้วน เช่น "@MLC" ที่หมายถึงสถานที่
+  [/(^|[^A-Za-z0-9._%+@-])@([A-Za-z0-9._]{3,})/g, function (m, pre, h) {
+    return (/[0-9_.]/.test(h) || (/[a-z]/.test(h) && h.length >= 4)) ? pre + '[ซ่อนไอดี]' : m;
+  }],
   [new RegExp('(^|' + LF_ND_ + ')' + LF_D_ + '(?:[\\s-]?' + LF_D_ + '){12}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนเลขบัตร]'],
   // เบอร์ที่เขียนเป็นรูปทรงชัดเจน: (081) 234-5678 · 081.234.5678 · 02.441.0000
   [new RegExp('(^|' + LF_ND_ + ')\\(?0' + LF_D_ + '{1,2}\\)?[\\s.-]?' + LF_D_ + '{3}[\\s.-]?' + LF_D_ + '{4}(?!' + LF_D_ + ')', 'g'), '$1[ซ่อนเบอร์]'],
@@ -387,9 +514,9 @@ const LF_PII_RULES = [
 function lfMaskPII_(s, known) {
   let base = lfStr_(s);
   for (let i = 0; i < LF_PII_RULES.length; i++) base = base.replace(LF_PII_RULES[i][0], LF_PII_RULES[i][1]);
-  // ลำดับสำคัญ: ปิดบังตามคำนำหน้าก่อน แล้วค่อยกวาดชื่อในระเบียนที่ยังเหลือ
+  // ลำดับสำคัญ: ชื่อหลังคำบอก → ชื่อหลังคำนำหน้า → ชื่อในระเบียนที่ยังเหลือ
   // (ถ้าสลับลำดับ ชื่อที่ถูกย่อแล้วจะถูกย่อซ้ำกลายเป็น "อ******")
-  return lfRedactKnownName_(lfMaskNames_(base), known);
+  return lfRedactKnownName_(lfMaskNames_(lfMaskCueNames_(base)), known).replace(/\*{4,}/g, '***');
 }
 
 /** ชื่อย่อประเภทบุคคล (ส่วนแรกก่อนช่องว่าง) */
@@ -494,22 +621,126 @@ function lfBuildRecords_() {
   return out;
 }
 
+/* ── ชั้นที่ 5: ชื่อในช่องชื่อของระเบียนอื่น + คำที่เจ้าหน้าที่สั่งปิด (ใช้เฉพาะ getPublicData) ── */
+
+// คำทั่วไปที่เคยถูกกรอกในช่องชื่อ แต่พบบ่อยในรายละเอียด/สถานที่ — ไม่นำไปปิดบังข้ามระเบียน
+const LF_CROSS_NAME_STOP = ['วิทยาลัย', 'วิทยาศาสตร์', 'ศาสตร์', 'ศูนย์', 'การเรียนรู้', 'เรียนรวม', 'สำนัก', 'โรงเรียน',
+  'โรงพยาบาล', 'ประตู', 'ลานจอด', 'ป้ายรถ', 'รถตู้', 'รถไฟฟ้า', 'จักรยาน', 'กระเป๋า', 'โทรศัพท์', 'มือถือ', 'กุญแจ', 'บัตร',
+  'นาฬิกา', 'แว่นตา', 'หูฟัง', 'สร้อย', 'แหวน', 'เงินสด', 'ธนบัตร', 'สมุด', 'หนังสือ', 'เอกสาร', 'ประชาชน', 'ภายนอก',
+  'ทั่วไป', 'บุคคล', 'ผู้แจ้ง', 'ทดสอบ', 'ไม่มี', 'ไม่ระบุ', 'mahidol', 'university', 'student', 'staff', 'officer',
+  'security', 'building', 'station', 'faculty', 'black', 'white', 'brown', 'green', 'gray', 'grey', 'silver', 'gold',
+  'rose', 'pink', 'amber', 'ruby', 'jade', 'apple', 'samsung', 'wallet', 'phone', 'card', 'keys', 'unknown', 'none', 'test'];
+// คำที่มักอยู่หน้าชื่อโดยเขียนติดกัน ("กระเป๋าของสมชาย" "ฝากไว้กับสมชาย")
+const LF_NAME_LEFT_CUES = ['ของ', 'ชื่อ', 'คุณ', 'น้อง', 'พี่', 'ครู', 'ให้', 'จาก', 'โดย', 'กับ', 'ถึง', 'แด่', 'เจ้าของ', 'อาจารย์', 'ป้า', 'ลุง', 'น้า'];
+
+/** ส่วนของชื่อในช่องชื่อ ที่ยาวพอและไม่ใช่คำทั่วไป */
+function lfNameParts_(fullName) {
+  const out = [];
+  lfStr_(fullName).split(/[\s,\/()\[\]·.]+/).forEach(function (p) {
+    p = p.replace(/^(?:นางสาว|นาง|นาย|เด็กชาย|เด็กหญิง|คุณ|อาจารย์|Mrs|Mr|Ms|Miss|Dr)/, '');
+    if (p.length < 4 || !/^[ก-๙A-Za-z]+$/.test(p) || /[๐-๙ๆฯ]/.test(p)) return;
+    const low = p.toLowerCase();
+    if (LF_NAME_FIELD_NOISE.indexOf(p) >= 0 || LF_NOT_SURNAME.indexOf(p) >= 0 || LF_CROSS_NAME_STOP.indexOf(low) >= 0) return;
+    out.push(p);
+  });
+  return out;
+}
+
+/** ชื่อข้ามระเบียน: ต้องอยู่ "เป็นคำ" — ซ้ายเป็นขอบคำหรือคำนำทาง ขวาเป็นขอบคำหรือคำต่อประโยค */
+function lfCrossBoundaryOk_(s, off, len) {
+  const before = s.slice(Math.max(0, off - 8), off), after = s.slice(off + len);
+  const leftOk = !before || !/[ก-๙]$/.test(before) || LF_NAME_LEFT_CUES.some(function (c) { return before.slice(-c.length) === c; });
+  if (!leftOk) return false;
+  if (!after || !/^[ก-๙]/.test(after)) return true;
+  return LF_NOT_SURNAME.some(function (w) { return after.indexOf(w) === 0; });
+}
+
+/** ฟังก์ชันปิดบังชื่อที่ปรากฏในช่องชื่อของทุกระเบียน (ค้นด้วยตารางตัวอักษรแรก ไม่ใช้ regex ยาว) */
+function lfMakeCrossNameMasker_(records) {
+  const th = {}, en = {}, seen = {};
+  let count = 0;
+  records.forEach(function (r) {
+    lfNameParts_(r.name).forEach(function (p) {
+      const thai = /^[ก-๙]+$/.test(p);
+      const k = thai ? p : p.toLowerCase();
+      if (seen[k]) return;
+      seen[k] = 1; count++;
+      const map = thai ? th : en;
+      (map[k.charAt(0)] = map[k.charAt(0)] || []).push(k);
+    });
+  });
+  [th, en].forEach(function (map) { Object.keys(map).forEach(function (c) { map[c].sort(function (a, b) { return b.length - a.length; }); }); });
+  const fn = function (text) {
+    const t = lfStr_(text);
+    if (!t || !count) return t;
+    const low = t.toLowerCase();
+    let out = '', i = 0;
+    while (i < t.length) {
+      let hit = 0;
+      const lt = th[t.charAt(i)];
+      if (lt) for (let j = 0; j < lt.length; j++) {
+        if (t.startsWith(lt[j], i) && lfCrossBoundaryOk_(t, i, lt[j].length)) { hit = lt[j].length; break; }
+      }
+      if (!hit && /[A-Za-z]/.test(t.charAt(i)) && (i === 0 || !/[A-Za-z]/.test(t.charAt(i - 1)))) {
+        const le = en[low.charAt(i)];
+        if (le) for (let j = 0; j < le.length; j++) {
+          if (low.startsWith(le[j], i) && !/[A-Za-z]/.test(t.charAt(i + le[j].length) || '')) { hit = le[j].length; break; }
+        }
+      }
+      if (hit) { out += t.charAt(i) + '***'; i += hit; } else { out += t.charAt(i); i++; }
+    }
+    return out;
+  };
+  fn.tokenCount = count;
+  return fn;
+}
+
+/** คำที่เจ้าหน้าที่สั่งปิดเพิ่ม (Script Property LF_PUBLIC_REDACT คั่นด้วยขึ้นบรรทัดใหม่หรือจุลภาค) — แก้ด่วนได้โดยไม่ต้อง deploy */
+function lfPublicRedactList_() {
+  let raw = '';
+  try { raw = PropertiesService.getScriptProperties().getProperty('LF_PUBLIC_REDACT') || ''; } catch (e) { raw = ''; }
+  return raw.split(/[\n,]+/).map(function (w) { return w.trim(); })
+    .filter(function (w) { return w.length >= 2; })
+    .sort(function (a, b) { return b.length - a.length; });
+}
+
+/** ตัวปิดบังสำหรับหน้าสาธารณะ: ชั้น 1–4 (lfMaskPII_) + ชื่อข้ามระเบียน + คำที่เจ้าหน้าที่สั่งปิด */
+function lfPublicMasker_(records) {
+  const cross = lfMakeCrossNameMasker_(records);
+  const redact = lfPublicRedactList_();
+  return function (text, ownName) {
+    let t = cross(lfMaskPII_(text, ownName));
+    for (let i = 0; i < redact.length; i++) {
+      const w = redact[i];
+      if (t.indexOf(w) >= 0) t = t.split(w).join(w.charAt(0) + '***');
+    }
+    return t.replace(/\*{4,}/g, '***');
+  };
+}
+
+// รูปของรายการที่เป็นเอกสารประจำตัว มักเห็นชื่อ/เลขบัตร/หน้าตา ซึ่งการปิดบังข้อความทำไม่ได้ → ไม่เผยแพร่รูป
+const LF_ID_DOC_RE = /บัตรประ(?:ชาชน|จำตัว)|บัตร\s*ปชช|บัตรนักศึกษา|บัตรนศ|บัตรพนักงาน|บัตรบุคลากร|บัตรข้าราชการ|บัตรเจ้าหน้าที่|ใบขับขี่|หนังสือเดินทาง|พาสปอร์ต|ปริญญาบัตร|ใบปริญญา|ทรานสคริปต์|บัตรเครดิต|บัตรเดบิต|บัตร\s*ATM|สมุดบัญชี|ทะเบียนบ้าน|passport|\bID\s*card|student\s*card|staff\s*card|driv(?:er'?s|ing)\s*licen[cs]e|credit\s*card|debit\s*card|transcript/i;
+function lfIsIdDocument_(r) {
+  return LF_ID_DOC_RE.test(lfStr_(r.title) + ' ' + lfStr_(r.actionText));
+}
+
 /** ตัดข้อมูลส่วนบุคคล/ข้อมูลภายในออก เหลือเฉพาะที่ผู้เข้าชมต้องใช้ */
-function lfPublicRecord_(r) {
+function lfPublicRecord_(r, mask) {
+  if (typeof mask !== 'function') mask = lfMaskPII_;      // map(fn) ส่ง index มาเป็นอาร์กิวเมนต์ที่ 2
   const label = r.type === 'สิ่งของสูญหาย' ? '[ของหาย]' : r.type === 'พบสิ่งของ' ? '[ของที่พบ]' : '[รับคืน]';
   return {
     source: r.source,
     refCode: r.refCode,
     type: r.type,
-    title: r.titleFromName ? label + ' ไม่ระบุรายละเอียด' : lfMaskPII_(r.title, r.name),
-    location: lfMaskPII_(r.location, r.name),
+    title: r.titleFromName ? label + ' ไม่ระบุรายละเอียด' : mask(r.title, r.name),
+    location: mask(r.location, r.name),
     reportedAt: r.reportedAt,
     itemDate: r.itemDate,
     itemTime: r.itemTime,
-    // รูปของเคส "รับของคืน" มักเป็นบัตรประจำตัว จึงไม่เผยแพร่
-    images: r.type === 'รับของคืน' ? [] : r.images.slice(0, 3),
+    // รูปของเคส "รับของคืน" และรูปเอกสารประจำตัว (บัตรประชาชน บัตรนักศึกษา ...) ไม่เผยแพร่
+    images: (r.type === 'รับของคืน' || lfIsIdDocument_(r)) ? [] : r.images.slice(0, 3),
     status: r.status,
-    actionText: lfMaskPII_(r.actionText, r.name)
+    actionText: mask(r.actionText, r.name)
   };
 }
 
@@ -590,10 +821,14 @@ function lfGetDataset_(force) {
 function getPublicData(e) {
   const force = e && e.parameter && e.parameter.force === '1';
   const ds = lfGetDataset_(force);
+  const t0 = Date.now();
+  const mask = lfPublicMasker_(ds.records);
+  const records = ds.records.map(function (r) { return lfPublicRecord_(r, mask); });
+  const timing = Object.assign({}, ds.timing || {}, { mask: Date.now() - t0 });
   return jsonResponse({
     success: true, version: LF_VERSION,
-    generatedAt: ds.generatedAt, cache: ds.cache, serverMs: ds.serverMs, timing: ds.timing,
-    records: ds.records.map(lfPublicRecord_)
+    generatedAt: ds.generatedAt, cache: ds.cache, serverMs: ds.serverMs, timing: timing,
+    records: records
   });
 }
 
@@ -1228,16 +1463,9 @@ function touchMemoryEntry(bucket, rawValue, refCode) {
     const now = Utilities.formatDate(new Date(), LF_TZ, 'yyyy-MM-dd HH:mm:ss');
     if (foundRow > 0) {
       const curCount  = parseInt(rows[foundRow-1][2]) || 0;
-      const curStatus = rows[foundRow-1][3] || 'pending';
       const newCount  = curCount + 1;
       sheet.getRange(foundRow, 3).setValue(newCount);
-      // ค่าที่ดูเหมือนข้อมูลส่วนบุคคลไม่ถูกเลื่อนเป็นคำแนะนำสาธารณะอัตโนมัติ — รอผู้ดูแลตรวจ
-      if (curStatus === 'pending' && newCount >= MEMORY_AUTO_PROMOTE_MIN && !lfMemoryLooksPersonal_(value)) {
-        sheet.getRange(foundRow, 4).setValue('approved');
-        sheet.getRange(foundRow, 7).setValue(now);
-        sheet.getRange(foundRow, 8).setValue('auto-promote');
-        Logger.log('✅ [Memory] auto-promote: ' + value + ' (' + newCount + ' ครั้ง)');
-      }
+      // นับอย่างเดียว ไม่เปลี่ยนสถานะ: การเผยแพร่เป็นคำแนะนำสาธารณะต้องผ่านผู้ดูแล (regex ตรวจชื่อ/ข้อมูลติดต่อไม่ครบทุกแบบ)
     } else {
       sheet.appendRow([bucket, value, 1, 'pending', now, lfClip_(refCode, 40), '', '', '']);
       Logger.log('✅ [Memory] new entry: [' + bucket + '] ' + value);
@@ -1253,18 +1481,30 @@ function touchMemoryEntry(bucket, rawValue, refCode) {
 function lfMemoryLooksPersonal_(v) {
   v = lfStr_(v);
   return v.length > 80 || /[0-9๐-๙](?:[\s.-]?[0-9๐-๙]){5,}/.test(v) || /@/.test(v) ||
-    /(^|\s)(นางสาว|นาง|นาย|น\.ส\.|ดร\.|คุณ)\s?[ก-๙]/.test(v) || /(^|\s)(Mrs|Mr|Ms|Miss|Dr)(\.|\s)\s*[A-Za-z]/.test(v);
+    /(^|\s)(นางสาว|นาง|นาย|น\.ส\.|ดร\.|คุณ)\s?[ก-๙]/.test(v) || /(^|\s)(Mrs|Mr|Ms|Miss|Dr)(\.|\s)\s*[A-Za-z]/.test(v) ||
+    lfMaskPII_(v) !== v;                     // กฎเดียวกับหน้าสาธารณะ (LINE ID, อีเมลเลี่ยง @, อาจารย์ ...) — ใช้เป็นคำเตือนให้ผู้ตรวจ
 }
 
+/**
+ * คำแนะนำที่ "คน" ตรวจแล้ว: สถานะ approved และมีชื่อผู้ตรวจที่ไม่ใช่ระบบ
+ * ค่าที่ระบบเคยเลื่อนอัตโนมัติ (reviewedBy = auto-promote) หรืออนุมัติโดยไม่มีชื่อผู้ตรวจ ถือว่ายังไม่ผ่านการตรวจ
+ */
+function lfMemoryTrusted_(r) {
+  const by = lfStr_(r && r.reviewedBy).trim();
+  return !!r && r.status === 'approved' && !!by && by !== 'auto-promote';
+}
+
+/** สถานะที่ใช้แสดง/กรอง: approved ที่ยังไม่ผ่านการตรวจโดยคน = pending (เจ้าหน้าที่เห็นในรายการรอตรวจและกดอนุมัติได้) */
+function lfMemoryEffectiveStatus_(r) {
+  if (r.status === 'approved' && !lfMemoryTrusted_(r)) return 'pending';
+  return r.status;
+}
+
+/** คำแนะนำสาธารณะ (ฟอร์ม): เฉพาะค่าที่ผู้ดูแลอนุมัติเอง — ค่าที่ผู้ใช้พิมพ์มา (pending) ไม่ถูกส่งออก ไม่ว่า regex จะตรวจพบข้อมูลส่วนบุคคลหรือไม่ */
 function getMemoryEntries(bucket) {
   const rows = readMemoryRows();
   return rows
-    .filter(function(r) {
-      if (r.bucket !== bucket) return false;
-      // ค่าที่ดูเหมือนข้อมูลส่วนบุคคล แสดงต่อสาธารณะเฉพาะเมื่อผู้ดูแล (คน) อนุมัติเอง — รวมค่าที่ระบบเคยเลื่อนอัตโนมัติไว้ก่อนหน้า
-      if (lfMemoryLooksPersonal_(r.value)) return r.status === 'approved' && !!r.reviewedBy && r.reviewedBy !== 'auto-promote';
-      return r.status === 'approved' || r.status === 'pending';
-    })
+    .filter(function(r) { return r.bucket === bucket && lfMemoryTrusted_(r); })
     .sort(function(a,b) { return b.count - a.count; })
     .slice(0, MEMORY_MAX_RETURN)
     .map(function(r) { return { value: r.value, count: r.count, status: r.status }; });
@@ -1274,7 +1514,7 @@ function getMemoryStats() {
   const rows = readMemoryRows();
   const stats = { dept_th:0, dept_en:0, loc_th:0, loc_en:0, total:0 };
   rows.forEach(function(r) {
-    if (r.status === 'pending') {
+    if (lfMemoryEffectiveStatus_(r) === 'pending') {
       if (stats.hasOwnProperty(r.bucket)) stats[r.bucket]++;
       stats.total++;
     }
@@ -1292,7 +1532,10 @@ function handleGetMemory(e) {
 function handleGetMemoryByBucket(e) {
   const bucket = e.parameter.bucket || '';
   const status = e.parameter.status || 'all';
-  const rows   = readMemoryRows();
+  const rows   = readMemoryRows().map(function(r) {
+    const eff = lfMemoryEffectiveStatus_(r);
+    return Object.assign({}, r, { status: eff, sheetStatus: r.status, needsReview: eff === 'pending' && r.status === 'approved' });
+  });
   const filtered = rows.filter(function(r) {
     return (!bucket || r.bucket === bucket) && (status === 'all' || r.status === status);
   });
@@ -1301,7 +1544,7 @@ function handleGetMemoryByBucket(e) {
 
 function handleGetPendingMemory() {
   const rows = readMemoryRows();
-  const pending = rows.filter(function(r) { return r.status === 'pending'; });
+  const pending = rows.filter(function(r) { return lfMemoryEffectiveStatus_(r) === 'pending'; });
   return jsonResponse({ success:true, entries:pending, total:pending.length });
 }
 
@@ -1905,7 +2148,17 @@ function lfProcessNotifyQueue() {
     if (!keys.length) return;
     const cfg = lfCfg_();
     const started = Date.now();
+    // สวิตช์หยุดส่งฉุกเฉินถูกอ่านซ้ำก่อนส่งทุกช่องทาง: ตั้งระหว่างรอบแล้วหยุดก่อนช่องทางถัดไป
+    // (คำขอที่กำลังส่งอยู่ ณ วินาทีที่ตั้งสวิตช์ หยุดกลางคันไม่ได้ — สูงสุด 1 ข้อความต่อ execution)
+    let pausedMid = false;
+    const pausedNow = function () {
+      if (pausedMid) return true;
+      try { pausedMid = props.getProperty(LF_QUEUE_PAUSE_KEY) === '1'; } catch (e) { pausedMid = false; }
+      if (pausedMid) lfNotifyLog_('—', 'queue', 'paused_mid_run', 0, 'หยุดส่งระหว่างรอบ (' + LF_QUEUE_PAUSE_KEY + '=1) — รายการที่ยังไม่ส่งคงสถานะเดิม');
+      return pausedMid;
+    };
     keys.sort().forEach(function (key) {
+      if (pausedMid) return;
       if (Date.now() - started > 240000) return;          // เผื่อเวลาก่อนครบ 6 นาที
       let item;
       try { item = JSON.parse(props.getProperty(key) || 'null'); } catch (e) { item = null; }
@@ -1942,6 +2195,7 @@ function lfProcessNotifyQueue() {
           return;
         }
         if (st.nextAt > Date.now()) return;
+        if (pausedNow()) return;                          // ก่อนทำเครื่องหมาย "กำลังส่ง" — สถานะคิวไม่เปลี่ยน
         const prev = { state: st.state, attempts: st.attempts, nextAt: st.nextAt };
         st.attempts++;
         st.state = 'sending';

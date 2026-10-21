@@ -5,6 +5,9 @@
 //   หน้ารายการผู้ดูแล (สิทธิ์ + กรอง), Dashboard/หน้า export สร้าง PDF ได้จริง, ไม่มีเลื่อนแนวนอนบนมือถือ
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
+const { execFileSync } = require('child_process');
+// ข้อความใน PDF (ใช้ pdftotext ถ้ามี) — ใช้ตรวจว่าอักษรไทยถูกฝังจริง ไม่ใช่แค่ไฟล์ใหญ่
+const pdfText = file => { try { return execFileSync('pdftotext', ['-q', file, '-'], { encoding: 'utf8' }); } catch (e) { return null; } };
 const root = path.resolve(process.argv[2] || '.');
 // ไฟล์ UMD อยู่โฟลเดอร์เดียวกับไฟล์หลักของแพ็กเกจ (package exports ไม่เปิด subpath)
 const lib = (pkg, file) => path.join(path.dirname(require.resolve(pkg)), file);
@@ -48,7 +51,8 @@ async function newPage(b, opts = {}) {
     const authed = body.token === 'tok';
     let j = { success: false, error: 'Unknown action' };
     if (action === 'getPublicData') j = { success: true, generatedAt: new Date().toISOString(), cache: 'hit', serverMs: 50, records: recs };
-    else if (action === 'getMemory') j = { success: true, entries: [{ value: 'อาคารทดสอบ 1', count: 3, status: 'approved' }] };
+    // คำแนะนำจากเซิร์ฟเวอร์ที่มีโค้ดแฝง และค่าที่มีเครื่องหมาย ' — ต้องแสดงเป็นข้อความ ไม่รันโค้ด
+    else if (action === 'getMemory') j = { success: true, entries: [{ value: 'อาคารทดสอบ 1', count: 3, status: 'approved' }, { value: 'XSS <img src=x onerror="window.__lfXss=1"> Lab', count: 2, status: 'approved' }, { value: "O'Brien Hall ทดสอบ", count: 2, status: 'approved' }] };
     else if (/^admin/.test(action) && action !== 'adminLogin' && !authed) j = { success: false, code: 401, error: 'Unauthorized' };
     else if (action === 'adminWhoAmI') j = { success: true, user: 'admin01' };
     else if (action === 'adminGetData') j = { success: true, generatedAt: new Date().toISOString(), records: adminRecs, staff: ['เจ้าหน้าที่ทดสอบ'], statuses: ['รอดำเนินการ', 'รับของคืนแล้ว'] };
@@ -96,6 +100,22 @@ async function formFlow(b, file, lang) {
   const touches = calls.filter(c => c.action === 'touchMemoryEntry');
   check(`ฟอร์ม${L}: คำแนะนำฟอร์มส่ง refCode ที่ได้จากเซิร์ฟเวอร์`, touches.length >= 1 && touches.every(t => t.refCode === 'LOS-261021-0001'), touches.map(t => t.bucket + '=' + t.refCode).join(', '));
   check(`ฟอร์ม${L}: ไม่มีเลื่อนแนวนอนบนมือถือ (390px)`, await noHScroll(page));
+  await ctx.close();
+
+  // คำแนะนำจากเซิร์ฟเวอร์ที่มีโค้ดแฝง: แสดงเป็นข้อความ ไม่รันโค้ด · ค่าที่มี ' เลือกแล้วกรอกได้ตรงตัว
+  ({ ctx, page, calls } = await newPage(b));
+  await page.goto(url(file));
+  await page.waitForFunction(() => typeof pickType === 'function');
+  await page.waitForTimeout(800);
+  await page.evaluate(() => { pickType('lost'); const st = document.getElementById('f-dept').closest('.step, [id^="s"]'); if (st && typeof showStep === 'function') showStep(st.id); });
+  await page.fill('#f-dept', 'XSS'); await page.waitForTimeout(200);
+  const xss = await page.evaluate(() => ({ ran: !!window.__lfXss, imgs: document.querySelectorAll('.autocomplete-list img, .ac-item img').length, shown: [...document.querySelectorAll('.ac-item')].map(e => e.textContent).join(' | ') }));
+  check(`ฟอร์ม${L}: คำแนะนำที่มีโค้ดแฝงแสดงเป็นข้อความ ไม่รันโค้ด`, !xss.ran && xss.imgs === 0 && /<img/.test(xss.shown), xss.shown.slice(0, 90));
+  await page.fill('#f-dept', "O'Br"); await page.waitForTimeout(200);
+  const item = page.locator('.ac-item[data-value]').filter({ hasText: "O'Brien" }).first();
+  let picked = '';
+  if (await item.count()) { await item.click(); picked = await page.inputValue('#f-dept'); }
+  check(`ฟอร์ม${L}: เลือกคำแนะนำที่มีเครื่องหมาย ' แล้วกรอกได้ตรงตัว`, picked === "O'Brien Hall ทดสอบ", picked || 'ไม่พบรายการ');
   await ctx.close();
 
   // 2) ส่งไม่สำเร็จ (ระบบไม่ว่าง) → กดส่งใหม่ใช้รหัสคำขอเดิม (กันบันทึกซ้ำ) → สำเร็จแต่แจ้งเตือนเข้าคิวไม่ได้ → บอกผู้ใช้ตามจริง
@@ -175,8 +195,10 @@ async function formFlow(b, file, lang) {
   let dl = page.waitForEvent('download', { timeout: 30000 }).catch(e => null);
   await page.evaluate(() => runPdfExport());
   let d = await dl; let size = 0, head = '';
-  if (d) { const p = await d.path(); const buf = fs.readFileSync(p); size = buf.length; head = buf.slice(0, 5).toString(); if (process.env.SMOKE_OUT) fs.writeFileSync(path.join(process.env.SMOKE_OUT, d.suggestedFilename()), buf); }
+  let pdfTxt = null;
+  if (d) { const p = await d.path(); const buf = fs.readFileSync(p); size = buf.length; head = buf.slice(0, 5).toString(); pdfTxt = pdfText(p); if (process.env.SMOKE_OUT) fs.writeFileSync(path.join(process.env.SMOKE_OUT, d.suggestedFilename()), buf); }
   check('Dashboard: สร้าง PDF ได้ (ฟอนต์ไทยในเครื่อง)', head === '%PDF-' && size > 20000, d ? d.suggestedFilename() + ' ' + Math.round(size / 1024) + ' KB' : 'ไม่มีไฟล์ดาวน์โหลด');
+  check('Dashboard: ข้อความไทยใน PDF อ่านได้ (pdftotext)', pdfTxt !== null && /รายงาน|รายการ/.test(pdfTxt), pdfTxt === null ? 'ไม่มี pdftotext ในเครื่อง' : (pdfTxt.match(/[ก-๙]+/g) || []).length + ' คำไทย');
   await ctx.close();
 
   // ── หน้า export รายงาน: สร้าง PDF ได้จริง ──
@@ -184,13 +206,17 @@ async function formFlow(b, file, lang) {
   await page.goto(url('lf_report_export.html'));
   await page.waitForFunction(() => typeof generatePDF === 'function' && document.getElementById('btn-gen') && !document.getElementById('btn-gen').disabled, null, { timeout: 15000 });
   await page.waitForTimeout(1500);
+  // ช่วงที่มีรายการสังเคราะห์ → ได้ตารางรายละเอียด (ทดสอบฟอนต์ไทยในตารางด้วย)
+  await page.evaluate(() => { setReportType('custom'); document.getElementById('custom-from').value = '2026-10-01'; document.getElementById('custom-to').value = '2026-10-21'; });
   dl = page.waitForEvent('download', { timeout: 30000 }).catch(() => null);
   await page.evaluate(() => generatePDF());
   d = await dl; size = 0; head = '';
-  if (d) { const p = await d.path(); const buf = fs.readFileSync(p); size = buf.length; head = buf.slice(0, 5).toString(); if (process.env.SMOKE_OUT) fs.writeFileSync(path.join(process.env.SMOKE_OUT, d.suggestedFilename()), buf); }
+  pdfTxt = null;
+  if (d) { const p = await d.path(); const buf = fs.readFileSync(p); size = buf.length; head = buf.slice(0, 5).toString(); pdfTxt = pdfText(p); if (process.env.SMOKE_OUT) fs.writeFileSync(path.join(process.env.SMOKE_OUT, d.suggestedFilename()), buf); }
   check('หน้า export: สร้างไฟล์ PDF ได้', head === '%PDF-', d ? d.suggestedFilename() + ' ' + Math.round(size / 1024) + ' KB' : 'ไม่มีไฟล์ดาวน์โหลด');
-  // หน้านี้ (v1.0.0 ไม่มีลิงก์จากหน้าใด) ใช้ฟอนต์ Helvetica ตั้งแต่ใน main — ข้อความไทยใน PDF อ่านไม่ได้ · PDF ที่ใช้งานจริงคือของ Dashboard
-  check('หน้า export: ฝังฟอนต์ไทยใน PDF (ปัญหาเดิมใน main)', size > 20000, Math.round(size / 1024) + ' KB — Dashboard ฝังฟอนต์ไทยแล้ว', true);
+  // เดิม (main และชุด f) ใช้ Helvetica — อักษรไทยหายทั้งหมด · รุ่นนี้ฝัง NotoSansThai จาก ./fonts เหมือน Dashboard
+  check('หน้า export: ฝังฟอนต์ไทย และข้อความไทยใน PDF อ่านได้ (pdftotext)', size > 20000 && pdfTxt !== null && /สรุปภาพรวม/.test(pdfTxt) && /รายการสังเคราะห์/.test(pdfTxt),
+    Math.round(size / 1024) + ' KB · ' + (pdfTxt === null ? 'ไม่มี pdftotext ในเครื่อง' : (pdfTxt.match(/[ก-๙]+/g) || []).length + ' คำไทย'));
   await ctx.close();
 
   await b.close(); srv.close();

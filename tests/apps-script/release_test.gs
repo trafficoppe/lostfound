@@ -37,7 +37,7 @@ function lfTestLineUrl_() {
   if (mode === 'dns') return 'https://lf-test-no-such-host.invalid/hook';
   if (mode === 'none') return '';
   if (!url) return '';
-  return url + (mode === 'bad' ? '?lfTestEcho=bad' : '?lfTestEcho=ok');
+  return url + (mode === 'bad' ? '?lfTestEcho=bad' : mode === 'selfpause' ? '?lfTestEcho=ok&lfTestPause=1' : '?lfTestEcho=ok');
 }
 
 function lfTestSheet_() {
@@ -162,9 +162,13 @@ function lfTest_2_ทดสอบทั้งหมด() {
   lfTestRecord_(G4, 'หน้าตรวจการแจ้งเตือนบอกสถานะรุ่น web app เทียบ Head ได้ (แสดงผลเท่านั้น)', gate.reason === 'settling' || gate.reason === 'ok', 'Apps Script จริง', gate.reason + ' — ' + gate.text);
   // ปิดบังข้อมูลสาธารณะบน runtime จริงของ Google (regex เลขไทย) — ข้อมูลสังเคราะห์
   const mk = [['โทร ๐๘๑-๒๓๔-๕๖๗๘', 'โทร [ซ่อนเบอร์]'], ['โทร (081) 234-5678', 'โทร [ซ่อนเบอร์]'], ['รหัส 6512345', 'รหัส [ซ่อนตัวเลข]'],
-    ['บัตรของ นายทดสอบ สมมติ', 'บัตรของ นายท*** ส***'], ['วันที่ 21.10.2569 10.30 น.', 'วันที่ 21.10.2569 10.30 น.'], ['คุณภาพดี ห้อง 1203', 'คุณภาพดี ห้อง 1203']];
+    ['บัตรของ นายทดสอบ สมมติ', 'บัตรของ นายท*** ส***'], ['วันที่ 21.10.2569 10.30 น.', 'วันที่ 21.10.2569 10.30 น.'], ['คุณภาพดี ห้อง 1203', 'คุณภาพดี ห้อง 1203'],
+    // 5 กรณีที่ชุด f ปล่อยผ่าน + คำทั่วไปที่ต้องไม่ถูกแตะ (regex lookbehind ต้องทำงานบน runtime ของ Google ด้วย)
+    ['คุณจอจาน ฉอฉิ่ง', 'คุณจ*** ฉ***'], ['อ.จอจาน ฉอฉิ่ง', 'อ.จ*** ฉ***'], ['บัตรนักศึกษาชื่อฟอฟัน พอพาน', 'บัตรนักศึกษาชื่อฟ*** พ***'],
+    ['ไลน์ไอดี fofan_99', 'ไลน์ไอดี [ซ่อนไอดี]'], ['fofan [at] example.com', '[ซ่อนอีเมล]'],
+    ['สะพานเชื่อม MLC', 'สะพานเชื่อม MLC'], ['ต.ศาลายา อ.พุทธมณฑล จ.นครปฐม', 'ต.ศาลายา อ.พุทธมณฑล จ.นครปฐม'], ['ขอบคุณครับ', 'ขอบคุณครับ']];
   const mkBad = mk.filter(c => lfMaskPII_(c[0]) !== c[1]).map(c => c[0] + ' → ' + lfMaskPII_(c[0]));
-  lfTestRecord_(G4, 'ปิดบังเบอร์/รหัส/ชื่อ (เลขไทยด้วย) และไม่แตะข้อความทั่วไป', mkBad.length === 0, 'Apps Script จริง', mkBad.join(' | ') || mk.length + ' เคสตรง');
+  lfTestRecord_(G4, 'ปิดบังเบอร์/รหัส/ชื่อ (เลขไทย คุณ อ. "ชื่อ" LINE ID อีเมลเลี่ยง @) และไม่แตะข้อความทั่วไป', mkBad.length === 0, 'Apps Script จริง', mkBad.join(' | ') || mk.length + ' เคสตรง');
 
   // ── 1. ฟอร์ม → ชีท/รูป (HTTP จริงเข้า doPost ของ web app ทดสอบ) ──
   const n0 = lfTestRowCount_();
@@ -296,9 +300,69 @@ function lfTest_2_ทดสอบทั้งหมด() {
   lfTestRecord_(G2, 'หยุดส่งฉุกเฉิน (LF_QUEUE_PAUSE=1) → ไม่ส่ง; ยกเลิกแล้วส่ง', !!(pzHeld && pzHeld.line.state === 'pending' && (!pzAfter || pzAfter.line.state === 'sent')),
     'Apps Script จริง', 'ระหว่างหยุด=' + (pzHeld && pzHeld.line.state) + ' · หลังยกเลิก=' + (pzAfter ? pzAfter.line.state : 'ส่งครบ/ลบแล้ว'));
 
+  // หยุดส่งระหว่างรอบ: web app ทดสอบตั้ง LF_QUEUE_PAUSE=1 ตอนรับคำขอ LINE แรก (จำลองเจ้าหน้าที่กดหยุดขณะกำลังส่ง)
+  props.deleteProperty('LF_QUEUE_PAUSE');
+  const mpRefs = [];
+  for (let i = 0; i < 3; i++) { const m = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ หยุดกลางรอบ', itemDesc: 'ของทดสอบหยุดกลางรอบ ' + i, clientRequestId: 'rt-mp-' + i + '-' + started }); if (m.json && m.json.refCode) mpRefs.push(m.json.refCode); }
+  props.setProperty('LF_TEST_LINE_MODE', 'selfpause');
+  lfProcessNotifyQueue();
+  const mpItems = mpRefs.map(lfTestItem_).filter(Boolean);
+  const mpSent = mpItems.filter(it => it.line.state === 'sent').length, mpUntouched = mpItems.filter(it => it.line.state === 'pending').length;
+  const mpPaused = props.getProperty('LF_QUEUE_PAUSE') === '1';
+  props.deleteProperty('LF_QUEUE_PAUSE'); props.setProperty('LF_TEST_LINE_MODE', 'self');
+  lfProcessNotifyQueue();
+  const mpLeft = mpRefs.map(lfTestItem_).filter(it => it && it.line.state !== 'sent' && it.line.state !== 'gave_up').length;
+  lfTestRecord_(G2, 'หยุดส่งระหว่างรอบ: ส่ง LINE เฉพาะคำขอที่กำลังส่งตอนตั้งสวิตช์ ที่เหลือไม่ถูกแตะ; ยกเลิกแล้วส่งครบ', mpRefs.length === 3 && mpPaused && mpSent === 1 && mpUntouched === 2 && mpLeft === 0,
+    'Apps Script จริง (HTTP)', 'สวิตช์ถูกตั้ง=' + mpPaused + ' · ส่งแล้ว=' + mpSent + ' · ไม่ถูกแตะ=' + mpUntouched + ' · หลังยกเลิกค้าง=' + mpLeft);
+
   if (Date.now() - started > 240000) { lfTestRecord_(G3, 'ข้าม (เวลาใกล้ครบ 6 นาที) — รัน lfTest_3_รายงานรายเดือน แยก', 'ข้าม', '-', ''); return; }
   lfTest_3_รายงานรายเดือน();
   lfTest_4_ประสิทธิภาพ();
+  if (Date.now() - started > 300000) { lfTestRecord_('5 หน้าสาธารณะ', 'ข้าม (เวลาใกล้ครบ 6 นาที) — รัน lfTest_5_ปิดบังหน้าสาธารณะ แยก', 'ข้าม', '-', ''); return; }
+  lfTest_5_ปิดบังหน้าสาธารณะ();
+}
+
+/**
+ * หน้าสาธารณะผ่าน HTTP จริง: ชื่อในช่องชื่อของระเบียนอื่น + คำที่เจ้าหน้าที่สั่งปิด (LF_PUBLIC_REDACT)
+ * และเวลาปิดบัง 800 รายการสังเคราะห์บน runtime จริง — ข้อมูลสังเคราะห์ทั้งหมด
+ */
+function lfTest_5_ปิดบังหน้าสาธารณะ() {
+  lfTestGuard_();
+  const G5 = '5 หน้าสาธารณะ';
+  const props = PropertiesService.getScriptProperties();
+  const t = Date.now();
+  props.setProperty('LF_TEST_LINE_MODE', 'self');
+  const a = lfTestPost_({ action: 'submit', type: 'สิ่งของสูญหาย', name: 'ฟอฟัน ทดสอบสาธารณะ', itemDesc: 'กระเป๋าทดสอบสาธารณะ', clientRequestId: 'rt-pub-a-' + t });
+  const b = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ ผู้พบ', itemDesc: 'บัตรห้องสมุดของฟอฟัน',
+    itemLoc: 'ฝากไว้กับ ฟอฟัน ที่ประตูทดสอบ', clientRequestId: 'rt-pub-b-' + t });
+  const c = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ ผู้พบ', itemDesc: 'ร่มของซอโซ่ฮอฮูก', clientRequestId: 'rt-pub-c-' + t });
+  props.setProperty('LF_PUBLIC_REDACT', 'ซอโซ่ฮอฮูก');
+  const res = lfTestGet_('action=getPublicData&force=1');
+  props.deleteProperty('LF_PUBLIC_REDACT');
+  lfProcessNotifyQueue();                                      // เคลียร์คิวของคำขอทดสอบ (ปลายทาง = web app ทดสอบ)
+  const recs = (res.json && res.json.records) || [];
+  const rb = recs.filter(r => b.json && r.refCode === b.json.refCode)[0] || {};
+  const rc = recs.filter(r => c.json && r.refCode === c.json.refCode)[0] || {};
+  const leaked = /ฟอฟัน|ซอโซ่ฮอฮูก/.test(JSON.stringify(recs));
+  lfTestRecord_(G5, 'ชื่อในช่องชื่อของระเบียนอื่นถูกปิดในรายละเอียด/สถานที่', !!(a.json && a.json.success) && rb.title === 'บัตรห้องสมุดของฟ***' && rb.location === 'ฝากไว้กับ ฟ*** ที่ประตูทดสอบ',
+    'Apps Script จริง (HTTP)', 'title=' + rb.title + ' · location=' + rb.location);
+  lfTestRecord_(G5, 'คำที่เจ้าหน้าที่สั่งปิด (LF_PUBLIC_REDACT) มีผลทันทีโดยไม่ต้อง deploy', rc.title === 'ร่มของซ***', 'Apps Script จริง (HTTP)', 'title=' + rc.title);
+  lfTestRecord_(G5, 'ผลลัพธ์สาธารณะทั้งชุดไม่มีชื่อสังเคราะห์หลุด', !leaked && recs.length > 0, 'Apps Script จริง (HTTP)', recs.length + ' รายการ · timing.mask=' + (res.json && res.json.timing && res.json.timing.mask) + ' ms');
+  // เวลาปิดบังกับข้อมูลขนาดใกล้ระบบจริง (≈800 รายการ) — สร้างในหน่วยความจำ ไม่เขียนชีท
+  const syl = ['กร', 'สม', 'ชาย', 'หญิง', 'ศักดิ์', 'พร', 'ประ', 'เสริฐ', 'สุข', 'ใจ', 'ดี', 'รัก', 'ทอง', 'มณี', 'ศรี', 'วงศ์'];
+  const w = i => syl[i % syl.length] + syl[(i * 7 + 3) % syl.length] + syl[(i * 11 + 5) % syl.length];
+  const fake = [];
+  for (let i = 0; i < 800; i++) fake.push({ source: 'LF_New', refCode: 'T' + i, type: 'พบสิ่งของ', name: 'นาย ' + w(i) + ' ' + w(i + 1),
+    title: (i % 10 === 0 ? 'บัตรห้องสมุดของ' + w(i + 3) : 'กระเป๋าสีดำ ยี่ห้อทดสอบ'), location: 'อาคารเรียนรวม ชั้น ' + (i % 5), actionText: i % 3 ? '' : 'ติดต่อเจ้าของแล้ว', images: [], status: 'รอดำเนินการ' });
+  const p0 = Date.now();
+  const mask = lfPublicMasker_(fake);
+  fake.map(function (r) { return lfPublicRecord_(r, mask); });
+  const pMs = Date.now() - p0;
+  const q0 = Date.now();
+  fake.map(function (r) { return lfPublicRecord_(r); });
+  const qMs = Date.now() - q0;
+  lfTestRecord_(G5, 'เวลาปิดบังหน้าสาธารณะ 800 รายการสังเคราะห์ (เกณฑ์ < 1500 ms)', pMs < 1500 ? true : 'ช้า ' + pMs + ' ms', 'Apps Script จริง',
+    'ทุกชั้น ' + pMs + ' ms · เฉพาะชั้น 1–4 ' + qMs + ' ms');
 }
 
 function lfTest_3_รายงานรายเดือน() {
@@ -340,6 +404,20 @@ function lfTest_3_รายงานรายเดือน() {
   generateLostFoundReportPreviousMonth(true);
   st = lfReadReportState_(props.getProperty(key));
   lfTestRecord_(G3, 'รอบก่อนหยุดกลางคัน (ค้าง sending) → ไม่แน่ใจ ไม่ส่ง LINE ซ้ำ', st.line.state === 'uncertain' && st.line.attempts === 1, 'สถานะจำลอง + การประมวลผลจริง', st.line.state);
+  // หยุดส่งระหว่างรอบ: web app ทดสอบตั้ง LF_QUEUE_PAUSE=1 ตอนรับ LINE ของรายงาน → ต้องไม่ลองอีเมลต่อ
+  props.deleteProperty(key);
+  props.deleteProperty('LF_QUEUE_PAUSE');
+  props.setProperty('LF_TEST_LINE_MODE', 'selfpause');
+  generateLostFoundReportPreviousMonth(true);
+  st = lfReadReportState_(props.getProperty(key));
+  const mPaused = props.getProperty('LF_QUEUE_PAUSE') === '1';
+  const mLine = st.line && st.line.state, mEmailAttempts = st.email ? st.email.attempts : -1;
+  props.deleteProperty('LF_QUEUE_PAUSE'); props.setProperty('LF_TEST_LINE_MODE', 'self');
+  generateLostFoundReportPreviousMonth(true);
+  const st2 = lfReadReportState_(props.getProperty(key));
+  lfTestRecord_(G3, 'หยุดส่งระหว่างรอบ: ส่ง LINE ของรายงานแล้วไม่ลองอีเมลต่อ; ยกเลิกแล้วลองอีเมล ไม่ส่ง LINE ซ้ำ',
+    mPaused && mLine === 'sent' && mEmailAttempts === 0 && st2.line.attempts === 1 && st2.email.attempts === 1, 'Apps Script จริง (HTTP)',
+    'สวิตช์ถูกตั้ง=' + mPaused + ' · LINE=' + mLine + ' · อีเมลระหว่างหยุด ' + mEmailAttempts + ' ครั้ง · หลังยกเลิก LINE ' + st2.line.attempts + ' ครั้ง อีเมล ' + st2.email.attempts + ' ครั้ง');
   props.deleteProperty(key);
 }
 

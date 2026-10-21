@@ -365,8 +365,16 @@ function generateLostFoundReportPreviousMonth(fromTrigger) {
     st.state = 'partial'; save();
 
     // 2) ส่งเฉพาะช่องทางที่ยังไม่สำเร็จและไม่อยู่ระหว่างรอเจ้าหน้าที่ตัดสิน
+    // ตรวจสวิตช์หยุดส่งฉุกเฉินซ้ำก่อนส่งแต่ละช่องทาง (เจ้าหน้าที่อาจตั้งระหว่างรอบ) — ช่องทางที่ยังไม่ส่งคงสถานะเดิม รอบหน้าส่งต่อ
+    let pausedMid = false;
     ['line', 'email'].forEach(function (ch) {
-      if (['pending', 'failed'].indexOf(st[ch].state) >= 0) lfMonthlySendChannel_(st, ch, pdfFile, data, save);
+      if (pausedMid || ['pending', 'failed'].indexOf(st[ch].state) < 0) return;
+      if (props.getProperty(LF_QUEUE_PAUSE_KEY) === '1') {
+        pausedMid = true;
+        lfNotifyLog_('MONTHLY-' + key.slice(-7), 'queue', 'paused_mid_run', 0, 'หยุดส่งระหว่างรอบ (' + LF_QUEUE_PAUSE_KEY + '=1) — ช่องทางที่ยังไม่ส่ง: ' + ch);
+        return;
+      }
+      lfMonthlySendChannel_(st, ch, pdfFile, data, save);
     });
 
     const ok = ['line', 'email'].every(ch => st[ch].state === 'sent' || st[ch].state === 'closed');

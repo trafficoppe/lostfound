@@ -450,7 +450,80 @@ test('PII: ผลลัพธ์สาธารณะใช้ชื่อใน
   assert.ok(!('name' in rec) && !('phone' in rec));   // ฟิลด์ส่วนบุคคลไม่ถูกส่งออกอยู่แล้ว
 });
 
-test('autofill สาธารณะ: ค่า pending ที่ดูเป็นข้อมูลส่วนบุคคลไม่ถูกส่งออก แต่ค่าที่อนุมัติแล้วยังอยู่', () => {
+// ชื่อในชุดนี้เป็นชื่อสังเคราะห์จากชื่อตัวอักษร (ฟอฟัน พอพาน จอจาน ฉอฉิ่ง) ไม่ใช่ชื่อบุคคลจริง
+test('PII: 5 กรณีที่ชุด f ปล่อยผ่าน ต้องถูกปิดบัง — คุณ / อ.–อาจารย์ / ชื่อหลังคำว่า "ชื่อ" / LINE ID / อีเมลเลี่ยง @', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  // 1) คุณ + ชื่อ (ติดกัน เว้นวรรค และคุณ+คำเรียก)
+  assert.equal(m('คุณจอจาน ฉอฉิ่ง'), 'คุณจ*** ฉ***');
+  assert.equal(m('ฝากไว้กับ คุณ จอจาน'), 'ฝากไว้กับ คุณ จ***');
+  assert.equal(m('คุณครูจอจาน โทรมาแจ้ง'), 'คุณครูจ*** โทรมาแจ้ง');
+  assert.equal(m('ส่งให้ คุณป้า ฉอฉิ่ง แล้ว'), 'ส่งให้ คุณป้า ฉ*** แล้ว');
+  // 2) อาจารย์ / อ. / ตำแหน่งวิชาการซ้อนกัน
+  assert.equal(m('อ.จอจาน ฉอฉิ่ง'), 'อ.จ*** ฉ***');
+  assert.equal(m('ส่งคืน อาจารย์ฟอฟัน แล้ว'), 'ส่งคืน อาจารย์ฟ*** แล้ว');
+  assert.equal(m('บัตร ผศ.ดร.ฟอฟัน พอพาน'), 'บัตร ผศ.ดร.ฟ*** พ***');
+  assert.equal(m('อาจารย์ ดร.ฟอฟัน'), 'อาจารย์ ดร.ฟ***');
+  // 3) ชื่อไม่มีคำนำหน้า แต่ตามหลังคำว่า "ชื่อ" / name / owner
+  assert.equal(m('บัตรนักศึกษาชื่อฟอฟัน พอพาน'), 'บัตรนักศึกษาชื่อฟ*** พ***');
+  assert.equal(m('สมุดชื่อเล่นต้นกล้า'), 'สมุดชื่อเล่นต***');
+  assert.equal(m('กระเป๋ามีชื่อว่า ฟอฟัน'), 'กระเป๋ามีชื่อว่า ฟ***');
+  assert.equal(m('บัตรเขียนชื่อ John Example'), 'บัตรเขียนชื่อ J*** E***');
+  assert.equal(m('wallet with name John Example'), 'wallet with name J*** E***');
+  assert.equal(m('Owner: Jane Sample'), 'Owner: J*** S***');
+  // 4) LINE ID / ช่องทางติดต่ออื่น
+  for (const [s, want] of [
+    ['ไลน์ไอดี fofan_99', 'ไลน์ไอดี [ซ่อนไอดี]'], ['LINE ID: pim.p', 'LINE ID: [ซ่อนไอดี]'], ['add line @abc123', 'add line [ซ่อนไอดี]'],
+    ['ติดต่อทางไลน์ fofan', 'ติดต่อทางไลน์ [ซ่อนไอดี]'], ['Line: fofan', 'Line: [ซ่อนไอดี]'], ['IG: fofan.pp', 'IG: [ซ่อนไอดี]'],
+    ['เฟซบุ๊ก Fofan Popan', 'เฟซบุ๊ก [ซ่อนไอดี]'], ['เฟส ฟอฟัน พอพาน', 'เฟส ฟ*** พ***'], ['ติดต่อ @fofan_99', 'ติดต่อ [ซ่อนไอดี]']]) assert.equal(m(s), want, s);
+  // 5) อีเมลที่เลี่ยงเครื่องหมาย @
+  for (const [s, want] of [
+    ['fofan [at] example.com', '[ซ่อนอีเมล]'], ['fofan at example dot com', '[ซ่อนอีเมล]'], ['fofan(at)mail(dot)co(dot)th', '[ซ่อนอีเมล]'],
+    ['อีเมล fofan แอท gmail ดอท com', 'อีเมล [ซ่อนอีเมล]'], ['fofan＠example.com', '[ซ่อนอีเมล]'], ['ส่งมาที่ fofan{at}example{dot}org นะ', 'ส่งมาที่ [ซ่อนอีเมล] นะ']]) assert.equal(m(s), want, s);
+});
+
+test('PII: กฎใหม่ไม่ปิดบังคำทั่วไป — คุณภาพ/ขอบคุณ/คุณสามารถ, ที่อยู่ อ.เขต, อาจารย์ที่ปรึกษา, ชื่อร้าน, line/at ทั่วไป', () => {
+  const r = rt();
+  const m = s => r.call('lfMaskPII_', s);
+  for (const s of ['คุณภาพดี คุณค่า คุณสมบัติ', 'มีคุณธรรม', 'คุณประโยชน์', 'ขอบคุณครับ', 'ขอบคุณ ค่ะ', 'คุณสามารถรับคืนได้ที่ประตู 1',
+    'คุณจะได้รับแจ้ง', 'คุณแม่ โทรมาแจ้ง', 'ต.ศาลายา อ.พุทธมณฑล จ.นครปฐม', 'อ.เมืองนครปฐม', 'บ้านอยู่ อ.สามพราน', 'อาคารเรียนรวม อ.1', 'ชั้น ๓ อ.๒',
+    'พ.ศ.นี้', 'ปี พ.ศ. ๒๕๖๙', 'อาจารย์ที่ปรึกษา', 'อาจารย์ประจำวิชา', 'ชื่อเสียง', 'ชื่อร้านอยู่บนถุง', 'ชื่อยี่ห้อ Casio', 'มีชื่ออยู่บนบัตร',
+    'name tag สีแดง', 'Line Friends doll', 'bus line 515', 'meet at gate 3', 'lost at Building 1', 'left at MLC.2', 'ลืมไว้ @MLC', 'ราคา 50 @ร้านค้า',
+    'ชื่อ นายก*** ใ***', 'สะพานเชื่อม MLC', 'ทางเชื่อมอาคาร 2', 'เชื่อว่าหายที่โรงอาหาร', 'รายชื่อผู้รับของ']) {
+    assert.equal(m(s), s, s);
+  }
+  // ชื่อที่มีคำนำหน้าตามหลัง "ชื่อ" ยังย่อแบบเดิม (ไม่ซ้อน)
+  assert.equal(m('บัตรประชาชน ชื่อ นายออ่าง ฮอนกฮูก'), 'บัตรประชาชน ชื่อ นายอ*** ฮ***');
+});
+
+test('PII: หน้าสาธารณะปิดบังชื่อที่อยู่ในช่องชื่อของระเบียนอื่น + รายการคำที่เจ้าหน้าที่สั่งปิด + ซ่อนรูปเอกสารประจำตัว (ข้อมูลสังเคราะห์)', () => {
+  const r = rt();
+  const N = r.sheets.LF_New;
+  const row = (ref, type, name, title, loc, img, action) =>
+    N.appendRow([D('2026-10-10T10:00:00+07:00'), ref, type, name, '', '', '', '', '', title, loc, img || '', 'รอดำเนินการ', action || '', '', '']);
+  row('LOS-261010-0001', 'สิ่งของสูญหาย', 'นาย ฟอฟัน พอพาน', 'กระเป๋าสีเทา', 'ประตู 2');
+  row('FND-261010-0002', 'พบสิ่งของ', 'นางสาว ทดสอบ ผู้พบ', 'บัตรห้องสมุดของฟอฟัน', 'ฝากไว้กับ ฟอฟัน ที่ประตู 2', '', 'แจ้ง พอพาน แล้ว');
+  row('LOS-261010-0003', 'สิ่งของสูญหาย', 'นาย วิทยา ทดสอบ', 'ร่ม', 'ประตู 1');
+  row('FND-261010-0004', 'พบสิ่งของ', 'นาย ทดสอบ ห้า', 'หนังสือ คณะวิทยาศาสตร์', 'ตึก วิทยาศาสตร์');
+  row('FND-261010-0005', 'พบสิ่งของ', 'นาย ทดสอบ หก', 'ร่มของซอโซ่ฮอฮูก', 'ประตู 3');
+  row('FND-261010-0006', 'พบสิ่งของ', 'นาย ทดสอบ เจ็ด', 'พบบัตรประชาชน', 'ประตู 4', 'https://drive.google.com/uc?id=EEEEEEEEEEEEEEEEEEEEEEEEE');
+  row('FND-261010-0007', 'พบสิ่งของ', 'นาย ทดสอบ แปด', 'ร่มสีฟ้า', 'ประตู 4', 'https://drive.google.com/uc?id=FFFFFFFFFFFFFFFFFFFFFFFFF');
+  r.props.set('LF_PUBLIC_REDACT', 'ซอโซ่ฮอฮูก\nไม่มีในข้อมูล');
+  const res = get(r, { action: 'getPublicData' });
+  const by = ref => res.records.find(x => x.refCode === ref);
+  assert.equal(by('FND-261010-0002').title, 'บัตรห้องสมุดของฟ***');
+  assert.equal(by('FND-261010-0002').location, 'ฝากไว้กับ ฟ*** ที่ประตู 2');
+  assert.equal(by('FND-261010-0002').actionText, 'แจ้ง พ*** แล้ว');
+  assert.equal(by('FND-261010-0004').title, 'หนังสือ คณะวิทยาศาสตร์');         // ชื่อของระเบียนอื่นที่เป็นส่วนของคำ ไม่ถูกปิด
+  assert.equal(by('FND-261010-0004').location, 'ตึก วิทยาศาสตร์');
+  assert.equal(by('FND-261010-0005').title, 'ร่มของซ***');                       // คำที่เจ้าหน้าที่สั่งปิด (Script Property)
+  assert.deepEqual(by('FND-261010-0006').images, []);                           // รูปบัตรประชาชนไม่เผยแพร่
+  assert.equal(by('FND-261010-0007').images.length, 1);
+  const s = JSON.stringify(res.records);
+  for (const w of ['ฟอฟัน', 'พอพาน', 'ซอโซ่ฮอฮูก', 'EEEEEEEEEEEE']) assert.ok(!s.includes(w), w);
+});
+
+test('autofill สาธารณะ: ค่า pending ทุกค่าไม่ถูกส่งออก (ไม่ขึ้นกับ regex) แต่ค่าที่ผู้ดูแลอนุมัติแล้วยังอยู่', () => {
   const r = rt();
   const mem = r.sheets.LF_Memory;
   mem.appendRow(['loc_th', 'อาคารเรียนรวม', 1, 'pending', '', '', '', '', '']);
@@ -458,10 +531,10 @@ test('autofill สาธารณะ: ค่า pending ที่ดูเป็
   mem.appendRow(['loc_th', 'ติดต่อ a@example.com', 1, 'pending', '', '', '', '', '']);
   mem.appendRow(['loc_th', 'หน้าห้อง นายสมชาย', 1, 'pending', '', '', '', '', '']);
   mem.appendRow(['loc_th', 'ศาลายา'.repeat(20), 1, 'pending', '', '', '', '', '']);
-  mem.appendRow(['loc_th', 'ประตู 4', 3, 'approved', '', '', '', '', '']);
+  mem.appendRow(['loc_th', 'ประตู 4', 3, 'approved', '', '', '2026-10-01', 'admin01', '']);
   const vals = r.call('getMemoryEntries', 'loc_th').map(x => x.value || x);
   const flat = JSON.stringify(vals);
-  assert.ok(flat.includes('อาคารเรียนรวม')); assert.ok(flat.includes('ประตู 4'));
+  assert.ok(!flat.includes('อาคารเรียนรวม'), 'pending ที่ดูปกติก็ยังไม่เผยแพร่'); assert.ok(flat.includes('ประตู 4'));
   assert.ok(!flat.includes('123456')); assert.ok(!flat.includes('@')); assert.ok(!flat.includes('สมชาย')); assert.ok(!flat.includes('ศาลายาศาลายาศาลายา'));
 });
 
@@ -1195,7 +1268,12 @@ test('ชุดทดสอบ Apps Script: ตรวจการแยกระ
   assert.equal(r.sent.mail.length, 0, 'ไม่มีอีเมลออก (ผู้รับว่าง)');
   const names = rows.map(x => x[2]);
   assert.ok(names.indexOf('ข้อความแจ้งเตือนที่ส่งเข้า web app ทดสอบไม่สร้างแถวใหม่') >= 0);
+  assert.ok(names.indexOf('หยุดส่งระหว่างรอบ: ส่ง LINE เฉพาะคำขอที่กำลังส่งตอนตั้งสวิตช์ ที่เหลือไม่ถูกแตะ; ยกเลิกแล้วส่งครบ') >= 0, 'มีกรณีหยุดส่งระหว่างรอบในชุดทดสอบจริง');
   assert.ok(names.indexOf('เขตเวลาชีททดสอบตรงกับระบบจริง (UTC+7)') >= 0);
+  for (const n of ['ชื่อในช่องชื่อของระเบียนอื่นถูกปิดในรายละเอียด/สถานที่', 'คำที่เจ้าหน้าที่สั่งปิด (LF_PUBLIC_REDACT) มีผลทันทีโดยไม่ต้อง deploy',
+    'ผลลัพธ์สาธารณะทั้งชุดไม่มีชื่อสังเคราะห์หลุด', 'เวลาปิดบังหน้าสาธารณะ 800 รายการสังเคราะห์ (เกณฑ์ < 1500 ms)',
+    'หยุดส่งระหว่างรอบ: ส่ง LINE ของรายงานแล้วไม่ลองอีเมลต่อ; ยกเลิกแล้วลองอีเมล ไม่ส่ง LINE ซ้ำ']) assert.ok(names.indexOf(n) >= 0, 'มีกรณี: ' + n);
+  assert.equal(r.props.get('LF_PUBLIC_REDACT'), undefined, 'ชุดทดสอบลบ LF_PUBLIC_REDACT ที่ตั้งชั่วคราว');
   r.call('lfTest_9_เก็บกวาด');
   assert.equal(r.triggers.length, 0);
   // ก่อน Archive: URL ยังตอบ → ต้องรายงานว่า "ยังไม่ปิด"
@@ -1362,10 +1440,10 @@ test('คำแนะนำฟอร์ม: เรียก touchMemoryEntry ซ
   }
   const row = mem().find(x => x[1] === pii);
   assert.equal(row[2], 12); assert.equal(row[3], 'pending', 'ข้อมูลส่วนบุคคลไม่ถูกเลื่อนอัตโนมัติ');
-  assert.equal(mem().find(x => x[1] === 'อาคารทดสอบใหม่')[3], 'approved', 'คำทั่วไปยังเลื่อนได้ตามเดิม');
+  assert.equal(mem().find(x => x[1] === 'อาคารทดสอบใหม่')[3], 'pending', 'ไม่มีการเลื่อนอัตโนมัติ — รอผู้ดูแลอนุมัติ');
   const pub = get(r, { action: 'getMemory', bucket: 'dept_th' }).entries.map(e => e.value);
   assert.ok(pub.indexOf(pii) < 0);
-  assert.ok(get(r, { action: 'getMemory', bucket: 'loc_th' }).entries.some(e => e.value === 'อาคารทดสอบใหม่'));
+  assert.ok(!get(r, { action: 'getMemory', bucket: 'loc_th' }).entries.some(e => e.value === 'อาคารทดสอบใหม่'), 'ยังไม่แสดงจนกว่าผู้ดูแลอนุมัติ');
   // ค่าที่ระบบเคยเลื่อนอัตโนมัติไว้ก่อนแก้ → ซ่อนจากสาธารณะ · ค่าที่ผู้ดูแลอนุมัติเอง → แสดง
   r.sheets.LF_Memory.appendRow(['dept_th', 'คุณ ทดสอบ ตัวอย่าง a.b@example.com', 30, 'approved', '', '', '2026-10-01', 'auto-promote', '']);
   r.sheets.LF_Memory.appendRow(['dept_th', 'สำนักงาน 02-123-4567 ต่อ 9', 0, 'approved', '', '', '2026-10-01', 'admin01', 'manual add']);
@@ -1412,4 +1490,71 @@ test('ย้อนกลับแบบวางโค้ดเดิมเป�
   for (let i = 0; i < 4; i++) { now += 20 * 60000; sweepDue(newHead); newHead.call('lfProcessNotifyQueue'); }
   assert.equal(web.sent.fetch.length, 1, 'ไม่ส่งซ้ำหลังกลับมา');
   assert.equal(web.sent.mail.length, 1);
+});
+
+test('คำแนะนำฟอร์ม: ค่าที่ผู้ใช้ส่งมาไม่เผยแพร่จนกว่าผู้ดูแลตรวจ — ค่าใหม่, pending, auto-promoted, ค่าเดิมในชีท (ข้อมูลสังเคราะห์)', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  const r = rt({ now: () => now });
+  // ค่าที่ตัวกรอง regex ตรวจไม่พบ: ชื่อไทยไม่มีคำนำหน้า, ชื่ออังกฤษ, LINE ID, อีเมลเลี่ยงสัญลักษณ์
+  const bareTh = 'สมชาย ใจดีมาก', bareEn = 'John Example', lineId = 'line: somchai_99', atMail = 'somchai at example dot com';
+  // ค่าใหม่จากการส่งฟอร์มจริง 12 ครั้ง (ชุด f เลื่อนเป็นคำแนะนำอัตโนมัติเมื่อครบ 10)
+  for (let i = 0; i < 12; i++) {
+    const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ก', department: bareTh, itemLoc: lineId, itemDesc: 'ของ', clientRequestId: 'pv' + i });
+    assert.equal(post(r, { action: 'touchMemoryEntry', bucket: 'dept_th', value: bareTh, refCode: s.refCode }).success, true);
+    assert.equal(post(r, { action: 'touchMemoryEntry', bucket: 'loc_th', value: lineId, refCode: s.refCode }).success, true);
+  }
+  const mem = r.sheets.LF_Memory;
+  // ค่าเดิมในชีท: เคยถูกเลื่อนอัตโนมัติ / อนุมัติแต่ไม่มีชื่อผู้ตรวจ / pending / ผู้ดูแลอนุมัติเอง
+  mem.appendRow(['loc_th', bareEn, 40, 'approved', '2026-09-01', 'LOS-260901-0001', '2026-09-02', 'auto-promote', '']);
+  mem.appendRow(['loc_th', atMail, 3, 'approved', '2026-09-01', '', '', '', '']);
+  mem.appendRow(['dept_th', 'หน่วยงานทดสอบ pending', 2, 'pending', '2026-09-01', '', '', '', '']);
+  mem.appendRow(['loc_th', 'ประตูทดสอบ 4', 0, 'approved', '2026-09-01', 'admin01', '2026-09-01', 'admin01', 'manual add']);
+  const pub = b => get(r, { action: 'getMemory', bucket: b }).entries.map(e => e.value);
+  const all = JSON.stringify(pub('dept_th').concat(pub('loc_th')));
+  for (const v of [bareTh, bareEn, lineId, atMail, 'หน่วยงานทดสอบ pending']) assert.ok(all.indexOf(v) < 0, 'ไม่เผยแพร่: ' + v);
+  assert.ok(pub('loc_th').indexOf('ประตูทดสอบ 4') >= 0, 'คำแนะนำที่ผู้ดูแลอนุมัติเองยังแสดง');
+  // เจ้าหน้าที่เห็นทุกค่าที่ยังไม่ผ่านการตรวจ (รวมค่าที่เคยเลื่อนอัตโนมัติ) ในรายการ "รอตรวจสอบ"
+  const token = login(r);
+  const pend = post(r, { action: 'adminGetMemory', token, bucket: '', status: 'pending' }).entries.map(e => e.value);
+  for (const v of [bareTh, bareEn, lineId, atMail, 'หน่วยงานทดสอบ pending']) assert.ok(pend.indexOf(v) >= 0, 'อยู่ในรายการรอตรวจ: ' + v);
+  assert.ok(pend.indexOf('ประตูทดสอบ 4') < 0);
+  assert.ok(get(r, { action: 'getMemoryStats' }).stats.total >= 5, 'ตัวเลขรอตรวจรวมค่าที่เคยเลื่อนอัตโนมัติ');
+  // ผู้ดูแลอนุมัติ 1 ค่า → แสดงต่อสาธารณะ
+  const row = post(r, { action: 'adminGetMemory', token, bucket: 'dept_th', status: 'all' }).entries.find(e => e.value === 'หน่วยงานทดสอบ pending');
+  assert.equal(post(r, { action: 'updateMemoryStatus', token, rowNum: row.rowNum, newStatus: 'approved', bucket: row.bucket, value: row.value }).success, true);
+  assert.ok(pub('dept_th').indexOf('หน่วยงานทดสอบ pending') >= 0);
+});
+
+test('หยุดส่งฉุกเฉินระหว่างรอบ: ตั้ง LF_QUEUE_PAUSE=1 ขณะกำลังส่ง → ไม่ส่งช่องทางถัดไปเลย; ยกเลิกแล้วส่งที่เหลือครั้งเดียว', () => {
+  let now = Date.parse('2026-10-25T10:00:00+07:00');
+  let r = null, pauseAfterFirst = true;
+  r = rt({ now: () => now, lineCode: () => { if (pauseAfterFirst) r.props.set(r.consts.LF_QUEUE_PAUSE_KEY, '1'); return 200; } });
+  const refs = [];
+  for (let i = 0; i < 3; i++) refs.push(post(r, { action: 'submit', type: 'พบสิ่งของ', name: 'ก', itemDesc: 'ของทดสอบ ' + i, clientRequestId: 'mp' + i }).refCode);
+  r.call('lfProcessNotifyQueue');                                  // คำขอ LINE แรกกำลังส่ง → เจ้าหน้าที่ตั้งสวิตช์หยุด
+  const afterPause = r.sent.fetch.length - 1 + r.sent.mail.length; // คำขอแรกออกไปแล้ว (หยุดกลางคำขอไม่ได้)
+  assert.equal(r.sent.fetch.length, 1, 'ส่ง LINE เฉพาะคำขอที่กำลังส่งอยู่ตอนตั้งสวิตช์');
+  assert.equal(afterPause, 0, 'หลังตั้งสวิตช์ต้องไม่มีการส่งเพิ่ม (ได้ ' + afterPause + ')');
+  const items = refs.map(ref => JSON.parse(r.props.get('lfq_' + ref)));
+  assert.equal(items.filter(it => it.line.state === 'sent').length, 1, 'LINE ส่งแล้ว 1 รายการ');
+  assert.equal(items.filter(it => it.email.state === 'pending').length, 3, 'อีเมลทุกรายการยังไม่ถูกแตะ');
+  assert.equal(items.filter(it => it.line.state === 'pending').length, 2, 'LINE ที่เหลือยังไม่ถูกแตะ (ไม่ค้าง "กำลังส่ง")');
+  assert.ok(lineRows(r).some(x => x[2] === 'queue' && x[3] === 'paused_mid_run'), 'มีบันทึกการหยุดระหว่างรอบใน LF_NotifyLog');
+  r.call('lfProcessNotifyQueue');                                  // ยังหยุดอยู่
+  assert.equal(r.sent.fetch.length + r.sent.mail.length, 1);
+  pauseAfterFirst = false; r.props.delete(r.consts.LF_QUEUE_PAUSE_KEY);
+  r.call('lfProcessNotifyQueue'); r.call('lfProcessNotifyQueue');
+  assert.equal(r.sent.fetch.length, 3, 'LINE ครบ 3 ครั้ง ไม่ซ้ำ'); assert.equal(r.sent.mail.length, 3, 'อีเมลครบ 3 ครั้ง ไม่ซ้ำ');
+});
+
+test('รายงานรายเดือน: ตั้ง LF_QUEUE_PAUSE=1 หลังส่ง LINE → ไม่ส่งอีเมลรายงานต่อ; ยกเลิกแล้วส่งอีเมลครั้งเดียว ไม่ส่ง LINE ซ้ำ', () => {
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  let r = null, pause = true;
+  r = rt({ now: () => now, lineCode: () => { if (pause) r.props.set(r.consts.LF_QUEUE_PAUSE_KEY, '1'); return 200; } });
+  stubReportDrive(r);
+  r.call('checkAndGenerateLostFoundReport');
+  assert.equal(r.sent.fetch.length, 1); assert.equal(r.sent.mail.length, 0, 'อีเมลรายงานต้องไม่ถูกส่งหลังตั้งสวิตช์');
+  pause = false; r.props.delete(r.consts.LF_QUEUE_PAUSE_KEY);
+  now += 3600000; r.call('checkAndGenerateLostFoundReport');
+  assert.equal(r.sent.fetch.length, 1, 'ไม่ส่ง LINE รายงานซ้ำ'); assert.equal(r.sent.mail.length, 1);
 });
