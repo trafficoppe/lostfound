@@ -249,10 +249,10 @@ test('ช่วงเปลี่ยนผ่าน (legacy on): API เดิ�
   assert.equal(post(r, { action: 'updateStatus', refCode: 'PKP-261018-5403', newStatus: 'รับของคืนแล้ว' }).code, 401);
 });
 
-test('คิวแจ้งเตือน: LINE ล้มเหลวแล้ว retry ภายหลัง อีเมลไม่ส่งซ้ำ', () => {
+test('คิวแจ้งเตือน: LINE ปฏิเสธคำขอ (ยังไม่ส่ง) แล้ว retry ภายหลัง อีเมลไม่ส่งซ้ำ', () => {
   let now = Date.parse('2026-10-19T10:00:00+07:00');
   let lineCode = 500;
-  const r = rt({ now: () => now, lineCode: () => lineCode });
+  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 400' }) });
   const s = post(r, { action: 'submit', type: 'สิ่งของสูญหาย', name: 'ง', itemDesc: 'ของ', clientRequestId: 'n1' });
   r.call('lfProcessNotifyQueue');
   assert.equal(r.sent.mail.length, 1);
@@ -512,10 +512,10 @@ test('sweeper: แถวที่บันทึกแล้วแต่ไม�
   assert.ok(r.sheets.LF_NotifyLog.rows.some(x => x[3] === 'recovered'));
 });
 
-test('รายงานรายเดือน: LINE ได้ HTTP 500 = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
+test('รายงานรายเดือน: LINE ปฏิเสธคำขอ (HTTP 500 + LINE 4xx) = ล้มเหลว, วันถัดไปส่งเฉพาะ LINE ด้วย PDF เดิม ไม่ส่งอีเมลซ้ำ', () => {
   let now = Date.parse('2026-11-01T09:05:00+07:00');
   let lineCode = 500;
-  const r = rt({ now: () => now, lineCode: () => lineCode });
+  const r = rt({ now: () => now, lineCode: () => lineCode, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 400' }) });
   stubReportDrive(r);
   r.call('checkAndGenerateLostFoundReport');
   let st = mstate(r);
@@ -532,6 +532,20 @@ test('รายงานรายเดือน: LINE ได้ HTTP 500 = ล�
   now += 86400000;
   r.call('checkAndGenerateLostFoundReport');
   assert.equal(r.sent.fetch.length, 2); assert.equal(r.sent.mail.length, 1);
+});
+
+test('รายงานรายเดือน: LINE ตอบ HTTP 500 ที่ยืนยันไม่ได้ว่ายังไม่ส่ง = ไม่แน่ใจ, ไม่ส่ง LINE ซ้ำเอง, อีเมลยังส่งตามปกติ', () => {
+  let now = Date.parse('2026-11-01T09:05:00+07:00');
+  const r = rt({ now: () => now, lineCode: () => 500, lineBody: () => JSON.stringify({ status: 'error', message: 'Request failed with status code 502' }) });
+  stubReportDrive(r);
+  r.call('checkAndGenerateLostFoundReport');
+  let st = mstate(r);
+  assert.equal(st.line.state, 'uncertain'); assert.equal(st.email.state, 'sent');
+  now += 86400000; r.call('checkAndGenerateLostFoundReport');
+  now += 86400000; r.call('checkAndGenerateLostFoundReport');
+  assert.equal(r.sent.fetch.length, 1, 'LINE ไม่ถูกส่งซ้ำอัตโนมัติ');
+  assert.equal(r.sent.mail.length, 1);
+  assert.equal(mstate(r).line.state, 'uncertain');
 });
 
 test('รายงานรายเดือน: ไม่มี URL LINE = ล้มเหลว (ไม่นับว่าสำเร็จ), อีเมลล้มเหลวลองใหม่โดยไม่ส่ง LINE ซ้ำ, ค่าเดิม done … ยังกันส่งซ้ำ', () => {
@@ -811,13 +825,27 @@ test('ส่งสำเร็จแต่บันทึกสถานะใ�
   assert.equal(qItem(r, s.refCode).line.state, 'uncertain');
 });
 
-test('ปลายทางตอบไม่ชัดเจน: หมดเวลา/HTTP 504 = ไม่แน่ใจ (ไม่ส่งซ้ำ), HTTP 500/503/DNS = ล้มเหลวและลองใหม่', () => {
+test('ปลายทางตอบไม่ชัดเจน: ยืนยันไม่ได้ว่ายังไม่ส่ง = ไม่แน่ใจ (ไม่ส่งซ้ำเอง); ยืนยันได้ว่ายังไม่ถึง LINE = ล้มเหลวและลองใหม่', () => {
+  const resp = (code, body) => () => ({ getResponseCode: () => code, getContentText: () => body });
+  const cf = msg => JSON.stringify({ status: 'error', message: msg });
   const cases = [
+    // ไม่แน่ใจ — Cloud Function อาจเรียก LINE ไปแล้ว
     [() => { throw new Error('Exception: Timeout: https://line.invalid/hook'); }, 'uncertain'],
-    [() => ({ getResponseCode: () => 504, getContentText: () => 'gateway timeout' }), 'uncertain'],
-    [() => ({ getResponseCode: () => 500, getContentText: () => 'err' }), 'failed'],
-    [() => ({ getResponseCode: () => 503, getContentText: () => 'busy' }), 'failed'],
-    [() => { throw new Error('Exception: DNS error: https://line.invalid/hook'); }, 'failed']
+    [resp(504, 'gateway timeout'), 'uncertain'],
+    [resp(500, cf('Request failed with status code 500')), 'uncertain'],     // LINE ตอบ 5xx
+    [resp(500, cf('socket hang up')), 'uncertain'],                          // เครือข่าย Cloud Function→LINE ขาด
+    [resp(500, '<html>Internal Server Error</html>'), 'uncertain'],          // ไม่ใช่คำตอบจากโค้ด
+    [resp(503, '<html>Service Unavailable</html>'), 'uncertain'],
+    [resp(502, 'bad gateway'), 'uncertain'],
+    [() => { throw new Error('Exception: Unexpected error while getting the method or property fetch'); }, 'uncertain'],
+    // ล้มเหลว ลองใหม่ได้ — ยืนยันจากโค้ด Cloud Function ว่ายังไม่มีข้อความออก
+    [resp(500, cf('Request failed with status code 400')), 'failed'],
+    [resp(500, cf('Request failed with status code 429')), 'failed'],
+    [resp(503, cf('LINE client not configured')), 'failed'],
+    [resp(404, 'not found'), 'failed'],
+    [resp(403, 'forbidden'), 'failed'],
+    [() => { throw new Error('Exception: DNS error: https://line.invalid/hook'); }, 'failed'],
+    [() => { throw new Error('Exception: Address unavailable: https://line.invalid/hook'); }, 'failed']
   ];
   cases.forEach(([impl, want], i) => {
     let now = Date.parse('2026-10-25T10:00:00+07:00');

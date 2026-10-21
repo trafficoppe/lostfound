@@ -194,7 +194,7 @@ function makeRuntime(fixture, opts = {}) {
       createFolder: () => ({})
     },
     MailApp: { sendEmail: m => { if (opts.failMail) throw new Error('mail quota'); sent.mail.push(m); } },
-    UrlFetchApp: { fetch: (url, o) => { sent.fetch.push({ url, body: o && o.payload }); const code = opts.lineCode ? opts.lineCode() : 200; return { getResponseCode: () => code, getContentText: () => 'ok' }; } },
+    UrlFetchApp: { fetch: (url, o) => { sent.fetch.push({ url, body: o && o.payload }); const code = opts.lineCode ? opts.lineCode() : 200; const body = opts.lineBody ? opts.lineBody() : 'ok'; return { getResponseCode: () => code, getContentText: () => body }; } },
     ScriptApp: {
       getProjectTriggers: () => triggers.map(t => ({ getHandlerFunction: () => t })),
       newTrigger: fn => { const b = { timeBased: () => b, everyMinutes: () => b, everyDays: () => b, atHour: () => b, create: () => triggers.push(fn) }; return b; },

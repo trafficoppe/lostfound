@@ -1573,18 +1573,32 @@ function lfSaveQueueItem_(props, key, item) {
 }
 
 /**
- * ความล้มเหลวที่ "ไม่รู้ว่าปลายทางได้รับหรือยัง" (ไม่ส่งซ้ำอัตโนมัติ ให้เจ้าหน้าที่ตัดสิน)
- *  - หมดเวลา/การเชื่อมต่อขาดหลังส่งคำขอไปแล้ว
- *  - HTTP 504 (เกตเวย์หมดเวลารอ — ปลายทางอาจทำงานไปแล้ว)
- * ส่วน DNS/ที่อยู่ผิด/ยังไม่ตั้งค่า/4xx/429/500/502/503 ถือว่าปลายทางยังไม่ได้ส่งต่อ → ลองใหม่ได้
- * (HTTP 500 ถือว่าล้มเหลว เพราะฟังก์ชันปลายทางตอบ 500 เมื่อส่งไม่สำเร็จ — เป็นสมมติฐานที่ยังไม่ได้ตรวจกับโค้ดปลายทาง)
+ * ความล้มเหลวที่ "ไม่รู้ว่าปลายทางส่งเข้า LINE แล้วหรือยัง" → ไม่ส่งซ้ำอัตโนมัติ ให้เจ้าหน้าที่ตัดสินที่หน้า "ตรวจการแจ้งเตือน"
+ * หลัก: ลองใหม่อัตโนมัติเฉพาะกรณีที่ยืนยันจากโค้ด Cloud Function ได้ว่ายังไม่มีข้อความออก (ตรวจโค้ดในเครื่องผู้ดูแล 21 ต.ค. 2569;
+ * ยังไม่ได้เทียบกับรุ่นที่ deploy อยู่ — ถ้า Cloud Function เปลี่ยน ต้องตรวจกติกานี้ใหม่)
+ * อีเมลเป็นช่องทางแยก — ถ้า LINE ไม่แน่ใจ อีเมลของรายการเดียวกันยังส่งตามปกติ
  */
 function lfIsAmbiguousSendError_(err) {
+  // true = ปลายทางอาจส่งข้อความเข้า LINE ไปแล้ว → ห้ามลองส่งเองอัตโนมัติ ให้เจ้าหน้าที่ตัดสิน
+  // false = ยืนยันได้ว่ายังไม่ถึง LINE → ลองใหม่อัตโนมัติได้
+  // อิงโค้ด Cloud Function (notifyLostFound / notifyMonthlyLostFoundReport):
+  //   503 + message "LINE client not configured" = หยุดก่อนเรียก LINE
+  //   500 + message "Request failed with status code 4xx" = LINE ปฏิเสธคำขอ (รวม 429 โควตา) ไม่มีข้อความออก
+  //   500 อื่น ๆ (LINE 5xx, เครือข่าย Cloud Function→LINE ขาด), 5xx อื่น, หมดเวลา, ข้อผิดพลาดที่ไม่รู้จัก = ไม่แน่ใจ
+  //   4xx จาก Cloud Function/Google (URL ผิด, ไม่มีสิทธิ์) = คำขอไม่ถึงโค้ดที่ส่ง LINE
   const code = err && err.httpCode;
-  if (code) return code === 504;
-  const msg = String((err && err.message) || err || '');
-  if (/not configured|dns|address unavailable|unknown host|invalid argument|bad url|too many times/i.test(msg)) return false;
-  return /timeout|timed out|deadline|socket|reset|unexpected end|eof|broken pipe|connection (closed|aborted)/i.test(msg);
+  if (code) {
+    if (code < 500) return false;
+    let msg = '';
+    try { msg = String((JSON.parse(String(err.body || '')) || {}).message || ''); } catch (e) { msg = ''; }
+    if (code === 503 && msg === 'LINE client not configured') return false;
+    if (code === 500 && /^Request failed with status code 4\d\d$/.test(msg)) return false;
+    return true;
+  }
+  const text = String((err && err.message) || err || '');
+  // ต่อไม่ติด/ยังไม่ได้ส่งคำขอออกไปเลย
+  if (/not configured|dns error|address unavailable|unknown host|invalid argument|bad url|too many times|bandwidth quota/i.test(text)) return false;
+  return true;
 }
 
 /** หลังอัปโหลดรูป: ใส่ URL รูปในรายการคิวแล้วปลดสถานะรอรูป */
@@ -1686,8 +1700,10 @@ function lfSendLine_(url, payload) {
   });
   const code = res.getResponseCode();
   if (code < 200 || code >= 300) {
-    const err = new Error('HTTP ' + code + ' ' + String(res.getContentText()).slice(0, 120));
+    const body = String(res.getContentText());
+    const err = new Error('HTTP ' + code + ' ' + body.slice(0, 120));
     err.httpCode = code;
+    err.body = body.slice(0, 1000);
     throw err;
   }
   return code;

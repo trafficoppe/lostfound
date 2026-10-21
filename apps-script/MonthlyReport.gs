@@ -171,8 +171,10 @@ function sendLostFoundReportToLine(pdfFile, data) {
   const code = response.getResponseCode();
   Logger.log('📡 LINE response: ' + code);
   if (code < 200 || code >= 300) {
-    const err = new Error('HTTP ' + code + ' ' + String(response.getContentText()).slice(0, 120));
+    const body = String(response.getContentText());
+    const err = new Error('HTTP ' + code + ' ' + body.slice(0, 120));
     err.httpCode = code;
+    err.body = body.slice(0, 1000);
     throw err;
   }
   return code;
