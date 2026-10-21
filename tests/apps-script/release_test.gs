@@ -436,6 +436,156 @@ function lfTest_4_ประสิทธิภาพ() {
   lfTestRecord_(G4, 'getPublicData ผ่าน HTTP (รวมเวลาแพลตฟอร์ม)', !!(h.json && h.json.success), 'Apps Script จริง (HTTP)', hMs + ' ms · serverMs ' + (h.json && h.json.serverMs) + ' · cache ' + (h.json && h.json.cache));
 }
 
+/**
+ * ใส่คิวไม่ได้เพราะพื้นที่ Script Properties เต็มจริง (นับไบต์ UTF-8 ตามที่ Google นับ) — รันแยกหลัง lfTest_2
+ * เติมค่าชั่วคราว LF_TEST_FILL_* ให้รวมเกินงบรายการใหม่ (400 KB) แต่ยังห่างขีดจำกัดรวม 500 KB แล้วลบทิ้งทันทีหลังส่งฟอร์ม
+ */
+function lfTest_6_ใส่คิวไม่ได้() {
+  lfTestGuard_();
+  const G6 = '6 ใส่คิวไม่ได้';
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('LF_TEST_LINE_MODE', 'self');
+  props.deleteProperty('LF_QUEUE_PAUSE');
+  ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'lfProcessNotifyQueue') ScriptApp.deleteTrigger(t); });
+  CacheService.getScriptCache().put('lf_nq_trigger_ok', '1', 3600);
+  const t = Date.now();
+  const before = lfPropsBytes_(props.getProperties());
+  const need = LF_QUEUE_NEW_BUDGET + 512 - before;
+  const fill = {};
+  let added = 0, i = 0;
+  while (added < need) {
+    const k = 'LF_TEST_FILL_' + (i++);
+    const v = new Array(Math.min(8000, Math.max(100, need - added)) + 1).join('x');
+    fill[k] = v; added += k.length + v.length;
+  }
+  const n0 = lfTestRowCount_();
+  let s = null, fullAt = 0;
+  try {
+    if (need > 0) props.setProperties(fill);
+    fullAt = lfPropsBytes_(props.getProperties());
+    s = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ คิวเต็ม', itemDesc: 'ของทดสอบคิวเต็ม', clientRequestId: 'rt-qf-' + t });
+  } finally {
+    Object.keys(fill).forEach(k => props.deleteProperty(k));
+  }
+  const ref = s && s.json && s.json.refCode;
+  const rowOk = lfTestRowCount_() === n0 + 1;
+  const logOk = !!ref && lfTestLogRows_(ref).some(r => r[3] === 'queue_failed');
+  lfTestRecord_(G6, 'พื้นที่ Script Properties เต็มจริง → ฟอร์มยังบันทึกแถว, บอกผู้ใช้ว่าแจ้งเตือนเข้าคิวไม่ได้, บันทึก queue_failed',
+    !!(s && s.json && s.json.success && s.json.notify === 'queue_failed') && rowOk && logOk && !lfTestItem_(ref), 'Apps Script จริง (HTTP)',
+    'พื้นที่ขณะส่ง ' + Math.round(fullAt / 1024) + ' KB · notify=' + (s && s.json && s.json.notify) + ' · แถวเพิ่ม=' + rowOk + ' · log=' + logOk);
+  CacheService.getScriptCache().remove('lf_sweep_ok');
+  lfProcessNotifyQueue();
+  const requeued = !!ref && lfTestLogRows_(ref).some(r => r[3] === 'requeued');
+  const sent1 = ref ? lfTestLogRows_(ref).filter(r => r[2] === 'line' && r[3] === 'sent').length : 0;
+  lfTestRecord_(G6, 'ลบค่าที่เติมแล้ว → ใส่คิวใหม่จากหลักฐาน queue_failed และส่ง LINE (ปลายทางทดสอบ)', requeued && sent1 === 1, 'Apps Script จริง',
+    'requeued=' + requeued + ' · LINE sent=' + sent1);
+  CacheService.getScriptCache().remove('lf_sweep_ok');
+  lfProcessNotifyQueue();
+  const sent2 = ref ? lfTestLogRows_(ref).filter(r => r[2] === 'line' && r[3] === 'sent').length : 0;
+  lfTestRecord_(G6, 'รอบถัดไปไม่ใส่คิว/ไม่ส่งซ้ำ', sent2 === 1, 'Apps Script จริง', 'LINE sent=' + sent2);
+}
+
+/* ── ซ้อมย้อนกลับบนโปรเจกต์ทดสอบ (ต้องวางโค้ดเองระหว่างขั้น — ดูคู่มือ) ──────────────────────
+ * 7 (โค้ดใหม่)  → วางโค้ด 2.0.0 เป็น Head › Save → 8 (ขณะเป็น 2.0.0) → วางโค้ดใหม่กลับ › Save → 8 (หลังกลับมา)
+ * web app ทดสอบยังเป็น deployment รุ่นใหม่ตลอด = สภาพเดียวกับระบบจริงหลัง "วางโค้ดเดิมเป็น Head" ในขั้นย้อนกลับข้อ 1
+ * ฟังก์ชันขั้น 8 ใช้เฉพาะสิ่งที่มีในทั้งสองรุ่น จึงรันได้ขณะ Head เป็น 2.0.0
+ */
+function lfTestGuardLite_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const c = lfTestCfg_();
+  const p = [];
+  if (lfTestSha_(ss.getId()) === LF_TEST_PROD_SHEET_SHA) p.push('ชีทที่ผูกกับโปรเจกต์นี้คือชีทระบบจริง');
+  if (!/^TEST/i.test(ss.getName())) p.push('ชื่อชีทต้องขึ้นต้นด้วย TEST');
+  if (c.testMode !== true) p.push('config ไม่ใช่ config.test.gs');
+  const url = String(c.testWebAppUrl || '');
+  if (!url || lfTestSha_(lfTestDeployId_(url)) === LF_TEST_PROD_DEPLOY_SHA) p.push('testWebAppUrl ไม่ใช่ web app ทดสอบ');
+  ['lineWebhookUrl', 'monthlyLineWebhookUrl'].forEach(function (k) {
+    const v = String(c[k] || '');
+    if (v && v.split('?')[0] !== url && !/INVALID_TEST_DEPLOYMENT|\.invalid\//.test(v)) p.push(k + ' ชี้ไปที่อื่นที่ไม่ใช่ web app ทดสอบ');
+  });
+  const me = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  (c.emailRecipients || []).concat(c.reportRecipients || []).forEach(function (e) { if (String(e).toLowerCase() !== me) p.push('มีผู้รับอีเมลอื่นนอกจากบัญชีที่รันทดสอบ'); });
+  if (p.length) throw new Error('หยุด: ตรวจการแยกระบบไม่ผ่าน — ' + p.join(' | '));
+}
+function lfTestLogSince_(fromRow) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTIFY_LOG_SHEET);
+  if (!sh || sh.getLastRow() <= fromRow) return [];
+  return sh.getRange(fromRow + 1, 1, sh.getLastRow() - fromRow, 6).getValues();
+}
+
+function lfTest_7_เตรียมซ้อมย้อนกลับ() {
+  lfTestGuard_();
+  if (typeof lfBuildId_ !== 'function') throw new Error('ขั้นนี้ต้องรันด้วยโค้ดรุ่นใหม่ (ยังไม่ได้วางโค้ด 2.0.0)');
+  const G7 = '7 ซ้อมย้อนกลับ';
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('LF_TEST_LINE_MODE', 'self');
+  props.deleteProperty('LF_QUEUE_PAUSE');
+  ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'lfProcessNotifyQueue') ScriptApp.deleteTrigger(t); });
+  CacheService.getScriptCache().put('lf_nq_trigger_ok', '1', 3600);
+  lfProcessNotifyQueue();                                   // เคลียร์งานค้างของขั้นก่อน ๆ (ปลายทางทดสอบ)
+  const logSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTIFY_LOG_SHEET);
+  const logRow = logSh ? logSh.getLastRow() : 1;
+  const t = Date.now(), refs = {};
+  ['A', 'B', 'C', 'D'].forEach(function (x) {
+    const r = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ ซ้อมย้อนกลับ', itemDesc: 'ซ้อมย้อนกลับ ' + x, clientRequestId: 'rt-rb-' + x + '-' + t });
+    refs[x] = r.json && r.json.refCode;
+  });
+  const hold = LF_HOLD_UNTIL_MS, now = Date.now();
+  const set = function (ref, line) { const it = lfTestItem_(ref); if (!it) return false; it.line = line; it.email = { state: 'sent', attempts: 1, nextAt: 0, lastError: '' }; lfTestSetItem_(ref, it); return true; };
+  const ok = !!(refs.A && refs.B && refs.C && refs.D) &&
+    set(refs.A, { state: 'uncertain', attempts: 1, nextAt: hold, lastError: 'ทดสอบ: ไม่แน่ใจ', uncertainAt: now }) &&
+    set(refs.B, { state: 'closed', attempts: 1, nextAt: hold, lastError: 'ทดสอบ: ปิดแล้ว' }) &&
+    set(refs.C, { state: 'sending', attempts: 1, nextAt: hold, lastError: '', sendingAt: now - 3600000 });
+  const pm = lfPrevMonth_(new Date());
+  const monthKey = 'LF_MONTHLY_REPORT_' + pm.y + '-' + ('0' + pm.m).slice(-2);
+  const monthRaw = 'done ' + JSON.stringify({ state: 'done', pdfFileId: '', snap: null, line: { state: 'sent', attempts: 1 }, email: { state: 'closed', attempts: 0 } });
+  props.setProperty(monthKey, monthRaw);
+  props.setProperty('LF_TEST_RB', JSON.stringify({ refs: refs, logRow: logRow, monthKey: monthKey, monthRaw: monthRaw, at: t }));
+  lfTestRecord_(G7, 'เตรียม: รายการ ไม่แน่ใจ (A) / ปิดแล้ว (B) / กำลังส่ง (C) / รอส่ง (D) + รายงานเดือนที่ส่งครบแล้ว', ok, 'Apps Script จริง (HTTP)',
+    JSON.stringify(refs) + ' · ขั้นต่อไป: วางโค้ด 2.0.0 แทน lf_gas.gs และ MonthlyReport.gs › Save › รัน lfTest_8_ตรวจหลังย้อนกลับ');
+}
+
+function lfTest_8_ตรวจหลังย้อนกลับ() {
+  lfTestGuardLite_();
+  const G8 = '7 ซ้อมย้อนกลับ';
+  const props = PropertiesService.getScriptProperties();
+  const rb = JSON.parse(props.getProperty('LF_TEST_RB') || 'null');
+  if (!rb) throw new Error('ยังไม่ได้รัน lfTest_7_เตรียมซ้อมย้อนกลับ');
+  const isNew = typeof lfBuildId_ === 'function';
+  const stage = isNew ? 'หลังวางโค้ดใหม่กลับ' : 'ขณะ Head เป็น ' + (typeof LF_VERSION !== 'undefined' ? LF_VERSION : '?');
+  props.setProperty('LF_TEST_LINE_MODE', 'self');
+  props.deleteProperty('LF_QUEUE_PAUSE');
+  ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'lfProcessNotifyQueue') ScriptApp.deleteTrigger(t); });
+  CacheService.getScriptCache().put('lf_nq_trigger_ok', '1', 3600);
+  if (!isNew && !rb.refs.E) {
+    // ช่วงต่างรุ่น: web app (รุ่นใหม่) รับฟอร์ม แล้วตัวประมวลผลคิวรุ่น 2.0.0 ส่ง
+    const h = lfTestGet_('action=health');
+    const e = lfTestPost_({ action: 'submit', type: 'พบสิ่งของ', name: 'ผู้ทดสอบ ซ้อมย้อนกลับ', itemDesc: 'ซ้อมย้อนกลับ E (ระหว่างต่างรุ่น)', clientRequestId: 'rt-rb-E-' + rb.at });
+    rb.refs.E = e.json && e.json.refCode;
+    rb.webVersion = h.json && h.json.version;
+    props.setProperty('LF_TEST_RB', JSON.stringify(rb));
+  }
+  for (let i = 0; i < 2; i++) lfProcessNotifyQueue();
+  const rep = generateLostFoundReportPreviousMonth(true);
+  const rows = lfTestLogSince_(rb.logRow);
+  const lineSent = function (ref) { return rows.filter(r => String(r[1]) === ref && r[2] === 'line' && r[3] === 'sent').length; };
+  const abc = ['A', 'B', 'C'].map(function (x) { return lineSent(rb.refs[x]); });
+  lfTestRecord_(G8, stage + ': ไม่ส่ง LINE ของรายการ ไม่แน่ใจ/ปิดแล้ว/กำลังส่ง', abc.join(',') === '0,0,0', 'Apps Script จริง', 'จำนวน LINE sent A,B,C = ' + abc.join(','));
+  const d = lineSent(rb.refs.D), e = rb.refs.E ? lineSent(rb.refs.E) : -1;
+  lfTestRecord_(G8, stage + ': รายการรอส่ง (D) และรายการที่รับระหว่างต่างรุ่น (E) ส่ง LINE ครั้งเดียว', d === 1 && e === 1, 'Apps Script จริง',
+    'D=' + d + ' · E=' + e + (rb.webVersion ? ' · web app ทดสอบ version=' + rb.webVersion : ''));
+  const raw = String(props.getProperty(rb.monthKey) || '');
+  const monthOk = isNew ? (/^done /.test(raw) && lfReadReportState_(raw).line.attempts === 1) : raw === rb.monthRaw;
+  lfTestRecord_(G8, stage + ': รายงานเดือนที่ส่งแล้วไม่ถูกส่งซ้ำ', monthOk && !(rep && rep.pdfUrl), 'Apps Script จริง',
+    'ค่า ' + raw.slice(0, 60) + ' · ผล ' + JSON.stringify(rep || {}).slice(0, 120));
+  // รุ่นใหม่ถือว่า "ปิดแล้ว" (B) จบงาน จึงลบรายการได้ · ไม่แน่ใจ (A) และกำลังส่ง→ไม่แน่ใจ (C) ต้องยังอยู่ให้เจ้าหน้าที่ตัดสิน
+  const need = isNew ? ['A', 'C'] : ['A', 'B', 'C'];
+  const left = need.filter(function (x) { return !!lfTestItem_(rb.refs[x]); }).length;
+  const cState = (lfTestItem_(rb.refs.C) || { line: {} }).line.state;
+  lfTestRecord_(G8, stage + ': รายการที่ต้องให้คนตัดสินยังอยู่ (ไม่ถูกลบ/ไม่ถูกส่ง)', left === need.length && (!isNew || cState === 'uncertain'), 'Apps Script จริง',
+    'เหลือ ' + left + '/' + need.length + ' (' + need.join(',') + ') · C=' + cState);
+}
+
 /** (ไม่บังคับ) ส่งอีเมลแจ้งเตือนจริง 1 ฉบับถึง "ตัวเอง" เท่านั้น เพื่อยืนยันว่าอีเมลถึงจริง */
 function lfTestOptional_EmailToMe() {
   lfTestGuard_();

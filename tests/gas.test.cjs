@@ -1284,6 +1284,55 @@ test('ชุดทดสอบ Apps Script: ตรวจการแยกระ
   assert.deepEqual(last, ['ไม่ผ่าน', 'ผ่าน']);
 });
 
+test('ชุดทดสอบ Apps Script: ใส่คิวไม่ได้ (พื้นที่เต็มจริง) และซ้อมย้อนกลับเป็น 2.0.0 แล้วกลับมา — ซ้อมใน Node ก่อนให้รันจริง', () => {
+  const kit = path.join(__dirname, 'apps-script');
+  const fs = require('fs');
+  const TEST_URL = 'https://script.google.com/macros/s/AKfycbTESTONLYdeployment00000000000000000000000000/exec';
+  let now = Date.parse('2026-10-27T10:05:00+07:00');
+  const cfgSrc = fs.readFileSync(path.join(kit, 'config.test.gs'), 'utf8').replace("testWebAppUrl: '',", "testWebAppUrl: '" + TEST_URL + "',");
+  const kitSrc = fs.readFileSync(path.join(kit, 'release_test.gs'), 'utf8');
+  const r = makeRuntime(fixture(), { now: () => now, configSource: cfgSrc, files: ['lf_gas.gs', 'MonthlyReport.gs'], extraSource: kitSrc });
+  const dress = x => {
+    stubReportDrive(x);
+    const ss = x.ctx.SpreadsheetApp.getActiveSpreadsheet();
+    ss.getName = () => 'TEST ชีททดสอบ Lost&Found';
+    x.ctx.Session.getEffectiveUser = () => ({ getEmail: () => 'tester@example.com' });
+    x.ctx.Session.getScriptTimeZone = () => 'Asia/Bangkok';
+    x.ctx.MailApp.getRemainingDailyQuota = () => 100;
+    x.ctx.ScriptApp.getService = () => ({ getUrl: () => TEST_URL });
+    // web app ทดสอบ = deployment รุ่นใหม่เสมอ (r) แม้ Head จะถูกวางเป็น 2.0.0
+    const route = (url, o) => {
+      assert.ok(url.startsWith(TEST_URL), 'ทุกคำขอ HTTP ต้องไปที่ web app ทดสอบเท่านั้น: ' + url);
+      const [, q] = url.split('?');
+      const qp = Object.fromEntries(new URLSearchParams(q || ''));
+      const out = (o && o.method === 'post') ? r.call('doPost', { postData: { contents: o.payload }, parameter: qp }) : r.call('doGet', { parameter: qp });
+      if (qp.lfTestEcho) r.sent.fetch.push({ url, body: o && o.payload });
+      return { getResponseCode: () => 200, getContentText: () => out.getContent() };
+    };
+    x.ctx.UrlFetchApp = { fetch: route, fetchAll: reqs => reqs.map(y => route(y.url, y)) };
+  };
+  dress(r);
+  assert.equal(r.call('lfTest_1_ตรวจการแยกระบบ').ok, true);
+  r.call('lfTest_6_ใส่คิวไม่ได้');
+  assert.ok(![...r.props.keys()].some(k => /^LF_TEST_FILL_/.test(k)), 'ลบค่าที่เติมชั่วคราวแล้ว');
+  r.call('lfTest_7_เตรียมซ้อมย้อนกลับ');
+  // วางโค้ด 2.0.0 เป็น Head (Script Properties/ชีท/แคชชุดเดิม) แล้วรันขั้น 8
+  now += 60000;
+  const old = makeRuntime(null, { now: () => now, shareWith: r, sourceDir: V200, configSource: cfgSrc, extraSource: kitSrc });
+  dress(old);
+  old.call('lfTest_8_ตรวจหลังย้อนกลับ');
+  // วางโค้ดใหม่กลับ แล้วรันขั้น 8 อีกครั้ง
+  now += 20 * 60000;
+  r.call('lfTest_8_ตรวจหลังย้อนกลับ');
+  const rows = r.sheets['ผลทดสอบ_APPS_SCRIPT'].rows.slice(1);
+  const mine = rows.filter(x => /^(6 ใส่คิวไม่ได้|7 ซ้อมย้อนกลับ)$/.test(x[1]));
+  assert.deepEqual(mine.filter(x => x[3] !== 'ผ่าน').map(x => x[2] + ' — ' + x[5]), []);
+  assert.equal(mine.filter(x => x[1] === '6 ใส่คิวไม่ได้').length, 3);
+  assert.equal(mine.filter(x => /^ขณะ Head เป็น 2\.0\.0/.test(x[2])).length, 4, 'ขั้น 8 รันบนโค้ด 2.0.0 จริง');
+  assert.equal(mine.filter(x => /^หลังวางโค้ดใหม่กลับ/.test(x[2])).length, 4);
+  assert.equal(r.sent.mail.length, 0, 'ไม่มีอีเมลออก');
+});
+
 test('ชุดทดสอบ Apps Script: เขตเวลาชีทต่างจากระบบจริง → บันทึกว่าไม่ผ่าน', () => {
   const fs = require('fs');
   const kit = path.join(__dirname, 'apps-script');

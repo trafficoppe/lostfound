@@ -176,7 +176,15 @@ function makeRuntime(fixture, opts = {}) {
           props.set(k, v);
         },
         deleteProperty: k => { if (propHooks.failDelete && propHooks.failDelete(k)) throw new Error('Exception: Service error (simulated)'); props.delete(k); },
-        getProperties: () => Object.fromEntries(props)
+        getProperties: () => Object.fromEntries(props),
+        // setProperties(obj) — ตรวจขนาดรวมครั้งเดียวทั้งชุดเหมือนของจริง (เกิน = ไม่บันทึกเลย)
+        setProperties: (o, deleteAllOthers) => {
+          const next = new Map(deleteAllOthers ? [] : props);
+          Object.keys(o).forEach(k => { const v = String(o[k]); if (u8(v) > 9216) throw new Error('Exception: Argument too large: value'); next.set(k, v); });
+          let total = 0; next.forEach((val, key) => { total += u8(key) + u8(val); });
+          if (total > 500 * 1024) throw new Error('Exception: You have exceeded the property storage quota.');
+          props.clear(); next.forEach((v, k) => props.set(k, v));
+        }
       })
     },
     LockService: {
