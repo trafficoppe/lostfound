@@ -213,6 +213,17 @@ function lfTest_2_ทดสอบทั้งหมด() {
   const mt2 = lfTestPost_({ action: 'touchMemoryEntry', bucket: 'loc_th', value: 'ประตูทดสอบ', refCode: a.json && a.json.refCode });
   lfTestRecord_(G1, 'คำแนะนำฟอร์ม: ไม่มีการส่งฟอร์ม = ปฏิเสธ, หลังส่งฟอร์มนับได้ครั้งเดียว', !!(mt0.json && mt0.json.success === false && mt1.json && mt1.json.success === true && mt2.json && mt2.json.success === false),
     'Apps Script จริง (HTTP)', [mt0, mt1, mt2].map(x => x.json ? x.json.success : x.code).join(' / '));
+  // คำแนะนำที่ผู้ใช้ส่ง/ระบบเคยเลื่อนขั้นเอง ไม่ออก API สาธารณะ; ค่าที่ผู้ดูแลตรวจแล้วออก (แถวสังเคราะห์ในชีททดสอบ)
+  const memSh = getMemorySheet();
+  memSh.appendRow(['loc_th', 'ค่าเลื่อนอัตโนมัติทดสอบ', 9, 'approved', '', '', '', 'auto-promote', '']);
+  memSh.appendRow(['loc_th', 'ค่าอนุมัติไม่มีผู้ตรวจทดสอบ', 9, 'approved', '', '', '', '', '']);
+  memSh.appendRow(['loc_th', 'ประตูผู้ดูแลตรวจทดสอบ', 3, 'approved', '', '', '', 'admin-test', '']);
+  const pubMem = lfTestGet_('action=getMemory&bucket=loc_th');
+  const pubVals = JSON.stringify((pubMem.json && pubMem.json.entries) || []);
+  lfTestRecord_(G1, 'คำแนะนำฟอร์มสาธารณะ: ค่าที่ผู้ใช้ส่ง (pending) / เลื่อนอัตโนมัติ / อนุมัติไม่มีผู้ตรวจ ไม่ออก — ค่าที่ผู้ดูแลตรวจแล้วออก',
+    !!(pubMem.json && pubMem.json.success) && pubVals.indexOf('ประตูทดสอบ') < 0 && pubVals.indexOf('ค่าเลื่อนอัตโนมัติทดสอบ') < 0 &&
+    pubVals.indexOf('ค่าอนุมัติไม่มีผู้ตรวจทดสอบ') < 0 && pubVals.indexOf('ประตูผู้ดูแลตรวจทดสอบ') >= 0, 'Apps Script จริง (HTTP)',
+    ((pubMem.json && pubMem.json.entries) || []).length + ' ค่าสาธารณะ');
 
   // ── 2. คิวแจ้งเตือน ──
   const refA = a.json && a.json.refCode;
