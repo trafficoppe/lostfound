@@ -108,6 +108,31 @@
   }
 
   const inflight = new Map();
+
+  // ── แคชข้อมูลสาธารณะในเครื่องผู้ใช้ (เฉพาะ getPublicData ซึ่งไม่มีชื่อ/เบอร์/อีเมลอยู่แล้ว) ──
+  // ใช้แสดงผลทันทีตอนเปิดหน้าซ้ำ แล้วโหลดข้อมูลใหม่จากเซิร์ฟเวอร์เสมอ; ข้อมูลผู้ดูแลไม่ถูกเก็บในเครื่อง
+  const PUB_CACHE_KEY = 'lf_pub_v1';
+  const PUB_CACHE_MAX_AGE_MS = 24 * 3600 * 1000;
+  function savePublicCache(json) {
+    try {
+      localStorage.setItem(PUB_CACHE_KEY, JSON.stringify({ v: 1, savedAt: Date.now(), generatedAt: json.generatedAt, records: json.records }));
+    } catch (e) { /* เต็ม/ถูกปิดกั้น — ข้ามได้ */ }
+  }
+  function cachedPublic() {
+    try {
+      const raw = localStorage.getItem(PUB_CACHE_KEY);
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      if (!o || o.v !== 1 || !Array.isArray(o.records) || !(Date.now() - o.savedAt < PUB_CACHE_MAX_AGE_MS)) {
+        localStorage.removeItem(PUB_CACHE_KEY);
+        return null;
+      }
+      const now = Date.now();
+      return { records: o.records.map(normalize).filter(r => r.type && (!r.dateObj || r.dateObj.getTime() <= now + 60000)),
+               generatedAt: parseDate(o.generatedAt), savedAt: new Date(o.savedAt), fromCache: true };
+    } catch (e) { return null; }
+  }
+  function clearPublicCache() { try { localStorage.removeItem(PUB_CACHE_KEY); } catch (e) {} }
   /** แปลงรายการจาก API เป็นรูปแบบที่หน้าเว็บใช้ */
   function normalize(r) {
     const dateObj = parseDate(r.reportedAt);
@@ -145,6 +170,7 @@
       if (!json || json.success !== true || !Array.isArray(json.records)) {
         throw new Error((json && (json.message || json.error)) || 'โหลดข้อมูลไม่สำเร็จ');
       }
+      if (!opts.admin) savePublicCache(json);
       const now = Date.now();
       const records = json.records.map(normalize).filter(r => r.type && (!r.dateObj || r.dateObj.getTime() <= now + 60000));
       return { records: records, generatedAt: parseDate(json.generatedAt), cache: json.cache, serverMs: json.serverMs,
@@ -195,6 +221,9 @@
     el.hidden = false;
     el.className = 'lf-status lf-status-' + state;
     if (state === 'loading') el.textContent = 'กำลังโหลดข้อมูล…';
+    else if (state === 'cached') {
+      el.textContent = 'แสดงข้อมูลที่โหลดไว้ ณ ' + format(info.generatedAt, { dateStyle: 'medium', timeStyle: 'short' }) + ' น. — กำลังอัปเดตข้อมูลล่าสุด…';
+    }
     else if (state === 'ok') {
       el.textContent = 'ข้อมูล ณ ' + format(info.generatedAt, { dateStyle: 'medium', timeStyle: 'medium' }) + ' น.' +
         (info.stale ? ' (แสดงข้อมูลเดิม — โหลดล่าสุดไม่สำเร็จ)' : '');
@@ -215,7 +244,7 @@
 
   root.LF = {
     API_URL, ZONE, parts, part, wall, bkk, parseDate, todayISO, timeNow, dayKey, format, formatDate, startOfDay, endOfDay,
-    esc, imgUrl, request, post, load, normalize, token, login, logout, whoami, adminCall, clearToken, status,
+    esc, imgUrl, request, post, load, normalize, cachedPublic, clearPublicCache, token, login, logout, whoami, adminCall, clearToken, status,
     requestId, isReturned, isPending
   };
   if (typeof module !== 'undefined') module.exports = root.LF;

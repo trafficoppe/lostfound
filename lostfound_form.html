@@ -639,16 +639,31 @@ let uploadedFiles  = { lost: [], found: [], pickup: [] };
 let isCompressing  = { lost: false, found: false, pickup: false };
 
 // ========= AUTOCOMPLETE =========
+// แสดงคำแนะนำอย่างปลอดภัย: ทุกค่า (รวมค่าจากเซิร์ฟเวอร์และที่เคยพิมพ์ไว้) ถูก escape และส่งค่าผ่าน data-* — ไม่ประกอบเป็นโค้ด HTML/JS
+function acEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function acHighlight(m, q) {
+  const s = String(m), lo = s.toLowerCase(), ql = String(q || '').trim().toLowerCase();
+  if (!ql) return acEsc(s);
+  let out = '', i = 0, j;
+  while ((j = lo.indexOf(ql, i)) >= 0) { out += acEsc(s.slice(i, j)) + '<mark>' + acEsc(s.slice(j, j + ql.length)) + '</mark>'; i = j + ql.length; }
+  return out + acEsc(s.slice(i));
+}
+function acItem(listId, value, labelHtml, memKey) {
+  return '<div class="ac-item" data-list="' + acEsc(listId) + '" data-value="' + acEsc(value) + '"' + (memKey ? ' data-mem="' + acEsc(memKey) + '"' : '') + '>' + labelHtml + '</div>';
+}
+document.addEventListener('click', e => {
+  const it = e.target && e.target.closest ? e.target.closest('.ac-item[data-value]') : null;
+  if (!it) return;
+  if (it.dataset.mem && typeof pickAcMemory === 'function') pickAcMemory(it.dataset.list, it.dataset.value, it.dataset.mem);
+  else pickAc(it.dataset.list, it.dataset.value);
+});
 function acSearch(q, listId, dataKey) {
   const list = document.getElementById(listId);
   const data = dataKey === 'DEPTS' ? DEPTS : PLACES;
   if (!q.trim()) { list.classList.remove('show'); return; }
   const matches = data.filter(d => d.toLowerCase().includes(q.toLowerCase()));
   if (!matches.length) { list.classList.remove('show'); return; }
-  list.innerHTML = matches.slice(0, 8).map(m => {
-    const hi = m.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark>$1</mark>');
-    return `<div class="ac-item" onclick="pickAc('${listId}','${m}')">${hi}</div>`;
-  }).join('');
+  list.innerHTML = matches.slice(0, 8).map(m => acItem(listId, m, acHighlight(m, q))).join('');
   list.classList.add('show');
 }
 function pickAc(listId, val) {
@@ -694,9 +709,7 @@ function acSearchMemory(q, listId, dataKey, memKey) {
     // ถ้ายังไม่ได้พิมพ์ → แสดง memory ที่เคยกรอก
     if (memory.length > 0) {
       list.innerHTML = '<div style="padding:8px 14px;font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.5px;">🕐 เคยกรอกมาก่อน</div>' +
-        memory.slice(0, 5).map(m =>
-          `<div class="ac-item" onclick="pickAcMemory('${listId}','${m.replace(/'/g,"\'")}','${memKey}')">${m}</div>`
-        ).join('');
+        memory.slice(0, 5).map(m => acItem(listId, m, acEsc(m), memKey)).join('');
       list.classList.add('show');
     } else {
       list.classList.remove('show');
@@ -712,12 +725,7 @@ function acSearchMemory(q, listId, dataKey, memKey) {
 
   if (!matches.length) { list.classList.remove('show'); return; }
 
-  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
-  list.innerHTML = matches.slice(0, 8).map((m, i) => {
-    const hi = m.replace(re, '<mark>$1</mark>');
-    const isMem = i < fromMem.length;
-    return `<div class="ac-item" onclick="pickAcMemory('${listId}','${m.replace(/'/g,"\'")}','${memKey}')">${isMem ? '🕐 ' : ''}${hi}</div>`;
-  }).join('');
+  list.innerHTML = matches.slice(0, 8).map((m, i) => acItem(listId, m, (i < fromMem.length ? '🕐 ' : '') + acHighlight(m, q), memKey)).join('');
   list.classList.add('show');
 }
 
@@ -1093,7 +1101,8 @@ async function _submitFormInner() {
     sessionStorage.removeItem('lf_mem_dept_th');
     sessionStorage.removeItem('lf_mem_loc_th');
   } catch(e) {}
-  const imgWarn = result.imagesFailed > 0 ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่แนบรูปไม่สำเร็จ ' + result.imagesFailed + ' ไฟล์ — กรุณาส่งรูปให้เจ้าหน้าที่พร้อมแจ้งเลขอ้างอิง' : '';
+  const imgWarn = (result.imagesFailed > 0 ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่แนบรูปไม่สำเร็จ ' + result.imagesFailed + ' ไฟล์ — กรุณาส่งรูปให้เจ้าหน้าที่พร้อมแจ้งเลขอ้างอิง' : '') +
+    (result.notify === 'queue_failed' ? '<br><br>⚠️ บันทึกข้อมูลแล้ว แต่ระบบยังแจ้งเจ้าหน้าที่อัตโนมัติไม่สำเร็จ (ระบบจะลองใหม่ภายใน 30 นาที) — หากเร่งด่วนกรุณาโทรแจ้งพร้อมเลขอ้างอิง' : '');
 
   const icons = { lost:'📋', found:'✅', pickup:'🎉' };
   const titles = { lost:'แจ้งของหายสำเร็จ', found:'แจ้งพบของสำเร็จ ขอบคุณ! 🙏', pickup:'บันทึกการรับของคืนแล้ว' };

@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard | Lost & Found มหาวิทยาลัยมหิดล</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -410,7 +412,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);}
   </div>
 </div>
 
-<script src="assets/lf-data.js"></script>
+<script src="assets/lf-data.js?v=2.1.1"></script>
 <script>
 /* =====================================================
  * Lost & Found Web App — dashboard.html  v1.3.1
@@ -447,15 +449,25 @@ async function doLogin() {
     btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
   }
 }
-function showDashboard() {
+function showDashboard(opts) {
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
-  loadDashboard(false); startAutoRefresh();
+  loadDashboard(false, opts); startAutoRefresh();
+}
+function showLogin() {
+  clearInterval(refreshInterval);
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-wrap').style.display = '';
 }
 async function logout() { await LF.logout(); location.reload(); }
 
-window.onload = async () => {
-  if (LF.token() && await LF.whoami()) showDashboard();
+// เริ่มทันทีที่สคริปต์ทำงาน (ไม่รอ window.onload) และไม่เรียก adminWhoAmI ก่อน:
+// adminGetData ตรวจ token ที่เซิร์ฟเวอร์อยู่แล้ว — ถ้า token หมดอายุจะได้ 401 แล้วกลับไปหน้าล็อกอินเงียบ ๆ
+// (ลดการรอเซิร์ฟเวอร์ 1 รอบ ~2.5 วินาทีทุกครั้งที่เปิดหน้า)
+async function lfDashInit() {
+  if (lfDashInit.done) return;
+  lfDashInit.done = true;
+  if (LF.token()) showDashboard({ quietAuth: true });
   const yr = LF.part(new Date(), 'year');
   ['p-monthly-year','p-yearly-year'].forEach(id => {
     const sel = document.getElementById(id);
@@ -465,7 +477,9 @@ window.onload = async () => {
   document.getElementById('p-custom-from').value = LF.todayISO();
   document.getElementById('p-custom-to').value   = LF.todayISO();
   document.getElementById('p-monthly-month').value = LF.part(new Date(), 'month');
-};
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lfDashInit);
+else lfDashInit();
 
 // v1.3.1: วัตถุประสงค์ อื่นๆ
 function onPurposeChange() {
@@ -535,7 +549,7 @@ let refreshInterval = null, dashLoaded = false;
 function startAutoRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(() => loadDashboard(false), 300000); }
 async function manualRefresh() { await loadDashboard(true); }
 
-async function loadDashboard(force) {
+async function loadDashboard(force, opts) {
   LF.status('lf-status', 'loading');
   try {
     const res = await LF.load({ admin: true, force: !!force });
@@ -547,6 +561,7 @@ async function loadDashboard(force) {
     loadMemoryStats();
   } catch (e) {
     console.error(e);
+    if (e.code === 401 && opts && opts.quietAuth) { showLogin(); return; }
     if (e.code === 401) { alert('สิทธิ์หมดอายุ กรุณาเข้าสู่ระบบใหม่'); location.reload(); return; }
     LF.status('lf-status', 'error', { message: e.message, hasData: dashLoaded });
     if (!dashLoaded) ['kpi-total','kpi-lost','kpi-found','kpi-pickup','kpi-rate'].forEach(id => document.getElementById(id).textContent = '–');

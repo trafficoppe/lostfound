@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- หน้านี้ไม่ติดต่อเครือข่ายเลย: ห้ามโหลดหรือส่งข้อมูลใด ๆ ออกไป -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>สร้างค่ารหัสผู้ดูแล Lost &amp; Found (ใช้ในเครื่อง)</title>
+<style>
+  :root { --bg:#fff; --fg:#1d1d1f; --muted:#5f6368; --line:#d0d4da; --accent:#1a5fb4; --warn:#9a5b00; --bad:#b3261e; --box:#f5f7fa; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16181c; --fg:#e8eaed; --muted:#a8adb5; --line:#3a3f47; --accent:#8ab4f8; --warn:#f2b45a; --bad:#f28b82; --box:#1f2228; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, "Sarabun", "Noto Sans Thai", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  label { display: block; font-weight: 600; margin: 16px 0 6px; }
+  input[type=text], input[type=password] { width: 100%; padding: 10px 12px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+  button { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--box); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+  #msg { margin-top: 14px; min-height: 1.6em; }
+  .bad { color: var(--bad); } .warn { color: var(--warn); }
+  pre { background: var(--box); border: 1px solid var(--line); border-radius: 8px; padding: 12px; white-space: pre-wrap; word-break: break-all; font-size: .85rem; }
+  ol { padding-left: 1.2em; } li { margin: 4px 0; }
+  .note { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>สร้างค่ารหัสผู้ดูแล (ใช้ในเครื่องนี้เท่านั้น)</h1>
+  <p class="lead">หน้านี้คำนวณในเบราว์เซอร์ ไม่ส่งรหัสผ่านไปที่ใด ไม่บันทึกลงไฟล์ — ปิดหน้านี้เมื่อเสร็จ</p>
+
+  <label for="user">ชื่อผู้ใช้</label>
+  <input id="user" type="text" value="admin01" autocomplete="off" spellcheck="false">
+
+  <label for="pw1">รหัสผ่านใหม่ (อย่างน้อย 12 ตัว)</label>
+  <input id="pw1" type="password" autocomplete="new-password">
+
+  <label for="pw2">ยืนยันรหัสผ่าน</label>
+  <input id="pw2" type="password" autocomplete="new-password">
+
+  <div class="row">
+    <button id="go" class="primary" type="button">สร้างค่า</button>
+    <button id="copy" type="button" disabled>คัดลอกบรรทัดผลลัพธ์</button>
+    <button id="clear" type="button">ล้างทั้งหมด</button>
+  </div>
+  <div id="msg" role="status"></div>
+  <pre id="out" hidden></pre>
+
+  <ol class="note">
+    <li>เปิดโปรเจกต์ Apps Script <b>ระบบจริง</b> › ไฟล์ <code>config.private.gs</code></li>
+    <li>ในส่วน <code>admins:</code> แทนรายการของชื่อผู้ใช้นี้ (ค่า <code>salt</code>, <code>hash</code>, <code>iterations</code>) ด้วยบรรทัดผลลัพธ์ด้านบน › 💾 บันทึก</li>
+    <li>รหัสใหม่ใช้ได้หลัง <b>Deploy</b> deployment เดิมเป็น New version เท่านั้น (web app ใช้ config ของรุ่นที่ deploy) — แนะนำให้ทำพร้อมขั้น Save Head ของการเผยแพร่ v2.1.1 แล้ว Deploy ครั้งเดียว จากนั้นทดลองล็อกอินที่หน้า Dashboard</li>
+    <li>ถ้าย้อนกลับไป deployment รุ่นเดิม รหัสเดิมจะกลับมาใช้ได้ — ต้องเปลี่ยนซ้ำหลังย้อนกลับ</li>
+    <li>ห้ามวางบรรทัดผลลัพธ์หรือรหัสผ่านในแชท อีเมล GitHub หรือเอกสารส่งต่อ</li>
+  </ol>
+</main>
+<script>
+'use strict';
+const ITER = 3000;   // ต้องตรงกับค่าที่ระบบใช้ (ค่าเริ่มต้นของเครื่องมือเดิม)
+const hex = buf => Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+// อัลกอริทึมเดียวกับ lfHashPassword_ ใน apps-script/lf_gas.gs: state = salt; วน state = sha256hex(state + ':' + password)
+async function lfMakeHash(password, salt, iterations) {
+  const enc = new TextEncoder();
+  let state = String(salt);
+  for (let i = 0; i < iterations; i++) state = hex(await crypto.subtle.digest('SHA-256', enc.encode(state + ':' + password)));
+  return state;
+}
+window.lfMakeHash = lfMakeHash;
+
+const $ = id => document.getElementById(id);
+const say = (t, cls) => { $('msg').textContent = t; $('msg').className = cls || ''; };
+let line = '';
+
+$('go').addEventListener('click', async () => {
+  const user = $('user').value.trim().toLowerCase();
+  const p1 = $('pw1').value, p2 = $('pw2').value;
+  $('out').hidden = true; $('copy').disabled = true; line = '';
+  if (!/^[a-z0-9_]{3,32}$/.test(user)) return say('ชื่อผู้ใช้ต้องเป็น a–z, 0–9 หรือ _ ยาว 3–32 ตัว', 'bad');
+  if (p1 !== p2) return say('รหัสผ่านสองช่องไม่ตรงกัน', 'bad');
+  if (p1 !== p1.trim()) return say('รหัสผ่านมีช่องว่างหน้า/หลัง — กรุณาตรวจอีกครั้ง', 'bad');
+  if (p1.length < 12) return say('รหัสผ่านสั้นเกินไป (' + p1.length + ' ตัว) — ต้องอย่างน้อย 12 ตัว', 'bad');
+  if (!window.crypto || !crypto.subtle) return say('เบราว์เซอร์นี้คำนวณไม่ได้ — เปิดไฟล์นี้ด้วย Chrome หรือ Edge', 'bad');
+  say('กำลังคำนวณ…');
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await lfMakeHash(p1, salt, ITER);
+  $('pw1').value = ''; $('pw2').value = '';
+  line = "    " + user + ": { salt: '" + salt + "', hash: '" + hash + "', iterations: " + ITER + " },";
+  $('out').textContent = line; $('out').hidden = false; $('copy').disabled = false;
+  say(/^\d+$/.test(p1) ? 'สร้างแล้ว — คำเตือน: รหัสผ่านเป็นตัวเลขล้วน เดาได้ง่ายกว่าแบบผสมตัวอักษร' : 'สร้างแล้ว — ล้างช่องรหัสผ่านให้แล้ว', /^\d+$/.test(p1) ? 'warn' : '');
+});
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(line); say('คัดลอกแล้ว — วางใน config.private.gs ของระบบจริงเท่านั้น'); }
+  catch (e) { say('คัดลอกอัตโนมัติไม่ได้ — เลือกข้อความในกรอบแล้วกด Ctrl+C', 'warn'); }
+});
+$('clear').addEventListener('click', () => {
+  ['pw1', 'pw2'].forEach(id => $(id).value = ''); line = '';
+  $('out').textContent = ''; $('out').hidden = true; $('copy').disabled = true; say('ล้างแล้ว');
+});
+</script>
+</body>
+</html>

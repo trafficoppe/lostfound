@@ -4,6 +4,7 @@
  *  - ใช้ API getPublicData (ไม่มีชื่อ/เบอร์โทรผู้แจ้ง)
  *  - เวลาแสดงตาม Asia/Bangkok, ข้อความทุกช่องผ่าน LF.esc()
  *  - โหลดไม่สำเร็จจะแจ้งเตือนและคงรายการเดิมไว้ ไม่แสดงเป็นศูนย์
+ *  - เปิดหน้าซ้ำ: แสดงข้อมูลสาธารณะที่โหลดไว้ (ไม่เกิน 24 ชม.) ทันที พร้อมป้ายเวลา แล้วอัปเดตจากเซิร์ฟเวอร์เสมอ
  * ===================================================== */
 'use strict';
 const ITEMS_PER_PAGE = 20;
@@ -21,8 +22,19 @@ function fmtDate(d) {
 async function loadAll(force) {
   const btn = $('btn-refresh');
   if (btn) btn.disabled = true;
+  let showingCache = false;
+  if (!loaded && !force && typeof LF.cachedPublic === 'function') {
+    const c = LF.cachedPublic();
+    if (c && c.records.length) {
+      allItems = c.records; loaded = true; lastInfo = c; showingCache = true;
+      LF.status('lf-status', 'cached', c);
+      $('update-time').textContent = 'ข้อมูลที่โหลดไว้ ณ ' + LF.format(c.generatedAt, { timeStyle: 'short' }) + ' น. (กำลังอัปเดต)';
+      updateCounts();
+      applyFilters(true);
+    }
+  }
   if (!loaded) $('gallery').innerHTML = '<div class="loading"><div class="spinner"></div>กำลังโหลดข้อมูล...</div>';
-  LF.status('lf-status', 'loading');
+  if (!showingCache) LF.status('lf-status', 'loading');
   try {
     const res = await LF.load({ force: !!force });
     allItems = res.records;
@@ -31,7 +43,7 @@ async function loadAll(force) {
     LF.status('lf-status', 'ok', res);
     $('update-time').textContent = 'ข้อมูล ณ ' + LF.format(res.generatedAt, { timeStyle: 'medium' }) + ' น.';
     updateCounts();
-    applyFilters(true);
+    applyFilters(true);            // คงหน้า/ตัวกรองที่ผู้ใช้เลือกไว้ (รวมกรณีแสดงข้อมูลแคชก่อน)
     if ($('pending-panel').classList.contains('show')) renderPendingList();
   } catch (e) {
     console.error('load error:', e);
@@ -297,7 +309,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.card[data-idx]')) openModal(Number(e.target.dataset.idx));
 });
 
-window.onload = () => {
+// เริ่มโหลดข้อมูลทันทีที่สคริปต์ทำงาน (สคริปต์อยู่ท้าย body — องค์ประกอบในหน้าพร้อมแล้ว)
+// ไม่รอ window.onload ซึ่งรอฟอนต์/รูปภาพโหลดครบก่อน (วัดจริง: API เริ่มช้าไป ~2.5 วินาที)
+function lfStart() {
+  if (lfStart.done) return;
+  lfStart.done = true;
   loadAll(false);
   setInterval(() => loadAll(false), 5 * 60 * 1000);
-};
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lfStart);
+else lfStart();

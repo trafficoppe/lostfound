@@ -15,4 +15,6 @@ const LF_PRIVATE_CONFIG = {
   admins: {
     admin01: { salt: '<random hex>', hash: '<sha256 chain hex>', iterations: 3000 }
   }
+  // ระบบทดสอบเท่านั้น (ระบบจริงไม่ต้องใส่ — จะใช้ชื่อเดิม 'LostFound_Images' และ 'รายงานของหาย/พบ'):
+  // , driveFolderName: 'TEST_LostFound_Images', reportFolderName: 'TEST_รายงานของหาย-พบ'
 };
